@@ -45,7 +45,10 @@ const AdminActivityLogPage = () => {
                 getUsers(),
             ]);
             setLogs(logsData);
-            setUsers(usersData.filter(u => u.role !== 'Client'));
+            // FIX: The UserRole enum does not include 'Client', causing a type error.
+            // Casting `u.role` to string allows the filter to work as intended in case
+            // the database contains user documents with a 'Client' role string.
+            setUsers(usersData.filter(u => (u.role as string) !== 'Client'));
             setLoading(false);
         };
         fetchData();

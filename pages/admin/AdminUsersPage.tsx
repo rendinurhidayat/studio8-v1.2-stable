@@ -125,7 +125,7 @@ const AdminUsersPage = () => {
   const fetchUsers = async () => {
     setLoading(true);
     const data = await getUsers();
-    setUsers(data.filter(u => u.role !== 'Client')); // Filter out clients
+    setUsers(data);
     setLoading(false);
   };
 
@@ -270,7 +270,7 @@ const AdminUsersPage = () => {
               <div>
                   <label className="block text-sm font-medium text-gray-700">Role</label>
                   <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500">
-                      {Object.values(UserRole).filter(role => role !== UserRole.Client).map(role => (
+                      {Object.values(UserRole).map(role => (
                         <option key={role} value={role}>{role}</option>
                       ))}
                   </select>

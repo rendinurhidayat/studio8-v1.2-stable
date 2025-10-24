@@ -29,7 +29,6 @@ export enum UserRole {
   Desain = 'Desain',
   AnakMagang = 'Anak Magang',
   AnakPKL = 'Anak PKL',
-  Client = 'Client',
 }
 
 export enum PaymentStatus {
