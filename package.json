@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "A comprehensive, full-stack web system for managing Studio 8, a photo studio.",
+  "type": "module",
   "scripts": {
     "start": "vite",
     "dev": "vite",
@@ -11,7 +12,7 @@
     "deploy": "npm run build && firebase deploy"
   },
   "dependencies": {
-    "@google/genai": "^1.27.0",
+    "@google/genai": "^0.11.0",
     "date-fns": "^2.30.0",
     "firebase": "^9.23.0",
     "framer-motion": "^11.2.4",
@@ -24,14 +25,14 @@
     "react-router-dom": "^6.23.0",
     "recharts": "^2.12.7"
   },
-  "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-big-calendar": "^1.8.9",
-    "@types/react-dom": "^18.2.0",
-    "@vercel/node": "^3.1.7",
-    "tailwindcss": "^3.4.3",
-    "typescript": "^5.4.5",
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.3.1"
+    "devDependencies": {
+      "@types/react": "^18.2.0",
+      "@types/react-big-calendar": "^1.8.9",
+      "@types/react-dom": "^18.2.0",
+      "@vercel/node": "^3.1.7",
+      "tailwindcss": "^3.4.3",
+      "typescript": "^5.4.5",
+      "@vitejs/plugin-react": "^4.3.1",
+      "vite": "^5.3.1"
+    }
   }
-}
