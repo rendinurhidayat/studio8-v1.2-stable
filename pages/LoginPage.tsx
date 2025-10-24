@@ -13,7 +13,7 @@ const LoginPage = () => {
   const [apiError, setApiError] = useState('');
   const [errors, setErrors] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
-  const { login, loginWithGoogle, user } = useAuth();
+  const { login, loginWithGoogle, user, error: authError, clearError } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const role = searchParams.get('role');
@@ -22,7 +22,17 @@ const LoginPage = () => {
     if (!role || (role !== UserRole.Admin && role !== UserRole.Staff)) {
         navigate('/auth');
     }
-  }, [role, navigate]);
+    // Clear any auth errors when component mounts or role changes
+    clearError();
+  }, [role, navigate, clearError]);
+  
+  useEffect(() => {
+    if (authError) {
+      setApiError(authError);
+      setIsLoading(false); // Stop loading if context reports an error
+    }
+  }, [authError]);
+
 
   const validateField = (field: 'username' | 'password', value: string) => {
     let message = '';
@@ -50,8 +60,6 @@ const LoginPage = () => {
     setIsLoading(true);
     try {
         await login(username, password);
-        // Jika berhasil, onAuthStateChanged di AuthContext akan menangani
-        // pengambilan data user dan navigasi akan ditangani oleh redirect di bawah.
     } catch (error: any) {
         console.error("Login Gagal:", error);
         let errorMessage = 'Terjadi kesalahan saat mencoba masuk.';
@@ -79,7 +87,6 @@ const LoginPage = () => {
         setApiError(errorMessage);
         setIsLoading(false);
     }
-    // Tidak perlu setIsLoading(false) di sini jika berhasil, karena komponen akan di-unmount.
   };
   
   const handleGoogleLogin = async () => {
@@ -87,10 +94,6 @@ const LoginPage = () => {
     setIsLoading(true);
     try {
       await loginWithGoogle();
-      // On success, the onAuthStateChanged listener in AuthContext will trigger a state
-      // update, and the redirect logic below will navigate to the correct dashboard.
-      // If the Google user is not in Firestore, the listener will sign them out,
-      // and the page will remain without redirecting.
     } catch (error: any) {
       console.error("Google Login Failed:", error);
       let errorMessage = 'Gagal masuk dengan Google. Pastikan akun Anda sudah terdaftar oleh admin.';
@@ -101,25 +104,20 @@ const LoginPage = () => {
         errorMessage = 'Akun dengan email ini sudah ada, coba login dengan metode lain.';
       }
       setApiError(errorMessage);
-    } finally {
-      // This will run both after a successful login attempt and after an error.
-      // If login is truly successful, the component will unmount due to redirection.
-      // If the user is not in Firestore, they get signed out, and this ensures
-      // the loading spinner stops, preventing a stuck UI.
       setIsLoading(false);
     }
+    // Don't set isLoading to false here in the finally block anymore,
+    // because the AuthContext's isLoading state is the source of truth
+    // during the auth state change process. The useEffect for authError
+    // will handle it if something goes wrong.
   };
   
-  // Jika user sudah login (setelah onAuthStateChanged berjalan), redirect ke dashboard yang sesuai
   if (user) {
-      // Periksa apakah peran user cocok dengan yang diminta di URL
       if (user.role === role) {
         const dashboardPath = user.role === UserRole.Admin ? '/admin/dashboard' : '/staff/dashboard';
         return <Navigate to={dashboardPath} />;
       } else {
-        // Jika peran tidak cocok, tampilkan pesan error. Logika logout tidak lagi diperlukan di sini.
-        // PrivateRoute akan menangani redirect jika user mencoba akses halaman yang tidak semestinya.
-         if (!apiError) { // Hanya set error jika belum ada
+         if (!apiError) {
             setApiError(`Akun ini terdaftar sebagai ${user.role}, bukan ${role}. Silakan logout dan coba lagi.`);
         }
       }
