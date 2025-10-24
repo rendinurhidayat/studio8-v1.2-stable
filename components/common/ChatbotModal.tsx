@@ -30,7 +30,6 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
     const [isLoading, setIsLoading] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [showFaqs, setShowFaqs] = useState(true);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -51,7 +50,6 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
     const sendMessage = async (messageText: string) => {
         if (!messageText.trim() || isLoading) return;
         
-        setShowFaqs(false);
         setError(null);
         setIsLoading(true);
 
@@ -162,32 +160,25 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
                     <div ref={chatEndRef} />
                 </div>
                 
-                <AnimatePresence>
-                    {showFaqs && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="pt-3 mt-3 border-t border-slate-200"
-                        >
-                            <div className="flex items-center gap-2 text-sm text-slate-600 mb-2 px-1">
-                                <Zap size={16} />
-                                <h4 className="font-semibold">Saran Pertanyaan</h4>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {faqQuestions.map((q, i) => (
-                                    <button 
-                                        key={i} 
-                                        onClick={() => handleFaqClick(q)}
-                                        className="w-full text-left text-sm p-3 bg-white border rounded-lg hover:bg-slate-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                    >
-                                        {q}
-                                    </button>
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                <div
+                    className="pt-3 mt-3 border-t border-slate-200"
+                >
+                    <div className="flex items-center gap-2 text-sm text-slate-600 mb-2 px-1">
+                        <Zap size={16} />
+                        <h4 className="font-semibold">Saran Pertanyaan</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {faqQuestions.map((q, i) => (
+                            <button 
+                                key={i} 
+                                onClick={() => handleFaqClick(q)}
+                                className="w-full text-left text-sm p-3 bg-white border rounded-lg hover:bg-slate-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            >
+                                {q}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
                 <div className="mt-4 flex items-center gap-2">
                     <input

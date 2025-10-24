@@ -322,22 +322,17 @@ export const getPackages = async (): Promise<Package[]> => {
     return snapshot.docs.map(doc => fromFirestore<Package>(doc));
 };
 
-export const addPackage = async (pkg: Omit<Package, 'id' | 'subPackages'>, currentUserId: string): Promise<Package> => {
-    const docRef = db.collection('packages').doc();
-    const dataToAdd: Omit<Package, 'id'> = { ...pkg, subPackages: [] };
-    
-    await docRef.set(dataToAdd);
-    await logActivity(currentUserId, `Menambah paket baru: ${dataToAdd.name}`);
-    
-    return { ...dataToAdd, id: docRef.id };
+export const addPackage = async (pkg: Omit<Package, 'id'>, currentUserId: string): Promise<Package> => {
+    const docRef = await db.collection('packages').add(pkg);
+    await logActivity(currentUserId, `Menambah paket baru: ${pkg.name}`);
+    const doc = await docRef.get();
+    return fromFirestore<Package>(doc);
 };
 
-export const updatePackage = async (packageId: string, updatedData: Partial<Package>, currentUserId: string): Promise<Package> => {
+export const updatePackage = async (packageId: string, updatedData: Partial<Omit<Package, 'id'>>, currentUserId: string): Promise<Package> => {
     const packageRef = db.collection('packages').doc(packageId);
-
     await packageRef.update(updatedData);
-    const oldDoc = await packageRef.get(); // Get after update to get the name for logging
-    await logActivity(currentUserId, `Mengubah paket ${updatedData.name || oldDoc.data()?.name}`);
+    await logActivity(currentUserId, `Mengubah paket ${updatedData.name}`);
     const doc = await packageRef.get();
     return fromFirestore<Package>(doc);
 };

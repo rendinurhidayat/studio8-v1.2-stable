@@ -30,6 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             folder: folder,
             public_id: publicId, // Optional public_id for consistent naming
             resource_type: "auto",
+            overwrite: true, // Overwrite if public_id already exists
         });
 
         if (!uploadResult?.secure_url) {

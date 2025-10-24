@@ -193,7 +193,7 @@ const FeedbackPage: React.FC = () => {
                         >
                             <CheckCircle className="w-16 h-16 mx-auto text-green-500"/>
                             <h2 className="mt-4 text-3xl font-bold text-[#0a1d37]">Terima kasih atas feedback-nya! 🥰</h2>
-                            <p className="mt-2 text-gray-600">Ulasan Anda membantu kami tumbuh lebih baik.</p>
+                            <p className="mt-2 text-gray-600">Ulasan Anda membantu kami tumbuh lebih baik. Anda akan diarahkan kembali...</p>
                         </motion.div>
                     )}
                 </AnimatePresence>
