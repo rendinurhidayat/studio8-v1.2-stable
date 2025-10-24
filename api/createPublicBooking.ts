@@ -1,8 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
-// use require + any to avoid compile-time missing type errors for the cloudinary package
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const cloudinary: any = require('cloudinary').v2;
+import { v2 as cloudinary } from 'cloudinary';
 
 export const config = {
     api: {
@@ -50,7 +48,7 @@ const fromFirestore = <T extends { id: string }>(doc: admin.firestore.DocumentSn
     return { id: doc.id, ...doc.data() } as T;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method not allowed" });
     }
@@ -82,6 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const generateReferralCode = (): string => `S8REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
         const formData = req.body;
+        console.log("Received raw name from form:", formData.name);
 
         // --- 1. Handle Payment Proof Upload to Cloudinary ---
         let paymentProofUrl = '';
@@ -99,12 +98,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const safeFileName =
                 (formData.name && String(formData.name).replace(/[\/\\]+/g, "_").replace(/[^\w.-]/g, "_")) ||
                 `proof_${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            console.log("Sanitized filename:", safeFileName);
+
+            const publicId = safeFileName.split(".")[0];
+            console.log(`Attempting to upload to Cloudinary with public_id: '${publicId}'`);
 
             try {
-                console.log(`Uploading to Cloudinary with public_id base: ${safeFileName}`);
                 const uploadResult = await cloudinary.uploader.upload(dataUrl, {
                     folder: "studio8_uploads",
-                    public_id: safeFileName.split(".")[0], // Use sanitized name without extension
+                    public_id: publicId,
                     resource_type: "auto",
                     upload_preset: "studio8_proofs",
                 });
@@ -118,7 +120,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 console.log("✅ Cloudinary upload successful:", paymentProofUrl);
 
             } catch (uploadError: any) {
-                console.error("Cloudinary Upload Error:", uploadError);
+                console.error("Full Cloudinary Upload Error Object:", JSON.stringify(uploadError, null, 2));
                 const message = uploadError.error?.message || uploadError.message || 'Gagal mengunggah bukti pembayaran ke Cloudinary.';
                 throw new Error(message);
             }
