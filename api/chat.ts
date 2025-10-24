@@ -64,7 +64,6 @@ export default async function handler(req: Request) {
 
         const latestMessage = history[history.length - 1]?.parts[0]?.text || '';
         
-        // FIX: Corrected the call to pass the message as an object with a 'message' property.
         const result = await chat.sendMessageStream({ message: latestMessage });
         
         const stream = new ReadableStream({
@@ -83,9 +82,9 @@ export default async function handler(req: Request) {
 
     } catch (error: any) {
         console.error('API Error in chat.ts:', error);
-            return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
+        return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
+}
