@@ -29,7 +29,13 @@ const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
+        reader.onload = () => {
+             if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error('FileReader result is not a string'));
+            }
+        };
         reader.onerror = error => reject(error);
     });
 };
@@ -262,11 +268,12 @@ const ServicesSettingsTab = () => {
                 return; 
             }
         } else if (!imagePreview && itemData?.imageUrl) {
+            // This handles the case where the user removes the image
             imageUrl = '';
         }
     
         if (type === 'package') {
-            const packagePayload: Omit<Package, 'id' | 'subPackages'> = {
+            const packagePayload = {
                 name: formData.name,
                 description: formData.description,
                 type: formData.type as 'Studio' | 'Outdoor',
@@ -275,7 +282,7 @@ const ServicesSettingsTab = () => {
             };
     
             if (mode === 'add') {
-                await addPackage(packagePayload, currentUser.id);
+                await addPackage({ ...packagePayload, subPackages: [] }, currentUser.id);
             } else if (itemData) {
                 await updatePackage(itemData.id, packagePayload, currentUser.id);
             }
