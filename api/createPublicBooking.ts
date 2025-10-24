@@ -1,6 +1,16 @@
-
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import admin from 'firebase-admin';
+// use require + any to avoid compile-time missing type errors for the cloudinary package
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const cloudinary: any = require('cloudinary').v2;
+
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: "10mb",
+        },
+    },
+};
 
 // --- Type Duplication (necessary for serverless environment) ---
 enum BookingStatus { Pending = 'Pending' }
@@ -40,9 +50,9 @@ const fromFirestore = <T extends { id: string }>(doc: admin.firestore.DocumentSn
     return { id: doc.id, ...doc.data() } as T;
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method Not Allowed' });
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    if (req.method !== "POST") {
+        return res.status(405).json({ error: "Method not allowed" });
     }
 
     try {
@@ -71,57 +81,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         const generateReferralCode = (): string => `S8REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-
         const formData = req.body;
 
         // --- 1. Handle Payment Proof Upload to Cloudinary ---
         let paymentProofUrl = '';
         if (formData.paymentProofBase64) {
-            const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-            const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
-
-            if (!cloudName || !uploadPreset) {
-                console.error("Cloudinary environment variables (CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET) are not set.");
-                throw new Error('Konfigurasi Cloudinary tidak ditemukan di environment variables.');
-            }
+             cloudinary.config({
+                cloud_name: process.env.CLOUDINARY_NAME,
+                api_key: process.env.CLOUDINARY_KEY,
+                api_secret: process.env.CLOUDINARY_SECRET,
+            });
 
             const { base64, mimeType } = formData.paymentProofBase64;
             const dataUrl = `data:${mimeType};base64,${base64}`;
             
-            // 🔒 Sanitize filename based on client name or a fallback to prevent Cloudinary errors
-            const safeFileNameBase = (formData.name && String(formData.name).replace(/[\/\\]+/g, "_").replace(/[^\w.-]/g, "_")) || `proof_${Date.now()}`;
-            
-            // Add a random suffix to ensure uniqueness and construct the final public_id
-            const publicId = `${safeFileNameBase}-${Math.random().toString(36).substring(2, 8)}`;
-            
-            console.log(`Uploading to Cloudinary with public_id: ${publicId}`);
-            const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    file: dataUrl,
-                    upload_preset: uploadPreset,
-                    folder: "studio8_uploads", // Specify upload folder
-                    public_id: publicId,       // Provide the sanitized and unique public_id
-                }),
-            });
+            // 🔒 Sanitize filename to prevent Cloudinary errors
+            const safeFileName =
+                (formData.name && String(formData.name).replace(/[\/\\]+/g, "_").replace(/[^\w.-]/g, "_")) ||
+                `proof_${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
-            if (!cloudinaryRes.ok) {
-                const errorData = await cloudinaryRes.json();
-                console.error("Cloudinary Upload Error:", errorData);
-                const errorMessage = errorData?.error?.message || 'Gagal mengunggah bukti pembayaran ke Cloudinary.';
-                throw new Error(`Cloudinary Error: ${errorMessage}`);
+            try {
+                console.log(`Uploading to Cloudinary with public_id base: ${safeFileName}`);
+                const uploadResult = await cloudinary.uploader.upload(dataUrl, {
+                    folder: "studio8_uploads",
+                    public_id: safeFileName.split(".")[0], // Use sanitized name without extension
+                    resource_type: "auto",
+                    upload_preset: "studio8_proofs",
+                });
+
+                if (!uploadResult?.secure_url) {
+                    console.error("Cloudinary upload successful but returned no secure_url:", uploadResult);
+                    throw new Error("Cloudinary gagal memberikan URL yang aman setelah upload.");
+                }
+                
+                paymentProofUrl = uploadResult.secure_url;
+                console.log("✅ Cloudinary upload successful:", paymentProofUrl);
+
+            } catch (uploadError: any) {
+                console.error("Cloudinary Upload Error:", uploadError);
+                const message = uploadError.error?.message || uploadError.message || 'Gagal mengunggah bukti pembayaran ke Cloudinary.';
+                throw new Error(message);
             }
-
-            const cloudinaryData = await cloudinaryRes.json();
-
-            if (!cloudinaryData.secure_url) {
-                console.error("Cloudinary upload successful but returned no secure_url:", cloudinaryData);
-                throw new Error("Cloudinary gagal memberikan URL yang aman setelah upload.");
-            }
-            
-            paymentProofUrl = cloudinaryData.secure_url;
-            console.log(`Cloudinary upload successful. URL: ${paymentProofUrl}`);
         }
 
         // --- 2. Re-fetch data for server-side validation & calculation ---
@@ -219,10 +219,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
     } catch (error: any) {
-        console.error('API Error in createPublicBooking:', error);
+        console.error("API Error in createPublicBooking:", error);
         return res.status(500).json({
             success: false,
-            message: 'Gagal membuat booking.',
+            message: "Gagal membuat booking.",
             error: error.message || String(error),
         });
     }
