@@ -8,29 +8,6 @@ type Timestamp = firebase.firestore.Timestamp;
 
 // --- Helper Functions ---
 
-const uploadImage = async (file: File, path: string, fileName: string): Promise<string> => {
-    const fileRef = storage.ref(`${path}/${fileName}`);
-    const snapshot = await fileRef.put(file);
-    return snapshot.ref.getDownloadURL();
-};
-
-const deleteImage = async (imageUrl: string): Promise<void> => {
-    if (!imageUrl || !imageUrl.startsWith('https://firebasestorage.googleapis.com')) {
-        console.warn("Invalid or non-Firebase Storage URL, skipping delete:", imageUrl);
-        return;
-    }
-    try {
-        const imageRef = storage.refFromURL(imageUrl);
-        await imageRef.delete();
-    } catch (error: any) {
-        if (error.code === 'storage/object-not-found') {
-            console.warn(`Image not found in storage, skipping delete: ${imageUrl}`);
-        } else {
-            console.error("Error deleting image from storage:", error);
-        }
-    }
-};
-
 // --- Data Transformation Helpers ---
 const fromFirestore = <T>(doc: firebase.firestore.DocumentSnapshot, dateFields: string[] = []): T => {
     const data = { id: doc.id, ...doc.data() } as any;
@@ -345,46 +322,22 @@ export const getPackages = async (): Promise<Package[]> => {
     return snapshot.docs.map(doc => fromFirestore<Package>(doc));
 };
 
-export const addPackage = async (pkg: Omit<Package, 'id' | 'subPackages' | 'imageUrl'>, imageFile: File | null, currentUserId: string): Promise<Package> => {
-    // 1. Create a document reference first to get a unique ID.
+export const addPackage = async (pkg: Omit<Package, 'id' | 'subPackages'>, currentUserId: string): Promise<Package> => {
     const docRef = db.collection('packages').doc();
-    const dataToAdd: Omit<Package, 'id'> = { ...pkg, imageUrl: '', subPackages: [] };
-
-    // 2. If there's an image, upload it using the unique ID as the filename.
-    if (imageFile) {
-        const fileName = `package_${docRef.id}`;
-        dataToAdd.imageUrl = await uploadImage(imageFile, 'package_images', fileName);
-    }
+    const dataToAdd: Omit<Package, 'id'> = { ...pkg, subPackages: [] };
     
-    // 3. Set the data for the new document.
     await docRef.set(dataToAdd);
     await logActivity(currentUserId, `Menambah paket baru: ${dataToAdd.name}`);
     
     return { ...dataToAdd, id: docRef.id };
 };
 
-export const updatePackage = async (packageId: string, updatedData: Partial<Package>, imageFile: File | null, currentUserId: string): Promise<Package> => {
+export const updatePackage = async (packageId: string, updatedData: Partial<Package>, currentUserId: string): Promise<Package> => {
     const packageRef = db.collection('packages').doc(packageId);
-    const oldDoc = await packageRef.get();
-    const oldImageUrl = oldDoc.exists ? oldDoc.data()?.imageUrl : undefined;
 
-    const dataToUpdate = { ...updatedData }; // Create a mutable copy
-
-    if (imageFile) { // New image is uploaded
-        if (oldImageUrl) {
-            await deleteImage(oldImageUrl); // Delete old image to save space
-        }
-        // Use the packageId for a consistent filename
-        const fileName = `package_${packageId}`;
-        dataToUpdate.imageUrl = await uploadImage(imageFile, 'package_images', fileName);
-    } else if ('imageUrl' in dataToUpdate && dataToUpdate.imageUrl === '') { // Image is being removed
-        if (oldImageUrl) {
-            await deleteImage(oldImageUrl);
-        }
-    }
-
-    await packageRef.update(dataToUpdate);
-    await logActivity(currentUserId, `Mengubah paket ${dataToUpdate.name || oldDoc.data()?.name}`);
+    await packageRef.update(updatedData);
+    const oldDoc = await packageRef.get(); // Get after update to get the name for logging
+    await logActivity(currentUserId, `Mengubah paket ${updatedData.name || oldDoc.data()?.name}`);
     const doc = await packageRef.get();
     return fromFirestore<Package>(doc);
 };
@@ -392,9 +345,7 @@ export const updatePackage = async (packageId: string, updatedData: Partial<Pack
 export const deletePackage = async (packageId: string, currentUserId: string): Promise<void> => {
     const docRef = db.collection('packages').doc(packageId);
     const doc = await docRef.get();
-    if (doc.exists && doc.data()?.imageUrl) {
-        await deleteImage(doc.data()!.imageUrl);
-    }
+    // Note: Deleting from Cloudinary would require a separate backend function call
     await docRef.delete();
     await logActivity(currentUserId, `Menghapus paket: ${doc.data()?.name}`);
 };

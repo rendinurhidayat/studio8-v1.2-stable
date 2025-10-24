@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addFeedback } from '../services/api';
 import StarRating from '../components/feedback/StarRating';
@@ -7,6 +7,7 @@ import { User, FileText, MessageSquare, CheckCircle, Loader2 } from 'lucide-reac
 
 const FeedbackPage: React.FC = () => {
     const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
     const [nama, setNama] = useState('');
     const [bookingId, setBookingId] = useState('');
     const [rating, setRating] = useState(0);
@@ -23,6 +24,17 @@ const FeedbackPage: React.FC = () => {
             setBookingId(idFromUrl);
         }
     }, [idFromUrl]);
+
+    useEffect(() => {
+        if (isSubmitted) {
+            const timer = setTimeout(() => {
+                navigate('/'); // Redirect to home page after 3 seconds
+            }, 3000);
+
+            return () => clearTimeout(timer); // Cleanup timer if component unmounts
+        }
+    }, [isSubmitted, navigate]);
+
 
     const validateField = (field: 'nama' | 'bookingId' | 'rating' | 'komentar', value: string | number): boolean => {
         let error = '';

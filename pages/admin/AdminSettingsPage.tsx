@@ -25,6 +25,15 @@ interface ModalState {
     parentId?: string;
 }
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
 const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void }> = ({ enabled, onChange }) => (
     <button type="button" onClick={onChange} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${enabled ? 'bg-primary' : 'bg-base-300'}`}>
         <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`}/>
@@ -227,24 +236,49 @@ const ServicesSettingsTab = () => {
     
         const { mode, type, itemData, parentId } = modalState;
     
+        let imageUrl = itemData?.imageUrl || '';
+        if (imageFile) {
+            try {
+                const imageBase64 = await fileToBase64(imageFile);
+                const uploadResponse = await fetch('/api/uploadImage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imageBase64,
+                        folder: 'package_images',
+                        publicId: itemData?.id ? `package_${itemData.id}` : `package_${Date.now()}`
+                    })
+                });
+    
+                if (!uploadResponse.ok) {
+                    const errorData = await uploadResponse.json();
+                    throw new Error(errorData.message || 'Image upload failed');
+                }
+                const { secure_url } = await uploadResponse.json();
+                imageUrl = secure_url;
+            } catch (error) {
+                console.error(error);
+                alert(`Error uploading image: ${(error as Error).message}`);
+                return; 
+            }
+        } else if (!imagePreview && itemData?.imageUrl) {
+            imageUrl = '';
+        }
+    
         if (type === 'package') {
-            const packagePayload = {
+            const packagePayload: Omit<Package, 'id' | 'subPackages'> = {
                 name: formData.name,
                 description: formData.description,
                 type: formData.type as 'Studio' | 'Outdoor',
                 isGroupPackage: formData.isGroupPackage,
+                imageUrl: imageUrl,
             };
-            
-            if (mode === 'add') {
-                await addPackage(packagePayload, imageFile, currentUser.id);
-            } else if (itemData) {
-                const updatePayload: Partial<Package> = { ...packagePayload };
-                if (!imagePreview && itemData.imageUrl) {
-                    updatePayload.imageUrl = '';
-                }
-                await updatePackage(itemData.id, updatePayload, imageFile, currentUser.id);
-            }
     
+            if (mode === 'add') {
+                await addPackage(packagePayload, currentUser.id);
+            } else if (itemData) {
+                await updatePackage(itemData.id, packagePayload, currentUser.id);
+            }
         } else {
             const price = parseFloat(formData.price);
             const commonData = { name: formData.name, description: formData.description };
