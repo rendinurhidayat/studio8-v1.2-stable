@@ -31,35 +31,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser: firebase.User | null) => {
-      if (firebaseUser) {
-        let userDocSnap = await db.collection("users").doc(firebaseUser.uid).get();
+      try {
+        if (firebaseUser) {
+            let userDocSnap = await db.collection("users").doc(firebaseUser.uid).get();
 
-        if (!userDocSnap.exists && firebaseUser.email) {
-            console.log(`User not found by UID (${firebaseUser.uid}), attempting lookup by email: ${firebaseUser.email}`);
-            const usersQuery = await db.collection("users").where('email', '==', firebaseUser.email).limit(1).get();
-            if (!usersQuery.empty) {
-                userDocSnap = usersQuery.docs[0];
+            if (!userDocSnap.exists && firebaseUser.email) {
+                console.log(`User not found by UID (${firebaseUser.uid}), attempting lookup by email: ${firebaseUser.email}`);
+                const usersQuery = await db.collection("users").where('email', '==', firebaseUser.email).limit(1).get();
+                if (!usersQuery.empty) {
+                    userDocSnap = usersQuery.docs[0];
+                }
             }
-        }
-        
-        if (userDocSnap.exists) {
-          const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-          setUser(userData);
-          localStorage.setItem('studio8-user', JSON.stringify(userData));
-          setError(null); // Clear any previous errors on successful login
+            
+            if (userDocSnap.exists) {
+              const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
+              setUser(userData);
+              localStorage.setItem('studio8-user', JSON.stringify(userData));
+              setError(null);
+            } else {
+              console.warn("User authenticated but not found in Firestore by UID or email. Preventing login. Email:", firebaseUser.email);
+              setError("Akun Google Anda berhasil diautentikasi, namun profil tidak ditemukan di sistem kami. Mohon pastikan admin telah mendaftarkan email Anda.");
+              setUser(null);
+              localStorage.removeItem('studio8-user');
+            }
         } else {
-          console.warn("User authenticated but not found in Firestore by UID or email. Preventing login. Email:", firebaseUser.email);
-          setError("Akun Google Anda berhasil diautentikasi, namun profil tidak ditemukan di sistem kami. Mohon pastikan admin telah mendaftarkan email Anda.");
-          // DO NOT SIGN OUT HERE. Let the user see the error on the login page.
-          // The next login attempt will handle the session correctly.
           setUser(null);
           localStorage.removeItem('studio8-user');
+          setError(null); // Clear error on successful sign out
         }
-      } else {
-        setUser(null);
-        localStorage.removeItem('studio8-user');
+      } catch (dbError: any) {
+          console.error("Error fetching user profile from Firestore:", dbError);
+          setError("Gagal memverifikasi profil pengguna dari database. Coba lagi nanti.");
+          setUser(null);
+          localStorage.removeItem('studio8-user');
+      } finally {
+          setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     return () => unsubscribe();
