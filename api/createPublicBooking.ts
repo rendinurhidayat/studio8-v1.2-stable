@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 
@@ -80,33 +81,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
 
             if (!cloudName || !uploadPreset) {
-                throw new Error('Konfigurasi Cloudinary (CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET) tidak ditemukan di environment variables.');
+                console.error("Cloudinary environment variables (CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET) are not set.");
+                throw new Error('Konfigurasi Cloudinary tidak ditemukan di environment variables.');
             }
 
-            const { base64, mimeType } = formData.paymentProofBase64;
+            const { base64, mimeType, fileName } = formData.paymentProofBase64;
             const dataUrl = `data:${mimeType};base64,${base64}`;
             
-            // Generate a unique, clean public_id to avoid Cloudinary's name inference issues.
-            const publicId = `studio8_proof_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+            // Sanitize filename to create a safe base for the public_id
+            const safeFileNameBase = (fileName || `proof_${Date.now()}`)
+                .split('.').slice(0, -1).join('.') // Remove file extension
+                .replace(/[\/\\]+/g, '_')        // Replace slashes with underscores
+                .replace(/[^\w-]/g, '_');         // Replace other invalid chars with underscores
 
+            const publicId = `${safeFileNameBase}_${Math.random().toString(36).substring(2, 8)}`;
+
+            console.log(`Uploading to Cloudinary with public_id: ${publicId}`);
             const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     file: dataUrl,
                     upload_preset: uploadPreset,
-                    public_id: publicId, // Set a specific public_id to prevent naming conflicts
+                    folder: "studio8_uploads", // Specify upload folder
+                    public_id: publicId,       // Provide the sanitized and unique public_id
                 }),
             });
 
             if (!cloudinaryRes.ok) {
                 const errorData = await cloudinaryRes.json();
                 console.error("Cloudinary Upload Error:", errorData);
-                throw new Error('Gagal mengunggah bukti pembayaran ke Cloudinary.');
+                const errorMessage = errorData?.error?.message || 'Gagal mengunggah bukti pembayaran ke Cloudinary.';
+                throw new Error(errorMessage);
             }
 
             const cloudinaryData = await cloudinaryRes.json();
+
+            if (!cloudinaryData.secure_url) {
+                console.error("Cloudinary upload successful but returned no secure_url:", cloudinaryData);
+                throw new Error("Cloudinary gagal memberikan URL yang aman setelah upload.");
+            }
+            
             paymentProofUrl = cloudinaryData.secure_url;
+            console.log(`Cloudinary upload successful. URL: ${paymentProofUrl}`);
         }
 
         // --- 2. Re-fetch data for server-side validation & calculation ---
