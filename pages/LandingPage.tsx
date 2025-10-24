@@ -10,7 +10,9 @@ import {
     MessageCircle, // for WhatsApp
     LogIn,
     UserCheck,
-    ArrowRight
+    ArrowRight,
+    Camera,
+    CheckCircle
 } from 'lucide-react';
 import ChatbotModal from '../components/common/ChatbotModal';
 import { getSystemSettings, getPublicFeedbacks } from '../services/api';
@@ -150,13 +152,19 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.4 }}
-                    className="mt-10 flex justify-center"
+                    className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4"
                 >
                     <Link
                         to="/pesan-sesi"
-                        className="px-8 py-4 text-lg font-semibold text-gray-900 bg-white rounded-lg shadow-lg hover:bg-gray-200 transition-transform transform hover:scale-105 w-full sm:w-auto"
+                        className="px-8 py-4 text-lg font-semibold text-gray-900 bg-white rounded-xl shadow-lg hover:bg-gray-200 transition-transform transform hover:scale-105 w-full sm:w-auto"
                     >
                         Booking Sekarang
+                    </Link>
+                    <Link
+                        to="/cek-status"
+                        className="px-8 py-3 text-lg font-semibold text-white bg-transparent border-2 border-white rounded-xl hover:bg-white hover:text-gray-900 transition-colors w-full sm:w-auto"
+                    >
+                        Cek Status Booking
                     </Link>
                 </motion.div>
             </div>
@@ -168,41 +176,59 @@ const HeroSection = () => {
 const AboutSection = () => (
     <motion.section 
       id="about" 
-      className="w-full py-16 md:py-24 bg-black text-white"
+      className="w-full py-16 md:py-24 bg-slate-50 text-base-content"
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, amount: 0.3 }}
       variants={sectionVariants}
     >
       <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-        <div className="space-y-4">
-          <h2 className="text-3xl md:text-4xl font-bold">Tentang Studio 8</h2>
-          <p className="text-lg text-white/80">
-            Studio 8 adalah ruang kreatif di jantung Kota Banjar, dirancang untuk siapa saja yang ingin mengabadikan momen secara bebas dan personal. Kami percaya setiap orang berhak memiliki foto berkualitas tanpa terbebani biaya mahal.
-          </p>
-          <p className="text-white/80">
-            Dengan konsep self-photo studio, kamu memegang kendali penuh atas sesimu. Cukup tekan tombol, dan biarkan kamera profesional kami menangkap ekspresi terbaikmu. Minimalis, modern, dan tanpa tekanan.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="relative h-96 md:h-[500px]">
             <motion.img 
-                custom={0} 
-                variants={cardVariants}
-                whileHover={{ scale: 1.05, rotate: -2 }}
+                whileHover={{ scale: 1.05, rotate: -3 }}
                 transition={{ type: 'spring', stiffness: 300 }}
                 src="/images/about-1.jpg" 
                 alt="Interior Studio 8" 
-                className="w-full h-auto rounded-lg shadow-lg border-4 border-white/10 aspect-square object-cover" 
+                className="absolute top-0 left-0 w-3/4 h-3/4 rounded-2xl shadow-xl border-8 border-white object-cover" 
             />
             <motion.img 
-                custom={1} 
-                variants={cardVariants} 
-                whileHover={{ scale: 1.05, rotate: 2 }}
+                whileHover={{ scale: 1.05, rotate: 3 }}
                 transition={{ type: 'spring', stiffness: 300 }}
                 src="/images/about-2.jpg" 
                 alt="Peralatan Studio 8" 
-                className="w-full h-auto rounded-lg shadow-lg border-4 border-white/10 aspect-square object-cover mt-8" 
+                className="absolute bottom-0 right-0 w-2/3 h-2/3 rounded-2xl shadow-2xl border-8 border-white object-cover" 
             />
+        </div>
+
+        <div className="space-y-6">
+          <span className="text-sm font-bold uppercase text-accent tracking-widest">Tentang Kami</span>
+          <h2 className="text-3xl md:text-4xl font-bold text-primary">Ruang Kreatifmu di Jantung Kota Banjar.</h2>
+          <p className="text-lg text-muted leading-relaxed">
+            Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
+          </p>
+          <ul className="space-y-4 pt-4 border-t border-base-200">
+              <li className="flex items-start gap-4">
+                  <div className="p-2 bg-success/10 rounded-full text-success"><CheckCircle className="w-6 h-6 flex-shrink-0" /></div>
+                  <div>
+                      <h4 className="font-semibold">Kendali Penuh di Tanganmu</h4>
+                      <p className="text-muted text-base">Ambil remot, atur gayamu, dan jepret sepuasnya. Tanpa fotografer, tanpa rasa canggung.</p>
+                  </div>
+              </li>
+              <li className="flex items-start gap-4">
+                  <div className="p-2 bg-success/10 rounded-full text-success"><Camera className="w-6 h-6 flex-shrink-0" /></div>
+                  <div>
+                      <h4 className="font-semibold">Kualitas Profesional</h4>
+                      <p className="text-muted text-base">Gunakan peralatan kamera dan lighting profesional kami untuk hasil foto terbaik.</p>
+                  </div>
+              </li>
+               <li className="flex items-start gap-4">
+                  <div className="p-2 bg-success/10 rounded-full text-success"><PartyPopper className="w-6 h-6 flex-shrink-0" /></div>
+                  <div>
+                      <h4 className="font-semibold">Minimalis & Nyaman</h4>
+                      <p className="text-muted text-base">Studio kami didesain modern dan minimalis, menciptakan suasana yang nyaman untuk berkreasi.</p>
+                  </div>
+              </li>
+          </ul>
         </div>
       </div>
     </motion.section>

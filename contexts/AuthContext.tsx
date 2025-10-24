@@ -29,9 +29,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser: firebase.User | null) => {
       if (firebaseUser) {
         // Pengguna berhasil login di Firebase.
-        // Sekarang, ambil data profil lengkap dari database Firestore.
-        const userDocRef = db.collection("users").doc(firebaseUser.uid);
-        const userDocSnap = await userDocRef.get();
+        // Coba ambil data via UID dulu (untuk user email/password).
+        let userDocSnap = await db.collection("users").doc(firebaseUser.uid).get();
+
+        // Jika tidak ketemu via UID (kemungkinan login via Google), coba cari via email.
+        if (!userDocSnap.exists && firebaseUser.email) {
+            console.log(`User not found by UID (${firebaseUser.uid}), attempting lookup by email: ${firebaseUser.email}`);
+            const usersQuery = await db.collection("users").where('email', '==', firebaseUser.email).limit(1).get();
+            if (!usersQuery.empty) {
+                userDocSnap = usersQuery.docs[0];
+            }
+        }
         
         if (userDocSnap.exists) {
           // Gabungkan data dari Firestore dengan uid dari Firebase Auth
@@ -42,7 +50,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // User is authenticated with a provider (e.g., Google) but doesn't have a profile in our system.
           // This is a security measure: only pre-approved users can access the dashboard.
           // We sign them out to prevent unauthorized access. An admin must create their user profile first.
-          console.warn("User authenticated but not found in Firestore. Signing out. UID:", firebaseUser.uid);
+          console.warn("User authenticated but not found in Firestore by UID or email. Signing out. Email:", firebaseUser.email);
           await auth.signOut();
           setUser(null);
         }
