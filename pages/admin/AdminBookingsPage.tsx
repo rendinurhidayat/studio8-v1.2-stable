@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     getBookings, 
@@ -142,22 +143,6 @@ const BookingConfirmationModal: React.FC<{
 }> = ({ isOpen, onClose, onConfirm, booking }) => {
     if (!booking) return null;
 
-    const handleDownloadProof = (fileName: string) => {
-        // Simulate file download as the app doesn't store the actual file
-        const fileContent = `This is a simulated payment proof for: ${fileName}\n\nBooking Code: ${booking?.bookingCode}\nClient: ${booking?.clientName}\nTimestamp: ${new Date().toISOString()}`;
-        const blob = new Blob([fileContent], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        // Ensure the downloaded file has a .txt extension for clarity
-        const downloadFileName = fileName.replace(/\.[^/.]+$/, "") + ".txt";
-        a.download = downloadFileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
-
     const DetailRow: React.FC<{ icon: React.ReactNode, label: string, value: React.ReactNode }> = ({ icon, label, value }) => (
         <div className="flex items-center gap-3 text-sm">
             <span className="text-gray-400">{icon}</span>
@@ -188,23 +173,14 @@ const BookingConfirmationModal: React.FC<{
                         <div className="flex justify-between items-center"><span className="text-gray-500 font-semibold">Sisa Pembayaran:</span> <span className="font-bold text-lg text-orange-600">Rp {remainingBalance.toLocaleString('id-ID')}</span></div>
                         <hr/>
                         <div className="flex justify-between items-center"><span className="text-gray-500">Metode:</span> <span className="font-semibold text-gray-800">{booking.paymentMethod}</span></div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-gray-500 flex items-center gap-2"><FileText size={16}/> Bukti Transfer:</span>
-                             {booking.paymentProofFileName ? (
-                                <a 
-                                  href="#" 
-                                  onClick={(e) => {
-                                      e.preventDefault();
-                                      handleDownloadProof(booking.paymentProofFileName!);
-                                  }} 
-                                  className="flex items-center gap-2 text-sm font-semibold text-blue-600 bg-blue-100 px-3 py-1 rounded-full hover:bg-blue-200" 
-                                  title={`Download ${booking.paymentProofFileName}`}
-                                >
-                                    <Download size={14} />
-                                    {booking.paymentProofFileName}
+                        <div className="flex flex-col items-start">
+                            <span className="text-gray-500 flex items-center gap-2 mb-2"><FileText size={16}/> Bukti Transfer:</span>
+                             {booking.paymentProofBase64 ? (
+                                <a href={booking.paymentProofBase64} target="_blank" rel="noopener noreferrer" className="block w-full">
+                                    <img src={booking.paymentProofBase64} alt="Bukti Pembayaran" className="w-full h-auto max-h-64 object-contain rounded-md border bg-white cursor-pointer"/>
                                 </a>
                             ) : (
-                                <span className="text-sm font-medium text-red-600">Tidak ada file</span>
+                                <span className="text-sm font-medium text-red-600">Tidak ada file bukti transfer.</span>
                             )}
                         </div>
                     </div>

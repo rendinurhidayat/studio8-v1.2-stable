@@ -122,8 +122,7 @@ export interface Booking {
   totalPrice: number;
   remainingBalance: number;
   createdAt: Date;
-  paymentProofUrl?: string;
-  paymentProofFileName?: string;
+  paymentProofBase64?: string;
   rescheduleRequestDate?: Date;
   notes?: string;
   googleDriveLink?: string;

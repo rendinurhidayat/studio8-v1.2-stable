@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
-import { Buffer } from 'buffer';
 
 // --- Type Duplication (necessary for serverless environment) ---
 enum BookingStatus { Pending = 'Pending' }
@@ -28,7 +27,6 @@ function initializeFirebaseAdmin(): admin.app.App {
         
         return admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
-            storageBucket: `${serviceAccount.project_id}.firebasestorage.app`
         });
     } catch (e: any) {
         console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:", e);
@@ -49,7 +47,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         initializeFirebaseAdmin();
         const db = admin.firestore();
-        const storage = admin.storage();
 
         const getPackages = async (): Promise<Package[]> => {
             const snapshot = await db.collection('packages').get();
@@ -76,16 +73,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const formData = req.body;
 
-        // --- 1. Upload Payment Proof ---
-        let paymentProofUrl = '', paymentProofFileName = '';
+        // --- 1. Handle Payment Proof (as Base64 data URL) ---
+        let paymentProofBase64 = '';
         if (formData.paymentProofBase64) {
-            const { base64, fileName, mimeType } = formData.paymentProofBase64;
-            const buffer = Buffer.from(base64, 'base64');
-            const file = storage.bucket().file(`payment_proofs/${Date.now()}-${fileName}`);
-            await file.save(buffer, { metadata: { contentType: mimeType } });
-            await file.makePublic();
-            paymentProofUrl = file.publicUrl();
-            paymentProofFileName = fileName;
+            const { base64, mimeType } = formData.paymentProofBase64;
+            // Create a data URL to be stored directly in Firestore
+            paymentProofBase64 = `data:${mimeType};base64,${base64}`;
         }
 
         // --- 2. Re-fetch data for server-side validation & calculation ---
@@ -158,7 +151,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             totalPrice: totalPrice,
             remainingBalance: totalPrice,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            paymentProofUrl, paymentProofFileName, notes: formData.notes,
+            paymentProofBase64, // Storing data URL directly
+            notes: formData.notes,
             discountAmount, discountReason, referralCodeUsed, pointsRedeemed, pointsValue, extraPersonCharge
         };
         
