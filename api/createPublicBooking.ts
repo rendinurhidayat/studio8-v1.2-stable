@@ -85,6 +85,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const { base64, mimeType } = formData.paymentProofBase64;
             const dataUrl = `data:${mimeType};base64,${base64}`;
+            
+            // Generate a unique, clean public_id to avoid Cloudinary's name inference issues.
+            const publicId = `studio8_proof_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
             const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
                 method: 'POST',
@@ -92,6 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 body: JSON.stringify({
                     file: dataUrl,
                     upload_preset: uploadPreset,
+                    public_id: publicId, // Set a specific public_id to prevent naming conflicts
                 }),
             });
 
