@@ -24,8 +24,15 @@ function initializeFirebaseAdmin(): App {
     if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || !process.env.FIREBASE_PROJECT_ID) {
         throw new Error('Firebase environment variables (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_PROJECT_ID) are not set in the Vercel project settings.');
     }
-
+    
+    // FIX: Correctly parse the service account JSON from the environment variable.
+    // The `private_key` in the service account JSON contains newline characters (\n)
+    // which can be improperly escaped when stored in environment variables (e.g., in Vercel).
+    // This fix ensures the private key is correctly formatted before authenticating.
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
     
     return initializeApp({
         credential: cert(serviceAccount),
@@ -176,11 +183,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (error: any) {
         console.error('API Error in createPublicBooking:', error.stack);
         
-        let errorMessage = 'Internal Server Error';
+        let errorMessage = 'Terjadi kesalahan internal pada server.';
         if (error.message.includes('Firebase environment variables')) {
              errorMessage = 'Kesalahan konfigurasi server. Harap hubungi support.';
-        } else if (error.message.includes('invalid-credential')) {
-             errorMessage = 'Kredensial Firebase tidak valid di konfigurasi server.';
+        } else if (error.message.includes('invalid_grant') || error.message.includes('invalid-credential')) {
+             errorMessage = 'Kesalahan autentikasi server. Harap hubungi support.';
         }
 
         return res.status(500).json({ message: errorMessage, error: error.message });
