@@ -8,8 +8,8 @@ type Timestamp = firebase.firestore.Timestamp;
 
 // --- Helper Functions ---
 
-const uploadImage = async (file: File, path: string): Promise<string> => {
-    const fileRef = storage.ref(`${path}/${Date.now()}-${file.name}`);
+const uploadImage = async (file: File, path: string, fileName: string): Promise<string> => {
+    const fileRef = storage.ref(`${path}/${fileName}`);
     const snapshot = await fileRef.put(file);
     return snapshot.ref.getDownloadURL();
 };
@@ -345,14 +345,22 @@ export const getPackages = async (): Promise<Package[]> => {
     return snapshot.docs.map(doc => fromFirestore<Package>(doc));
 };
 
-export const addPackage = async (pkg: Omit<Package, 'id' | 'subPackages'>, imageFile: File | null, currentUserId: string): Promise<Package> => {
-    const dataToAdd: Omit<Package, 'id' | 'subPackages'> = { ...pkg };
+export const addPackage = async (pkg: Omit<Package, 'id' | 'subPackages' | 'imageUrl'>, imageFile: File | null, currentUserId: string): Promise<Package> => {
+    // 1. Create a document reference first to get a unique ID.
+    const docRef = db.collection('packages').doc();
+    const dataToAdd: Omit<Package, 'id'> = { ...pkg, imageUrl: '', subPackages: [] };
+
+    // 2. If there's an image, upload it using the unique ID as the filename.
     if (imageFile) {
-        dataToAdd.imageUrl = await uploadImage(imageFile, 'package_images');
+        const fileName = `package_${docRef.id}`;
+        dataToAdd.imageUrl = await uploadImage(imageFile, 'package_images', fileName);
     }
-    const docRef = await db.collection('packages').add({ ...dataToAdd, subPackages: [] });
+    
+    // 3. Set the data for the new document.
+    await docRef.set(dataToAdd);
     await logActivity(currentUserId, `Menambah paket baru: ${dataToAdd.name}`);
-    return { ...dataToAdd, id: docRef.id, subPackages: [] };
+    
+    return { ...dataToAdd, id: docRef.id };
 };
 
 export const updatePackage = async (packageId: string, updatedData: Partial<Package>, imageFile: File | null, currentUserId: string): Promise<Package> => {
@@ -360,19 +368,23 @@ export const updatePackage = async (packageId: string, updatedData: Partial<Pack
     const oldDoc = await packageRef.get();
     const oldImageUrl = oldDoc.exists ? oldDoc.data()?.imageUrl : undefined;
 
+    const dataToUpdate = { ...updatedData }; // Create a mutable copy
+
     if (imageFile) { // New image is uploaded
         if (oldImageUrl) {
-            await deleteImage(oldImageUrl);
+            await deleteImage(oldImageUrl); // Delete old image to save space
         }
-        updatedData.imageUrl = await uploadImage(imageFile, 'package_images');
-    } else if ('imageUrl' in updatedData && updatedData.imageUrl === '') { // Image is being removed
+        // Use the packageId for a consistent filename
+        const fileName = `package_${packageId}`;
+        dataToUpdate.imageUrl = await uploadImage(imageFile, 'package_images', fileName);
+    } else if ('imageUrl' in dataToUpdate && dataToUpdate.imageUrl === '') { // Image is being removed
         if (oldImageUrl) {
             await deleteImage(oldImageUrl);
         }
     }
 
-    await packageRef.update(updatedData);
-    await logActivity(currentUserId, `Mengubah paket ${updatedData.name}`);
+    await packageRef.update(dataToUpdate);
+    await logActivity(currentUserId, `Mengubah paket ${dataToUpdate.name || oldDoc.data()?.name}`);
     const doc = await packageRef.get();
     return fromFirestore<Package>(doc);
 };

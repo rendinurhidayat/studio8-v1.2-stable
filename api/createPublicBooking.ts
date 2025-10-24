@@ -109,7 +109,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const generateReferralCode = (): string => `S8REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
         const formData = req.body;
-        console.log("Received raw name from form:", formData.name);
+
+        // Generate a unique booking code upfront to use it for the filename.
+        const newBookingCode = `S8-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
         // --- 1. Handle Payment Proof Upload to Cloudinary ---
         let paymentProofUrl = '';
@@ -123,13 +125,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { base64, mimeType } = formData.paymentProofBase64;
             const dataUrl = `data:${mimeType};base64,${base64}`;
             
-            // 🔒 Sanitize filename to prevent Cloudinary errors
-            const safeFileName =
-                (formData.name && String(formData.name).replace(/[\/\\]+/g, "_").replace(/[^\w.-]/g, "_")) ||
-                `proof_${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-            console.log("Sanitized filename:", safeFileName);
-
-            const publicId = safeFileName.split(".")[0];
+            // Use the new booking code as a unique identifier for the filename.
+            const publicId = `proof_${newBookingCode}`;
             console.log(`Attempting to upload to Cloudinary with public_id: '${publicId}'`);
 
             try {
@@ -212,7 +209,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // --- 5. Create Booking Document ---
         const newBookingData = {
-            bookingCode: `S8-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            bookingCode: newBookingCode,
             clientName: formData.name, clientEmail: formData.email, clientPhone: formData.whatsapp,
             bookingDate: admin.firestore.Timestamp.fromDate(new Date(`${formData.date}T${formData.time}`)),
             package: selectedPackage, selectedSubPackage: selectedSubPackage,
