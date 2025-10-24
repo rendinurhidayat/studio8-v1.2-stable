@@ -83,9 +83,9 @@ export default async function handler(req: Request) {
 
     } catch (error: any) {
         console.error('API Error in chat.ts:', error);
-        return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+            return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
     }
-}
