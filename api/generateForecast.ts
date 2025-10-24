@@ -1,30 +1,20 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 
-export const runtime = 'edge';
-
-export default async function handler(req: Request) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
-        return new Response(JSON.stringify({ message: 'Method Not Allowed' }), {
-            status: 405,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
     try {
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) {
-            return new Response(JSON.stringify({ message: 'API key is not configured on the server. Please set the API_KEY environment variable.' }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-            });
+        const { historicalDataString } = req.body;
+        if (!historicalDataString) {
+            return res.status(400).json({ message: 'historicalDataString is required.' });
         }
 
-        const { historicalDataString } = await req.json();
-        if (!historicalDataString) {
-            return new Response(JSON.stringify({ message: 'historicalDataString is required.' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-            });
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ message: 'API key is not configured.' });
         }
         
         const ai = new GoogleGenAI({ apiKey });
@@ -69,21 +59,14 @@ export default async function handler(req: Request) {
             config: {
                 responseMimeType: 'application/json',
                 responseSchema: schema,
-                temperature: 0.2 // Lower temperature for more deterministic financial predictions
             }
         });
 
-        // The response text is already a JSON string
-        return new Response(response.text, {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        const result = JSON.parse(response.text);
+        return res.status(200).json(result);
 
     } catch (error: any) {
         console.error('API Error in generateForecast:', error);
-        return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 }
