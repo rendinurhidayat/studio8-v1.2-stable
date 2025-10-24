@@ -1,20 +1,30 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const runtime = 'edge';
+
+export default async function handler(req: Request) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method Not Allowed' });
+        return new Response(JSON.stringify({ message: 'Method Not Allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     try {
-        const { historicalDataString } = req.body;
+        const { historicalDataString } = await req.json();
         if (!historicalDataString) {
-            return res.status(400).json({ message: 'historicalDataString is required.' });
+            return new Response(JSON.stringify({ message: 'historicalDataString is required.' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.API_KEY;
         if (!apiKey) {
-            return res.status(500).json({ message: 'API key is not configured.' });
+            return new Response(JSON.stringify({ message: 'API key is not configured.' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
         
         const ai = new GoogleGenAI({ apiKey });
@@ -59,14 +69,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             config: {
                 responseMimeType: 'application/json',
                 responseSchema: schema,
+                temperature: 0.2 // Lower temperature for more deterministic financial predictions
             }
         });
 
-        const result = JSON.parse(response.text);
-        return res.status(200).json(result);
+        // The response text is already a JSON string
+        return new Response(response.text, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
 
     } catch (error: any) {
         console.error('API Error in generateForecast:', error);
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 }

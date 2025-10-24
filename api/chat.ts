@@ -18,7 +18,7 @@ export default async function handler(req: Request) {
     try {
         const { history } = (await req.json()) as { history: GeminiMessage[] };
         
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.API_KEY;
         if (!apiKey) {
             throw new Error('API key is not configured on the server.');
         }
