@@ -18,20 +18,22 @@ function initializeFirebaseAdmin(): admin.app.App {
     if (admin.apps.length > 0) {
         return admin.apps[0]!;
     }
-    
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || !process.env.FIREBASE_PROJECT_ID) {
-        throw new Error('Firebase environment variables (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_PROJECT_ID) are not set in the Vercel project settings.');
+
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        throw new Error('Firebase environment variable FIREBASE_SERVICE_ACCOUNT_JSON is not set. Please provide the stringified service account JSON.');
     }
-    
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
+    try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+        
+        return admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            storageBucket: `${serviceAccount.project_id}.firebasestorage.app`
+        });
+    } catch (e: any) {
+        console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:", e);
+        throw new Error("The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not a valid JSON string.");
     }
-    
-    return admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`
-    });
 }
 
 // --- Server-side API Helpers ---
@@ -178,9 +180,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('API Error in createPublicBooking:', error.stack);
         
         let errorMessage = 'Terjadi kesalahan internal pada server.';
-        if (error.message.includes('Firebase environment variables')) {
+        if (error.message.includes('Firebase environment variable')) {
              errorMessage = 'Kesalahan konfigurasi server. Harap hubungi support.';
-        } else if (error.message.includes('invalid_grant') || error.message.includes('invalid-credential')) {
+        } else if (error.message.includes('invalid_grant') || error.message.includes('invalid-credential') || error.message.includes('Invalid JWT Signature')) {
              errorMessage = 'Kesalahan autentikasi server. Harap hubungi support.';
         }
 
