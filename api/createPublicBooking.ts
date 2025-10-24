@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
-import { getFirestore, Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
+import admin from 'firebase-admin';
 import { Buffer } from 'buffer';
 
 // --- Type Duplication (necessary for serverless environment) ---
@@ -11,37 +9,33 @@ interface Package { id: string; name: string; description: string; subPackages: 
 interface SubPackage { id:string; name: string; price: number; description?: string; }
 interface AddOn { id: string; name: string; subAddOns: SubAddOn[]; }
 interface SubAddOn { id: string; name: string; price: number; }
-interface Client { id: string; name: string; email: string; phone: string; firstBooking: Date | Timestamp; lastBooking: Date | Timestamp; totalBookings: number; totalSpent: number; loyaltyPoints: number; referralCode: string; referredBy?: string; loyaltyTier?: string; }
+interface Client { id: string; name: string; email: string; phone: string; firstBooking: Date | admin.firestore.Timestamp; lastBooking: Date | admin.firestore.Timestamp; totalBookings: number; totalSpent: number; loyaltyPoints: number; referralCode: string; referredBy?: string; loyaltyTier?: string; }
 interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: { name: string; bookingThreshold: number; discountPercentage: number }[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
 // --- End Type Duplication ---
 
 // Helper function for robust initialization
-function initializeFirebaseAdmin(): App {
-    if (getApps().length > 0) {
-        return getApps()[0];
+function initializeFirebaseAdmin(): admin.app.App {
+    if (admin.apps.length > 0) {
+        return admin.apps[0]!;
     }
     
     if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || !process.env.FIREBASE_PROJECT_ID) {
         throw new Error('Firebase environment variables (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_PROJECT_ID) are not set in the Vercel project settings.');
     }
     
-    // FIX: Correctly parse the service account JSON from the environment variable.
-    // The `private_key` in the service account JSON contains newline characters (\n)
-    // which can be improperly escaped when stored in environment variables (e.g., in Vercel).
-    // This fix ensures the private key is correctly formatted before authenticating.
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
     if (serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
     
-    return initializeApp({
-        credential: cert(serviceAccount),
+    return admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
         storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`
     });
 }
 
 // --- Server-side API Helpers ---
-const fromFirestore = <T extends { id: string }>(doc: DocumentSnapshot): T => {
+const fromFirestore = <T extends { id: string }>(doc: admin.firestore.DocumentSnapshot): T => {
     return { id: doc.id, ...doc.data() } as T;
 };
 
@@ -52,8 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         initializeFirebaseAdmin();
-        const db = getFirestore();
-        const storage = getStorage();
+        const db = admin.firestore();
+        const storage = admin.storage();
 
         const getPackages = async (): Promise<Package[]> => {
             const snapshot = await db.collection('packages').get();
@@ -109,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (isNewClient) {
             client = {
                 id: lowerEmail, name: formData.name, email: lowerEmail, phone: formData.whatsapp,
-                firstBooking: Timestamp.now(), lastBooking: Timestamp.now(),
+                firstBooking: admin.firestore.Timestamp.now(), lastBooking: admin.firestore.Timestamp.now(),
                 totalBookings: 0, totalSpent: 0, loyaltyPoints: 0, referralCode: generateReferralCode(), loyaltyTier: 'Newbie'
             };
         }
@@ -151,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const newBookingData = {
             bookingCode: `S8-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
             clientName: formData.name, clientEmail: formData.email, clientPhone: formData.whatsapp,
-            bookingDate: Timestamp.fromDate(new Date(`${formData.date}T${formData.time}`)),
+            bookingDate: admin.firestore.Timestamp.fromDate(new Date(`${formData.date}T${formData.time}`)),
             package: selectedPackage, selectedSubPackage: selectedSubPackage,
             addOns: allAddOns.filter(a => a.subAddOns.some(sa => formData.subAddOnIds.includes(sa.id))),
             selectedSubAddOns: selectedSubAddOns,
@@ -161,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             bookingStatus: BookingStatus.Pending,
             totalPrice: totalPrice,
             remainingBalance: totalPrice,
-            createdAt: FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
             paymentProofUrl, paymentProofFileName, notes: formData.notes,
             discountAmount, discountReason, referralCodeUsed, pointsRedeemed, pointsValue, extraPersonCharge
         };
