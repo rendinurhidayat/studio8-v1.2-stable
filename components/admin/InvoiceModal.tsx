@@ -136,7 +136,7 @@ Studio 8
                     </div>
                     <div className="text-right">
                          <h2 className="text-2xl font-bold text-primary">Studio <span className="text-accent">8</span></h2>
-                        <p>Jl. Pahlawan, Purwaharja, Banjar</p>
+                        <p>Depan SMK 4 Banjar, Pataruman, Banjar</p>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 my-6">
