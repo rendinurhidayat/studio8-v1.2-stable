@@ -808,8 +808,28 @@ const BookingForm = () => {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Gagal membuat booking.');
+                let errorMessage = `Gagal membuat booking. Status: ${response.status}`;
+                const contentType = response.headers.get("content-type");
+
+                if (contentType && contentType.includes("application/json")) {
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorMessage;
+                    } catch (jsonError) {
+                        console.error("Could not parse JSON error response:", jsonError);
+                        errorMessage = "Gagal memproses respons error dari server.";
+                    }
+                } else {
+                    try {
+                        const errorText = await response.text();
+                        console.error("Server error response (not JSON):", errorText);
+                        errorMessage = "Terjadi kesalahan pada server. Silakan coba lagi atau hubungi support jika masalah berlanjut.";
+                    } catch (textError) {
+                         console.error("Could not read text error response:", textError);
+                         errorMessage = "Gagal membaca respons error dari server.";
+                    }
+                }
+                throw new Error(errorMessage);
             }
 
             const result = await response.json();

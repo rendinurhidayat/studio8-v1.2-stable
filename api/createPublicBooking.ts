@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getFirestore, Timestamp, FieldValue, DocumentSnapshot } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { Buffer } from 'buffer';
@@ -15,49 +15,28 @@ interface Client { id: string; name: string; email: string; phone: string; first
 interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: { name: string; bookingThreshold: number; discountPercentage: number }[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
 // --- End Type Duplication ---
 
-// Firebase Admin SDK Initialization
-try {
-    if (!getApps().length) {
-        // IMPORTANT: Set these environment variables in your Vercel project settings.
-        // FIREBASE_PROJECT_ID and FIREBASE_SERVICE_ACCOUNT_JSON
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON as string);
-        initializeApp({
-            credential: cert(serviceAccount),
-            storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`
-        });
+// Helper function for robust initialization
+function initializeFirebaseAdmin(): App {
+    if (getApps().length > 0) {
+        return getApps()[0];
     }
-} catch (e: any) {
-    console.error('Firebase Admin Initialization Error:', e.stack);
-}
+    
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON || !process.env.FIREBASE_PROJECT_ID) {
+        throw new Error('Firebase environment variables (FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_PROJECT_ID) are not set in the Vercel project settings.');
+    }
 
-const db = getFirestore();
-const storageBucket = getStorage().bucket();
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    
+    return initializeApp({
+        credential: cert(serviceAccount),
+        storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`
+    });
+}
 
 // --- Server-side API Helpers ---
 const fromFirestore = <T extends { id: string }>(doc: DocumentSnapshot): T => {
     return { id: doc.id, ...doc.data() } as T;
 };
-const getPackages = async (): Promise<Package[]> => {
-    const snapshot = await db.collection('packages').get();
-    return snapshot.docs.map(doc => fromFirestore<Package>(doc));
-};
-const getAddOns = async (): Promise<AddOn[]> => {
-    const snapshot = await db.collection('addons').get();
-    return snapshot.docs.map(doc => fromFirestore<AddOn>(doc));
-};
-const getSystemSettings = async (): Promise<SystemSettings> => {
-    const doc = await db.collection('settings').doc('main').get();
-    return doc.data() as SystemSettings; // Simplified for this context
-};
-const getClientByEmail = async (email: string): Promise<Client | null> => {
-    const doc = await db.collection('clients').doc(email.toLowerCase()).get();
-    return doc.exists ? fromFirestore<Client>(doc) : null;
-};
-const getClientByReferralCode = async (code: string): Promise<Client | null> => {
-    const snapshot = await db.collection('clients').where('referralCode', '==', code.toUpperCase()).limit(1).get();
-    return snapshot.empty ? null : fromFirestore<Client>(snapshot.docs[0]);
-};
-const generateReferralCode = (): string => `S8REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -65,6 +44,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
+        initializeFirebaseAdmin();
+        const db = getFirestore();
+        const storage = getStorage();
+
+        const getPackages = async (): Promise<Package[]> => {
+            const snapshot = await db.collection('packages').get();
+            return snapshot.docs.map(doc => fromFirestore<Package>(doc));
+        };
+        const getAddOns = async (): Promise<AddOn[]> => {
+            const snapshot = await db.collection('addons').get();
+            return snapshot.docs.map(doc => fromFirestore<AddOn>(doc));
+        };
+        const getSystemSettings = async (): Promise<SystemSettings> => {
+            const doc = await db.collection('settings').doc('main').get();
+            return doc.data() as SystemSettings;
+        };
+        const getClientByEmail = async (email: string): Promise<Client | null> => {
+            const doc = await db.collection('clients').doc(email.toLowerCase()).get();
+            return doc.exists ? fromFirestore<Client>(doc) : null;
+        };
+        const getClientByReferralCode = async (code: string): Promise<Client | null> => {
+            const snapshot = await db.collection('clients').where('referralCode', '==', code.toUpperCase()).limit(1).get();
+            return snapshot.empty ? null : fromFirestore<Client>(snapshot.docs[0]);
+        };
+        const generateReferralCode = (): string => `S8REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+
         const formData = req.body;
 
         // --- 1. Upload Payment Proof ---
@@ -72,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (formData.paymentProofBase64) {
             const { base64, fileName, mimeType } = formData.paymentProofBase64;
             const buffer = Buffer.from(base64, 'base64');
-            const file = storageBucket.file(`payment_proofs/${Date.now()}-${fileName}`);
+            const file = storage.bucket().file(`payment_proofs/${Date.now()}-${fileName}`);
             await file.save(buffer, { metadata: { contentType: mimeType } });
             await file.makePublic();
             paymentProofUrl = file.publicUrl();
@@ -168,7 +174,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ bookingCode: newBookingData.bookingCode });
 
     } catch (error: any) {
-        console.error('API Error in createPublicBooking:', error);
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        console.error('API Error in createPublicBooking:', error.stack);
+        
+        let errorMessage = 'Internal Server Error';
+        if (error.message.includes('Firebase environment variables')) {
+             errorMessage = 'Kesalahan konfigurasi server. Harap hubungi support.';
+        } else if (error.message.includes('invalid-credential')) {
+             errorMessage = 'Kredensial Firebase tidak valid di konfigurasi server.';
+        }
+
+        return res.status(500).json({ message: errorMessage, error: error.message });
     }
 }
