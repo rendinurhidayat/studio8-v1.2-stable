@@ -73,12 +73,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const formData = req.body;
 
-        // --- 1. Handle Payment Proof (as Base64 data URL) ---
-        let paymentProofBase64 = '';
+        // --- 1. Handle Payment Proof Upload to Cloudinary ---
+        let paymentProofUrl = '';
         if (formData.paymentProofBase64) {
+            const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+            const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
+
+            if (!cloudName || !uploadPreset) {
+                throw new Error('Konfigurasi Cloudinary (CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET) tidak ditemukan di environment variables.');
+            }
+
             const { base64, mimeType } = formData.paymentProofBase64;
-            // Create a data URL to be stored directly in Firestore
-            paymentProofBase64 = `data:${mimeType};base64,${base64}`;
+            const dataUrl = `data:${mimeType};base64,${base64}`;
+
+            const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    file: dataUrl,
+                    upload_preset: uploadPreset,
+                }),
+            });
+
+            if (!cloudinaryRes.ok) {
+                const errorData = await cloudinaryRes.json();
+                console.error("Cloudinary Upload Error:", errorData);
+                throw new Error('Gagal mengunggah bukti pembayaran ke Cloudinary.');
+            }
+
+            const cloudinaryData = await cloudinaryRes.json();
+            paymentProofUrl = cloudinaryData.secure_url;
         }
 
         // --- 2. Re-fetch data for server-side validation & calculation ---
@@ -151,7 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             totalPrice: totalPrice,
             remainingBalance: totalPrice,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            paymentProofBase64, // Storing data URL directly
+            paymentProofUrl,
             notes: formData.notes,
             discountAmount, discountReason, referralCodeUsed, pointsRedeemed, pointsValue, extraPersonCharge
         };
@@ -178,6 +202,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              errorMessage = 'Kesalahan konfigurasi server. Harap hubungi support.';
         } else if (error.message.includes('invalid_grant') || error.message.includes('invalid-credential') || error.message.includes('Invalid JWT Signature')) {
              errorMessage = 'Kesalahan autentikasi server. Harap hubungi support.';
+        } else if (error.message.includes('Cloudinary')) {
+            errorMessage = error.message; // Propagate Cloudinary config errors
         }
 
         return res.status(500).json({ message: errorMessage, error: error.message });

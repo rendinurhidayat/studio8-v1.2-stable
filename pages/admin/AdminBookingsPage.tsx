@@ -175,9 +175,9 @@ const BookingConfirmationModal: React.FC<{
                         <div className="flex justify-between items-center"><span className="text-gray-500">Metode:</span> <span className="font-semibold text-gray-800">{booking.paymentMethod}</span></div>
                         <div className="flex flex-col items-start">
                             <span className="text-gray-500 flex items-center gap-2 mb-2"><FileText size={16}/> Bukti Transfer:</span>
-                             {booking.paymentProofBase64 ? (
-                                <a href={booking.paymentProofBase64} target="_blank" rel="noopener noreferrer" className="block w-full">
-                                    <img src={booking.paymentProofBase64} alt="Bukti Pembayaran" className="w-full h-auto max-h-64 object-contain rounded-md border bg-white cursor-pointer"/>
+                             {booking.paymentProofUrl ? (
+                                <a href={booking.paymentProofUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
+                                    <img src={booking.paymentProofUrl} alt="Bukti Pembayaran" className="w-full h-auto max-h-64 object-contain rounded-md border bg-white cursor-pointer"/>
                                 </a>
                             ) : (
                                 <span className="text-sm font-medium text-red-600">Tidak ada file bukti transfer.</span>
