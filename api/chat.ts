@@ -16,15 +16,12 @@ export default async function handler(req: Request) {
     }
 
     try {
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) {
-            return new Response(JSON.stringify({ message: 'API key is not configured on the server. Please set the API_KEY environment variable.' }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
-        
         const { history } = (await req.json()) as { history: GeminiMessage[] };
+        
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error('API key is not configured on the server.');
+        }
         
         const ai = new GoogleGenAI({ apiKey });
 
