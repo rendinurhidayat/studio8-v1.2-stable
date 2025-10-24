@@ -18,7 +18,8 @@ interface SubPackage { id:string; name: string; price: number; description?: str
 interface AddOn { id: string; name: string; subAddOns: SubAddOn[]; }
 interface SubAddOn { id: string; name: string; price: number; }
 interface Client { id: string; name: string; email: string; phone: string; firstBooking: Date | admin.firestore.Timestamp; lastBooking: Date | admin.firestore.Timestamp; totalBookings: number; totalSpent: number; loyaltyPoints: number; referralCode: string; referredBy?: string; loyaltyTier?: string; }
-interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: { name: string; bookingThreshold: number; discountPercentage: number }[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
+interface LoyaltyTier { id: string; name: string; bookingThreshold: number; discountPercentage: number; }
+interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: LoyaltyTier[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
 // --- End Type Duplication ---
 
 // Helper function for robust initialization
@@ -66,8 +67,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return snapshot.docs.map(doc => fromFirestore<AddOn>(doc));
         };
         const getSystemSettings = async (): Promise<SystemSettings> => {
+            // Default settings to prevent crashes if the document doesn't exist
+            const defaults: SystemSettings = {
+                loyaltySettings: {
+                    pointsPerRupiah: 0.001,
+                    rupiahPerPoint: 100,
+                    referralBonusPoints: 50,
+                    firstBookingReferralDiscount: 15000,
+                    loyaltyTiers: [
+                        { id: '1', name: 'Bronze', bookingThreshold: 3, discountPercentage: 5 },
+                        { id: '2', name: 'Silver', bookingThreshold: 10, discountPercentage: 7 },
+                        { id: '3', name: 'Gold', bookingThreshold: 20, discountPercentage: 10 },
+                    ],
+                }
+            };
+
             const doc = await db.collection('settings').doc('main').get();
-            return doc.data() as SystemSettings;
+            if (doc.exists && doc.data()) {
+                const settings = doc.data() as Partial<SystemSettings>;
+                // Merge defaults to ensure all properties exist
+                return {
+                    ...defaults,
+                    ...settings,
+                    loyaltySettings: {
+                        ...defaults.loyaltySettings,
+                        ...settings.loyaltySettings,
+                    },
+                };
+            }
+            // Return defaults if document is not found
+            return defaults;
         };
         const getClientByEmail = async (email: string): Promise<Client | null> => {
             const doc = await db.collection('clients').doc(email.toLowerCase()).get();
@@ -216,7 +245,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ 
             success: true, 
             message: "Booking berhasil dibuat!",
-            bookingId: newBookingData.bookingCode, 
+            bookingCode: newBookingData.bookingCode, 
             cloudinaryUrl: paymentProofUrl 
         });
 
