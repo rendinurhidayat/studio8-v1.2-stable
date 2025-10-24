@@ -85,17 +85,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 throw new Error('Konfigurasi Cloudinary tidak ditemukan di environment variables.');
             }
 
-            const { base64, mimeType, fileName } = formData.paymentProofBase64;
+            const { base64, mimeType } = formData.paymentProofBase64;
             const dataUrl = `data:${mimeType};base64,${base64}`;
             
-            // Sanitize filename to create a safe base for the public_id
-            const safeFileNameBase = (fileName || `proof_${Date.now()}`)
-                .split('.').slice(0, -1).join('.') // Remove file extension
-                .replace(/[\/\\]+/g, '_')        // Replace slashes with underscores
-                .replace(/[^\w-]/g, '_');         // Replace other invalid chars with underscores
-
-            const publicId = `${safeFileNameBase}_${Math.random().toString(36).substring(2, 8)}`;
-
+            // 🔒 Sanitize filename based on client name or a fallback to prevent Cloudinary errors
+            const safeFileNameBase = (formData.name && String(formData.name).replace(/[\/\\]+/g, "_").replace(/[^\w.-]/g, "_")) || `proof_${Date.now()}`;
+            
+            // Add a random suffix to ensure uniqueness and construct the final public_id
+            const publicId = `${safeFileNameBase}-${Math.random().toString(36).substring(2, 8)}`;
+            
             console.log(`Uploading to Cloudinary with public_id: ${publicId}`);
             const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
                 method: 'POST',
@@ -112,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const errorData = await cloudinaryRes.json();
                 console.error("Cloudinary Upload Error:", errorData);
                 const errorMessage = errorData?.error?.message || 'Gagal mengunggah bukti pembayaran ke Cloudinary.';
-                throw new Error(errorMessage);
+                throw new Error(`Cloudinary Error: ${errorMessage}`);
             }
 
             const cloudinaryData = await cloudinaryRes.json();
@@ -213,20 +211,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         // --- 7. Respond ---
-        return res.status(200).json({ bookingCode: newBookingData.bookingCode });
+        return res.status(200).json({ 
+            success: true, 
+            message: "Booking berhasil dibuat!",
+            bookingId: newBookingData.bookingCode, 
+            cloudinaryUrl: paymentProofUrl 
+        });
 
     } catch (error: any) {
-        console.error('API Error in createPublicBooking:', error.stack);
-        
-        let errorMessage = 'Terjadi kesalahan internal pada server.';
-        if (error.message.includes('Firebase environment variable')) {
-             errorMessage = 'Kesalahan konfigurasi server. Harap hubungi support.';
-        } else if (error.message.includes('invalid_grant') || error.message.includes('invalid-credential') || error.message.includes('Invalid JWT Signature')) {
-             errorMessage = 'Kesalahan autentikasi server. Harap hubungi support.';
-        } else if (error.message.includes('Cloudinary')) {
-            errorMessage = error.message; // Propagate Cloudinary config errors
-        }
-
-        return res.status(500).json({ message: errorMessage, error: error.message });
+        console.error('API Error in createPublicBooking:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Gagal membuat booking.',
+            error: error.message || String(error),
+        });
     }
 }
