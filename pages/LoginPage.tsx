@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, useSearchParams, useNavigate, Link } from 'react-router-dom';
@@ -102,6 +103,8 @@ const LoginPage = () => {
         errorMessage = 'Jendela login Google ditutup. Silakan coba lagi.';
       } else if (error.code === 'auth/account-exists-with-different-credential') {
         errorMessage = 'Akun dengan email ini sudah ada, coba login dengan metode lain.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = 'Domain aplikasi ini tidak diizinkan untuk otentikasi. Mohon hubungi administrator untuk menambahkan domain ini ke daftar yang diizinkan di Firebase.';
       }
       setApiError(errorMessage);
       setIsLoading(false);
