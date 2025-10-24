@@ -30,7 +30,7 @@ function initializeFirebaseAdmin(): admin.app.App {
     
     return admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        storageBucket: `${process.env.FIREBASE_PROJECT_ID}.firebasestorage.app`
+        storageBucket: `${process.env.FIREBASE_PROJECT_ID}.appspot.com`
     });
 }
 
