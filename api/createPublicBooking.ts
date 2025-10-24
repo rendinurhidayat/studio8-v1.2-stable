@@ -86,9 +86,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let paymentProofUrl = '';
         if (formData.paymentProofBase64) {
              cloudinary.config({
-                cloud_name: process.env.CLOUDINARY_NAME,
-                api_key: process.env.CLOUDINARY_KEY,
-                api_secret: process.env.CLOUDINARY_SECRET,
+                cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+                api_key: process.env.CLOUDINARY_API_KEY,
+                api_secret: process.env.CLOUDINARY_API_SECRET,
             });
 
             const { base64, mimeType } = formData.paymentProofBase64;
