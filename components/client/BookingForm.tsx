@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPackages, getAddOns, createBooking, getSystemSettings, getClientDetailsForBooking, validateReferralCode } from '../../services/api';
+import { getPackages, getAddOns, getSystemSettings, getClientDetailsForBooking, validateReferralCode } from '../../services/api';
 import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, Client } from '../../types';
 import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, ArrowRight, ArrowLeft, Send, Home, Search, FileText, Loader2, AlertTriangle, Tag, Award, X } from 'lucide-react';
+
 
 // --- Type Definitions ---
 type FormData = {
@@ -58,6 +59,23 @@ const calculateDpAmount = (totalPrice: number, pkg: Package | undefined): number
     }
      // Studio under or equal 150k
     return 35000;
+};
+
+// --- Helper Functions ---
+const fileToBase64 = (file: File): Promise<{ base64: string, fileName: string, mimeType: string }> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64String = (reader.result as string).split(',')[1];
+            resolve({
+                base64: base64String,
+                fileName: file.name,
+                mimeType: file.type,
+            });
+        };
+        reader.onerror = error => reject(error);
+    });
 };
 
 
@@ -644,7 +662,7 @@ const BookingForm = () => {
         name: '', email: '', whatsapp: '', date: '', time: '', packageId: '', subPackageId: '',
         people: 1, subAddOnIds: [], notes: '', paymentMethod: '', paymentProof: null, referralCode: '', usePoints: false
     });
-    const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+    const [errors, setErrors] = useState<Partial<Record<keyof FormData, string> & { api?: string }>>({});
     const [bookingCode, setBookingCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [clientData, setClientData] = useState<Client | null>(null);
@@ -770,15 +788,41 @@ const BookingForm = () => {
         };
 
         setIsLoading(true);
+        setErrors(prev => ({ ...prev, api: undefined }));
         try {
-            const newBooking = await createBooking(formData);
-            if(newBooking) {
-                setBookingCode(newBooking.bookingCode);
+            let paymentProofBase64 = null;
+            if (formData.paymentProof) {
+                paymentProofBase64 = await fileToBase64(formData.paymentProof);
+            }
+
+            const payload = {
+                ...formData,
+                paymentProof: undefined, // remove file object
+                paymentProofBase64: paymentProofBase64
+            };
+
+            const response = await fetch('/api/createPublicBooking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Gagal membuat booking.');
+            }
+
+            const result = await response.json();
+            
+            if(result.bookingCode) {
+                setBookingCode(result.bookingCode);
                 setStep(CONFIRMATION_STEP);
+            } else {
+                throw new Error("Kode booking tidak diterima dari server.");
             }
         } catch (error) {
             console.error("Failed to create booking:", error);
-            // Optionally, set an error message to display to the user
+            setErrors(prev => ({ ...prev, api: (error as Error).message }));
         } finally {
             setIsLoading(false);
         }
@@ -803,6 +847,11 @@ const BookingForm = () => {
 
     return (
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mt-8 border border-base-200">
+            {errors.api && (
+                <div className="bg-error/10 text-error text-sm p-4 rounded-lg mb-4 border border-error/20">
+                    <strong>Gagal membuat booking:</strong> {errors.api}
+                </div>
+            )}
             {step < CONFIRMATION_STEP && (
                 <>
                     <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS_DISPLAY} />
