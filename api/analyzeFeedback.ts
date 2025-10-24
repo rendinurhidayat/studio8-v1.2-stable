@@ -11,18 +11,18 @@ export default async function handler(req: Request) {
     }
 
     try {
-        const { feedbackText } = await req.json();
-        if (!feedbackText) {
-             return new Response(JSON.stringify({ message: 'feedbackText is required in the request body.' }), {
-                status: 400,
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+             return new Response(JSON.stringify({ message: 'API key is not configured on the server. Please set the API_KEY environment variable.' }), {
+                status: 500,
                 headers: { 'Content-Type': 'application/json' },
             });
         }
 
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) {
-             return new Response(JSON.stringify({ message: 'API key is not configured on the server.' }), {
-                status: 500,
+        const { feedbackText } = await req.json();
+        if (!feedbackText) {
+             return new Response(JSON.stringify({ message: 'feedbackText is required in the request body.' }), {
+                status: 400,
                 headers: { 'Content-Type': 'application/json' },
             });
         }

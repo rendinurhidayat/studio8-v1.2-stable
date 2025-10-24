@@ -11,18 +11,18 @@ export default async function handler(req: Request) {
     }
 
     try {
-        const { historicalDataString } = await req.json();
-        if (!historicalDataString) {
-            return new Response(JSON.stringify({ message: 'historicalDataString is required.' }), {
-                status: 400,
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+            return new Response(JSON.stringify({ message: 'API key is not configured on the server. Please set the API_KEY environment variable.' }), {
+                status: 500,
                 headers: { 'Content-Type': 'application/json' },
             });
         }
 
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) {
-            return new Response(JSON.stringify({ message: 'API key is not configured.' }), {
-                status: 500,
+        const { historicalDataString } = await req.json();
+        if (!historicalDataString) {
+            return new Response(JSON.stringify({ message: 'historicalDataString is required.' }), {
+                status: 400,
                 headers: { 'Content-Type': 'application/json' },
             });
         }
