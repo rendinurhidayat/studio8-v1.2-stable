@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Studio 8 | Abadikan Momen Berharga Anda</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/react-big-calendar@1.12.2/lib/css/react-big-calendar.css">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              'primary': '#0a1a2f',
+              'primary-content': '#ffffff',
+              'accent': '#3b82f6',
+              'accent-content': '#ffffff',
+              'base-100': '#f8f9fa',
+              'base-200': '#e5e7eb',
+              'base-300': '#d1d5db',
+              'base-content': '#0a1a2f',
+              'muted': '#6b7280',
+              'success': '#16a34a',
+              'warning': '#f59e0b',
+              'error': '#dc2626',
+            },
+            borderRadius: {
+              'xl': '12px',
+              '2xl': '20px',
+            },
+            boxShadow: {
+               'lg': '0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07)',
+               'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .rbc-event {
+        background-color: #3b82f6 !important;
+        border-color: #2563eb !important;
+      }
+      .rbc-today {
+        background-color: #eff6ff !important;
+      }
+    </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+  // --- Injected Configuration ---
+  // This config is replaced by the CI/CD pipeline during deployment.
+  // Do not edit these placeholder values manually.
+  window.firebaseConfig = {
+    apiKey: "AIzaSyBq6T-Zwo39mOTIqHLaa6d1zYPIIQH0g34",
+    authDomain: "studio-8-manager-ec159.firebaseapp.com",
+    projectId: "studio-8-manager-ec159",
+    storageBucket: "studio-8-manager-ec159.firebasestorage.app",
+    messagingSenderId: "433216636123",
+    appId: "1:433216636123:web:6f05722c4617f1d44c78fe",
+    measurementId: "G-Z68L1FS2NQ"
+  };
+
+  window.appConfig = {
+      googleMapsReviewUrl: "https://maps.app.goo.gl/4JTSsqzEhz6RuBBr8"
+  };
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.4",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.546.0",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.4.0/",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
+    "date-fns": "https://aistudiocdn.com/date-fns@^4.1.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+    "react-big-calendar": "https://aistudiocdn.com/react-big-calendar@^1.19.4",
+    "date-fns/": "https://aistudiocdn.com/date-fns@^4.1.0/",
+    "vite": "https://aistudiocdn.com/vite@^7.1.12",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@0.11.0",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "fs/": "https://aistudiocdn.com/fs@^0.0.1-security/",
+    "node-cron": "https://aistudiocdn.com/node-cron@^4.2.1",
+    "qrcode-terminal": "https://aistudiocdn.com/qrcode-terminal@^0.12.0",
+    "whatsapp-web.js": "https://aistudiocdn.com/whatsapp-web.js@^1.34.1",
+    "dayjs": "https://aistudiocdn.com/dayjs@^1.11.18",
+    "firebase-functions": "https://aistudiocdn.com/firebase-functions@^6.6.0",
+    "firebase-admin": "https://aistudiocdn.com/firebase-admin@^13.5.0",
+    "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.5.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-base-100 text-base-content">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

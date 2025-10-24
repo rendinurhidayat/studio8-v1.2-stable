@@ -1,0 +1,5 @@
+{
+  "name": "Studio 8 V1.2 Stable",
+  "description": "A comprehensive, full-stack web system for managing Studio 8, a photo studio. This system caters to three main roles: Admin, Staff, and Client, with dedicated dashboards and functionalities for each. It includes features for booking, payment tracking, scheduling, and reporting.",
+  "requestFramePermissions": []
+}
