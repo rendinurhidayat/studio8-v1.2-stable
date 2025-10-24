@@ -48,10 +48,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.setItem('studio8-user', JSON.stringify(userData));
           setError(null); // Clear any previous errors on successful login
         } else {
-          console.warn("User authenticated but not found in Firestore by UID or email. Signing out. Email:", firebaseUser.email);
-          setError("Akun Google Anda diautentikasi tetapi tidak ditemukan di sistem. Pastikan admin telah mendaftarkan email Anda.");
-          await auth.signOut();
+          console.warn("User authenticated but not found in Firestore by UID or email. Preventing login. Email:", firebaseUser.email);
+          setError("Akun Google Anda berhasil diautentikasi, namun profil tidak ditemukan di sistem kami. Mohon pastikan admin telah mendaftarkan email Anda.");
+          // DO NOT SIGN OUT HERE. Let the user see the error on the login page.
+          // The next login attempt will handle the session correctly.
           setUser(null);
+          localStorage.removeItem('studio8-user');
         }
       } else {
         setUser(null);
