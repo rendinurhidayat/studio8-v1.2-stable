@@ -64,6 +64,7 @@ export default async function handler(req: Request) {
 
         const latestMessage = history[history.length - 1]?.parts[0]?.text || '';
         
+        // FIX: Corrected the call to pass the message as an object with a 'message' property.
         const result = await chat.sendMessageStream({ message: latestMessage });
         
         const stream = new ReadableStream({

@@ -50,17 +50,16 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
 
     const sendMessage = async (messageText: string) => {
         if (!messageText.trim() || isLoading) return;
+        
         setShowFaqs(false);
         setError(null);
+        setIsLoading(true);
 
         const userMessage: UIMessage = { id: crypto.randomUUID(), text: messageText, sender: 'user' };
         const userHistoryMessage: GeminiMessage = { role: 'user', parts: [{ text: messageText }] };
-
-        setMessages(prev => [...prev, userMessage]);
-        setIsLoading(true);
-
         const botMessageId = crypto.randomUUID();
-        setMessages(prev => [...prev, { id: botMessageId, text: <Loader2 className="animate-spin text-gray-500" size={20} />, sender: 'bot' }]);
+
+        setMessages(prev => [...prev, userMessage, { id: botMessageId, text: <Loader2 className="animate-spin text-gray-500" size={20} />, sender: 'bot' }]);
 
         try {
             const response = await fetch('/api/chat', {
@@ -71,32 +70,42 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
                 }),
             });
 
-            if (!response.ok || !response.body) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Gagal terhubung dengan asisten AI.');
+            if (!response.ok) {
+                let errorMessage = 'Gagal terhubung dengan asisten AI.';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } catch (e) {
+                    errorMessage = `Terjadi kesalahan pada server (${response.status}).`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            if (!response.body) {
+                throw new Error('Respons dari server tidak valid.');
             }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let botResponse = '';
+            let botResponseText = '';
             
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
                 
-                botResponse += decoder.decode(value, { stream: true });
+                botResponseText += decoder.decode(value, { stream: true });
 
                 setMessages(prev => prev.map(msg => 
-                    msg.id === botMessageId ? { ...msg, text: botResponse } : msg
+                    msg.id === botMessageId ? { ...msg, text: botResponseText } : msg
                 ));
             }
 
-            const botHistoryMessage: GeminiMessage = { role: 'model', parts: [{ text: botResponse }] };
+            const botHistoryMessage: GeminiMessage = { role: 'model', parts: [{ text: botResponseText }] };
             setHistory(prev => [...prev, userHistoryMessage, botHistoryMessage]);
 
-        } catch (error: any) {
-            console.error("Chatbot API error:", error);
-            const errorMessage = "Maaf, terjadi kesalahan. Coba beberapa saat lagi ya.";
+        } catch (err: any) {
+            console.error("Chatbot API error:", err);
+            const errorMessage = err.message || "Maaf, terjadi kesalahan. Coba beberapa saat lagi ya.";
             setError(errorMessage);
             setMessages(prev => prev.map(msg => 
                 msg.id === botMessageId ? { ...msg, text: errorMessage } : msg
@@ -105,6 +114,7 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
             setIsLoading(false);
         }
     };
+
 
     const handleSend = async () => {
         const userMessage = input;
