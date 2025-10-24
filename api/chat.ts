@@ -1,26 +1,26 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
-
-export const runtime = 'edge';
 
 interface GeminiMessage {
     role: 'user' | 'model';
     parts: { text: string }[];
 }
 
-export default async function handler(req: Request) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
-        return new Response(JSON.stringify({ message: 'Method Not Allowed' }), {
-            status: 405,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
     try {
-        const { history } = (await req.json()) as { history: GeminiMessage[] };
+        const { history } = req.body as { history: GeminiMessage[] };
         
-        const apiKey = process.env.GEMINI_API_KEY;
+        if (!history) {
+            return res.status(400).json({ message: 'Request body must contain a "history" array.' });
+        }
+
+        const apiKey = process.env.API_KEY;
         if (!apiKey) {
-            throw new Error('API key is not configured on the server.');
+            return res.status(500).json({ message: 'API key is not configured on the server.' });
         }
         
         const ai = new GoogleGenAI({ apiKey });
@@ -66,25 +66,23 @@ export default async function handler(req: Request) {
         
         const result = await chat.sendMessageStream({ message: latestMessage });
         
-        const stream = new ReadableStream({
-            async start(controller) {
-                const encoder = new TextEncoder();
-                for await (const chunk of result) {
-                    controller.enqueue(encoder.encode(chunk.text));
-                }
-                controller.close();
-            },
-        });
-
-        return new Response(stream, {
-            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-        });
+        // Set headers for streaming response
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        
+        // Stream the response chunks back to the client
+        for await (const chunk of result) {
+            res.write(chunk.text);
+        }
+        
+        // End the response stream
+        res.end();
 
     } catch (error: any) {
         console.error('API Error in chat.ts:', error);
-        return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        // Ensure that if an error occurs, we send a JSON response, but only if headers haven't been sent.
+        if (!res.headersSent) {
+            return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        }
+        res.end();
     }
 }
