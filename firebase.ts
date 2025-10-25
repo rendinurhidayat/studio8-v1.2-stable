@@ -18,7 +18,7 @@ const localDevFirebaseConfig = {
 
 // Use the injected config from index.html if it's available and not a placeholder.
 // Otherwise, fall back to the local development config.
-export const firebaseConfig = 
+const firebaseConfig = 
   window.firebaseConfig && !window.firebaseConfig.apiKey.startsWith('__FIREBASE') 
   ? window.firebaseConfig 
   : localDevFirebaseConfig;
@@ -39,6 +39,26 @@ if (!firebase.apps.length) {
 }
 
 // Ekspor layanan yang akan digunakan di seluruh aplikasi
-export const auth = firebase.auth();
-export const db = firebase.firestore();
-export const storage = firebase.storage();
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+// Apply experimental settings to mitigate potential connectivity issues in certain environments (e.g., Vercel deployments).
+// This forces Firestore to use HTTP long-polling instead of WebSockets, which can be more reliable if WebSockets are blocked or unstable.
+// This must be called before any other Firestore operations are initiated.
+try {
+  // FIX: Removed 'useFetchStreams' as it does not exist in the Firestore 'Settings' type.
+  db.settings({
+    experimentalForceLongPolling: true,
+  });
+} catch (error) {
+  if (error instanceof Error && (error as any).code === 'failed-precondition') {
+    // This error is expected in hot-reload development environments where settings cannot be changed after the first use.
+    // It is safe to ignore in this context.
+    console.warn('Firestore settings were not applied, likely due to hot-reloading. This is expected in development.');
+  } else {
+    console.error('An unexpected error occurred while applying Firestore settings:', error);
+  }
+}
+
+export { auth, db, storage, firebaseConfig };

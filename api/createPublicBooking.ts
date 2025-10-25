@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
+import webpush from 'web-push';
 
 export const config = {
     api: {
@@ -13,12 +14,14 @@ export const config = {
 // --- Type Duplication (necessary for serverless environment) ---
 enum BookingStatus { Pending = 'Pending' }
 enum PaymentStatus { Pending = 'Pending' }
+enum UserRole { Admin = 'Admin', Staff = 'Staff' }
 interface Package { id: string; name: string; description: string; subPackages: SubPackage[]; type?: 'Studio' | 'Outdoor'; imageUrl?: string; isGroupPackage?: boolean; }
 interface SubPackage { id:string; name: string; price: number; description?: string; }
 interface AddOn { id: string; name: string; subAddOns: SubAddOn[]; }
 interface SubAddOn { id: string; name: string; price: number; }
 interface Client { id: string; name: string; email: string; phone: string; firstBooking: Date | admin.firestore.Timestamp; lastBooking: Date | admin.firestore.Timestamp; totalBookings: number; totalSpent: number; loyaltyPoints: number; referralCode: string; referredBy?: string; loyaltyTier?: string; }
 interface LoyaltyTier { id: string; name: string; bookingThreshold: number; discountPercentage: number; }
+// FIX: Corrected typo 'pointsPerRiah' to 'pointsPerRupiah' to match the 'types.ts' definition and fix property access error.
 interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: LoyaltyTier[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
 // --- End Type Duplication ---
 
@@ -49,6 +52,59 @@ const fromFirestore = <T extends { id: string }>(doc: admin.firestore.DocumentSn
     return { id: doc.id, ...doc.data() } as T;
 };
 
+// --- Push Notification Helper ---
+async function sendPushNotification(bookingData: any) {
+    if (!process.env.VAPID_PRIVATE_KEY || !process.env.VITE_VAPID_PUBLIC_KEY || !process.env.WEB_PUSH_EMAIL) {
+        console.warn('VAPID keys or email not set. Skipping push notification.');
+        return;
+    }
+    
+    webpush.setVapidDetails(
+        process.env.WEB_PUSH_EMAIL,
+        process.env.VITE_VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+
+    const db = admin.firestore();
+    const subscriptionsSnapshot = await db.collection('pushSubscriptions')
+        .where('role', 'in', [UserRole.Admin, UserRole.Staff])
+        .get();
+
+    if (subscriptionsSnapshot.empty) {
+        console.log("No push subscriptions found for admins or staff.");
+        return;
+    }
+    
+    const notificationPayload = JSON.stringify({
+        title: 'Booking Baru Diterima!',
+        body: `Sesi untuk ${bookingData.clientName} pada ${bookingData.bookingDate.toDate().toLocaleDateString('id-ID', {day: '2-digit', month: 'long'})}`,
+        url: '/admin/schedule' // URL to open on click
+    });
+
+    const sendPromises = subscriptionsSnapshot.docs.flatMap(doc => {
+        const data = doc.data();
+        const userSubscriptions = data.subscriptions || [];
+        
+        return userSubscriptions.map((subscription: any) => 
+            webpush.sendNotification(subscription, notificationPayload)
+                .catch(error => {
+                    // If subscription is expired (410), remove it from Firestore
+                    if (error.statusCode === 410) {
+                        console.log(`Subscription for user ${doc.id} expired. Removing.`);
+                        return db.collection('pushSubscriptions').doc(doc.id).update({
+                            subscriptions: admin.firestore.FieldValue.arrayRemove(subscription)
+                        });
+                    } else {
+                        console.error('Error sending notification:', error);
+                    }
+                })
+        );
+    });
+
+    await Promise.allSettled(sendPromises);
+}
+
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method not allowed" });
@@ -58,6 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         initializeFirebaseAdmin();
         const db = admin.firestore();
 
+        // ... [Existing API helpers: getPackages, getAddOns, etc.] ...
         const getPackages = async (): Promise<Package[]> => {
             const snapshot = await db.collection('packages').get();
             return snapshot.docs.map(doc => fromFirestore<Package>(doc));
@@ -67,35 +124,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return snapshot.docs.map(doc => fromFirestore<AddOn>(doc));
         };
         const getSystemSettings = async (): Promise<SystemSettings> => {
-            // Default settings to prevent crashes if the document doesn't exist
-            const defaults: SystemSettings = {
-                loyaltySettings: {
-                    pointsPerRupiah: 0.001,
-                    rupiahPerPoint: 100,
-                    referralBonusPoints: 50,
-                    firstBookingReferralDiscount: 15000,
-                    loyaltyTiers: [
-                        { id: '1', name: 'Bronze', bookingThreshold: 3, discountPercentage: 5 },
-                        { id: '2', name: 'Silver', bookingThreshold: 10, discountPercentage: 7 },
-                        { id: '3', name: 'Gold', bookingThreshold: 20, discountPercentage: 10 },
-                    ],
-                }
-            };
-
+            const defaults: SystemSettings = { loyaltySettings: { pointsPerRupiah: 0.001, rupiahPerPoint: 100, referralBonusPoints: 50, firstBookingReferralDiscount: 15000, loyaltyTiers: [] } };
             const doc = await db.collection('settings').doc('main').get();
             if (doc.exists && doc.data()) {
                 const settings = doc.data() as Partial<SystemSettings>;
-                // Merge defaults to ensure all properties exist
-                return {
-                    ...defaults,
-                    ...settings,
-                    loyaltySettings: {
-                        ...defaults.loyaltySettings,
-                        ...settings.loyaltySettings,
-                    },
-                };
+                return { ...defaults, ...settings, loyaltySettings: { ...defaults.loyaltySettings, ...settings.loyaltySettings } };
             }
-            // Return defaults if document is not found
             return defaults;
         };
         const getClientByEmail = async (email: string): Promise<Client | null> => {
@@ -108,60 +142,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         const generateReferralCode = (): string => `S8REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
+
         const formData = req.body;
-
-        // Generate a unique booking code upfront to use it for the filename.
         const newBookingCode = `S8-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-        // --- 1. Handle Payment Proof Upload to Cloudinary ---
-        let paymentProofUrl = '';
+        
+        // ... [Existing Cloudinary upload logic] ...
+         let paymentProofUrl = '';
         if (formData.paymentProofBase64) {
              cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
                 api_key: process.env.CLOUDINARY_API_KEY,
                 api_secret: process.env.CLOUDINARY_API_SECRET,
             });
-
             const { base64, mimeType } = formData.paymentProofBase64;
             const dataUrl = `data:${mimeType};base64,${base64}`;
-            
-            // Use the new booking code as a unique identifier for the filename.
             const publicId = `proof_${newBookingCode}`;
-            console.log(`Attempting to upload to Cloudinary with public_id: '${publicId}'`);
-
             try {
                 const uploadResult = await cloudinary.uploader.upload(dataUrl, {
-                    folder: "studio8_uploads",
-                    public_id: publicId,
-                    resource_type: "auto",
-                    upload_preset: "studio8_proofs",
+                    folder: "studio8_uploads", public_id: publicId, resource_type: "auto", upload_preset: "studio8_proofs",
                 });
-
-                if (!uploadResult?.secure_url) {
-                    console.error("Cloudinary upload successful but returned no secure_url:", uploadResult);
-                    throw new Error("Cloudinary gagal memberikan URL yang aman setelah upload.");
-                }
-                
+                if (!uploadResult?.secure_url) throw new Error("Cloudinary gagal memberikan URL yang aman setelah upload.");
                 paymentProofUrl = uploadResult.secure_url;
-                console.log("✅ Cloudinary upload successful:", paymentProofUrl);
-
             } catch (uploadError: any) {
-                console.error("Full Cloudinary Upload Error Object:", JSON.stringify(uploadError, null, 2));
                 const message = uploadError.error?.message || uploadError.message || 'Gagal mengunggah bukti pembayaran ke Cloudinary.';
                 throw new Error(message);
             }
         }
-
-        // --- 2. Re-fetch data for server-side validation & calculation ---
+        
+        // ... [Existing validation, calculation, and client management logic] ...
         const [allPackages, allAddOns, settings] = await Promise.all([getPackages(), getAddOns(), getSystemSettings()]);
-
         const selectedPackage = allPackages.find(p => p.id === formData.packageId);
         if (!selectedPackage) throw new Error("Package not found");
         const selectedSubPackage = selectedPackage.subPackages.find(sp => sp.id === formData.subPackageId);
         if (!selectedSubPackage) throw new Error("Sub-package not found");
         const selectedSubAddOns = allAddOns.flatMap(a => a.subAddOns).filter(sa => formData.subAddOnIds.includes(sa.id));
-
-        // --- 3. Client Management ---
         const lowerEmail = formData.email.toLowerCase();
         const clientRef = db.collection('clients').doc(lowerEmail);
         let client = await getClientByEmail(formData.email);
@@ -173,30 +187,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 totalBookings: 0, totalSpent: 0, loyaltyPoints: 0, referralCode: generateReferralCode(), loyaltyTier: 'Newbie'
             };
         }
-        
-        // --- 4. Price & Discount Calculation (Server-side) ---
         let extraPersonCharge = (selectedPackage.isGroupPackage && formData.people > 2) ? (formData.people - 2) * 15000 : 0;
         let subtotal = selectedSubPackage.price + selectedSubAddOns.reduce((sum, sa) => sum + sa.price, 0) + extraPersonCharge;
-        
         let discountAmount = 0, discountReason = '', pointsRedeemed = 0, pointsValue = 0, referralCodeUsed = '';
-
         if (isNewClient && formData.referralCode) {
             const referrer = await getClientByReferralCode(formData.referralCode);
             if (referrer && referrer.email.toLowerCase() !== lowerEmail) {
                 discountAmount = settings.loyaltySettings.firstBookingReferralDiscount;
-                discountReason = `Diskon Referral`;
-                referralCodeUsed = formData.referralCode.toUpperCase();
-                client.referredBy = referralCodeUsed;
+                discountReason = `Diskon Referral`; referralCodeUsed = formData.referralCode.toUpperCase(); client.referredBy = referralCodeUsed;
             }
         } else if (!isNewClient && client) {
             const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => b.bookingThreshold - a.bookingThreshold);
             const clientTier = sortedTiers.find(t => client!.totalBookings >= t.bookingThreshold);
-            if (clientTier) {
-                discountAmount = subtotal * (clientTier.discountPercentage / 100);
-                discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`;
-            }
+            if (clientTier) { discountAmount = subtotal * (clientTier.discountPercentage / 100); discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`; }
         }
-
         if (formData.usePoints && client && client.loyaltyPoints > 0) {
             pointsValue = Math.min(subtotal - discountAmount, client.loyaltyPoints * settings.loyaltySettings.rupiahPerPoint);
             pointsRedeemed = Math.round(pointsValue / settings.loyaltySettings.rupiahPerPoint);
@@ -204,10 +208,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             discountReason = `${discountReason ? discountReason + ' & ' : ''}${pointsRedeemed.toLocaleString('id-ID')} Poin`;
             client.loyaltyPoints -= pointsRedeemed;
         }
-
         let totalPrice = subtotal - discountAmount;
 
-        // --- 5. Create Booking Document ---
         const newBookingData = {
             bookingCode: newBookingCode,
             clientName: formData.name, clientEmail: formData.email, clientPhone: formData.whatsapp,
@@ -227,7 +229,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             discountAmount, discountReason, referralCodeUsed, pointsRedeemed, pointsValue, extraPersonCharge
         };
         
-        // --- 6. Firestore Transaction ---
         const bookingRef = db.collection('bookings').doc();
         await db.runTransaction(async (transaction) => {
             transaction.set(bookingRef, newBookingData);
@@ -238,7 +239,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        // --- 7. Respond ---
+        // --- NEW: Trigger Push Notification (asynchronously) ---
+        sendPushNotification(newBookingData).catch(err => {
+            console.error("Failed to send push notification in background:", err);
+        });
+
         return res.status(200).json({ 
             success: true, 
             message: "Booking berhasil dibuat!",
