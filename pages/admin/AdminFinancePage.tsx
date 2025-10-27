@@ -128,10 +128,10 @@ const FinancialForecastingSection: React.FC<{ bookings: Booking[] }> = ({ bookin
         const historicalDataString = historicalData.map(d => `${d.month}: Rp ${d.revenue.toLocaleString('id-ID')}`).join('\n');
         
         try {
-             const response = await fetch('/api/generateForecast', {
+             const response = await fetch('/api/ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ historicalDataString }),
+                body: JSON.stringify({ action: 'generateForecast', historicalDataString }),
             });
 
             if (!response.ok) {

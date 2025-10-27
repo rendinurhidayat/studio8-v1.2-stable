@@ -124,7 +124,21 @@ const StaffInternDetailPage = () => {
         if (!report.content) return;
         setGeneratingFeedbackId(report.id);
         try {
-            const updatedReport = await generateAiFeedbackForReport(report.id, report.content);
+            const response = await fetch('/api/ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'generateAiFeedback', reportId: report.id, reportContent: report.content }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to generate AI feedback');
+            }
+            const updatedReport = await response.json();
+             // Convert ISO string back to Date object to match the type
+            if (updatedReport.submittedAt) {
+                updatedReport.submittedAt = new Date(updatedReport.submittedAt);
+            }
+
             setReports(prevReports => 
                 prevReports.map(r => r.id === updatedReport.id ? updatedReport : r)
             );

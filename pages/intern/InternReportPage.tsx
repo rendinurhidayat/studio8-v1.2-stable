@@ -54,10 +54,10 @@ const InternReportPage = () => {
             }
 
             // Fire-and-forget call to the analysis API
-            fetch('/api/analyzeInternReport', {
+            fetch('/api/ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id, reportContent: content }),
+                body: JSON.stringify({ action: 'analyzeInternReport', userId: user.id, reportContent: content }),
             }).catch(error => {
                 // Log error but don't block UI
                 console.error("Failed to trigger AI analysis:", error);

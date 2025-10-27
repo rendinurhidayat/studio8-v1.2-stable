@@ -19,10 +19,16 @@ const ExplanationPill: React.FC<{
         setIsLoading(true);
         setError('');
         try {
-            const response = await fetch('/api/generateQuizExplanation', {
+            const response = await fetch('/api/ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ questionText, options, correctAnswerIndex, userAnswerIndex }),
+                body: JSON.stringify({ 
+                    action: 'generateQuizExplanation',
+                    questionText, 
+                    options, 
+                    correctAnswerIndex, 
+                    userAnswerIndex 
+                }),
             });
             if (!response.ok) throw new Error('Gagal mendapatkan penjelasan dari AI.');
             const text = await response.text();

@@ -137,10 +137,10 @@ const AdminDashboardPage: React.FC = () => {
                 packagePopularity: chartData.packagePopularity,
                 dailyRevenue: chartData.dailyData.slice(-7),
             };
-            const response = await fetch('/api/generateMarketingInsight', {
+            const response = await fetch('/api/ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ action: 'generateMarketingInsight', ...payload }),
             });
             if (!response.ok) throw new Error('Failed to generate insight');
             const data = await response.json();

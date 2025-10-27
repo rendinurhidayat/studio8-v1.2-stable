@@ -60,10 +60,11 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
         setMessages(prev => [...prev, userMessage, { id: botMessageId, text: <Loader2 className="animate-spin text-gray-500" size={20} />, sender: 'bot' }]);
 
         try {
-            const response = await fetch('/api/chat', {
+            const response = await fetch('/api/ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    action: 'chat',
                     history: [...history, userHistoryMessage],
                 }),
             });

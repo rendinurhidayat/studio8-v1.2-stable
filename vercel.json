@@ -1,6 +1,9 @@
 
 {
     "functions": {
+        "api/ai.ts": {
+            "maxDuration": 60
+        },
         "api/generateCertificate.ts": {
             "maxDuration": 60
         },
@@ -22,38 +25,11 @@
         "api/generateMou.ts": {
             "maxDuration": 60
         },
-        "api/analyzeFeedback.ts": {
-            "maxDuration": 30
-        },
-        "api/generateForecast.ts": {
-            "maxDuration": 30
-        },
         "api/uploadImage.ts": {
-            "maxDuration": 30
-        },
-        "api/chat.ts": {
-            "maxDuration": 30
-        },
-        "api/analyzeInternReport.ts": {
             "maxDuration": 30
         },
         "api/saveSubscription.ts": {
             "maxDuration": 15
-        },
-        "api/generateAiFeedback.ts": {
-            "maxDuration": 30
-        },
-        "api/generateQuizExplanation.ts": {
-            "maxDuration": 30
-        },
-        "api/generateQuizQuestions.ts": {
-            "maxDuration": 45
-        },
-        "api/analyzeQuizResult.ts": {
-            "maxDuration": 30
-        },
-        "api/generateMarketingInsight.ts": {
-            "maxDuration": 30
         }
     }
 }

@@ -104,10 +104,10 @@ const AdminFeedbackPage: React.FC = () => {
         try {
             const feedbackText = feedbacks.map((fb, i) => `${i + 1}. Rating: ${fb.rating}/5. Komentar: "${fb.komentar}"`).join('\n');
             
-            const response = await fetch('/api/analyzeFeedback', {
+            const response = await fetch('/api/ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ feedbackText }),
+                body: JSON.stringify({ action: 'analyzeFeedback', feedbackText }),
             });
 
             if (!response.ok) {
