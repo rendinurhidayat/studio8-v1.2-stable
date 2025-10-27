@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, useSearchParams, useNavigate, Link } from 'react-router-dom';
@@ -149,7 +147,7 @@ const LoginPage = () => {
             <ArrowLeft />
         </Link>
         <div className="text-center">
-            <h1 className="text-3xl font-bold text-primary">Studio 8</h1>
+            <h1 className="text-3xl font-bold text-primary">STUDIO 8</h1>
             <p className="mt-2 text-muted">Selamat datang kembali ✨</p>
             <p className="text-sm text-muted">Login sebagai <span className="font-bold text-base-content">{role}</span></p>
         </div>

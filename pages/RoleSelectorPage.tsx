@@ -55,7 +55,7 @@ const RoleSelectorPage = () => {
                 transition={{ duration: 0.5 }}
                 className="text-center mb-12"
             >
-                <h1 className="text-4xl font-extrabold text-slate-800">Studio 8 Management</h1>
+                <h1 className="text-4xl font-extrabold text-slate-800">STUDIO 8 Management</h1>
                 <p className="mt-2 text-gray-600">Silakan pilih peran Anda untuk masuk.</p>
             </motion.div>
 

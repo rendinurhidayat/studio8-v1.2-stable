@@ -108,7 +108,7 @@ export interface Package {
     description: string;
     subPackages: SubPackage[];
     type?: 'Studio' | 'Outdoor';
-    imageUrl?: string;
+    imageUrls?: string[];
     isGroupPackage?: boolean;
 }
 

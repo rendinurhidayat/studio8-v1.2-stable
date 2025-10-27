@@ -11,7 +11,7 @@ import {
 import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, FeatureToggles, Promo, OperationalHours, PaymentMethods, InventoryItem, InventoryStatus, LoyaltyTier } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud } from 'lucide-react';
 import Card from '../../components/common/Card';
 
 type ModalMode = 'add' | 'edit';
@@ -172,10 +172,9 @@ const ServicesSettingsTab = () => {
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     
     const [formData, setFormData] = useState({
-        name: '', price: '', description: '', imageUrl: '', type: 'Studio', isGroupPackage: false
+        name: '', price: '', description: '', imageUrls: [] as string[], type: 'Studio', isGroupPackage: false
     });
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imageFiles, setImageFiles] = useState<File[]>([]);
 
 
     const fetchData = async () => {
@@ -191,8 +190,7 @@ const ServicesSettingsTab = () => {
     }, []);
 
     const openModal = (mode: ModalMode, type: ItemType, itemData?: any, parentId?: string) => {
-        setImageFile(null);
-        setImagePreview(null);
+        setImageFiles([]);
         setModalState({ isOpen: true, mode, type, itemData, parentId });
         
         if (mode === 'edit' && itemData) {
@@ -200,15 +198,12 @@ const ServicesSettingsTab = () => {
                 name: itemData.name || '',
                 price: itemData.price?.toString() || '',
                 description: itemData.description || '',
-                imageUrl: itemData.imageUrl || '',
+                imageUrls: itemData.imageUrls || [],
                 type: itemData.type || 'Studio',
                 isGroupPackage: itemData.isGroupPackage || false,
             });
-            if (itemData.imageUrl) {
-                setImagePreview(itemData.imageUrl);
-            }
         } else {
-            setFormData({ name: '', price: '', description: '', imageUrl: '', type: 'Studio', isGroupPackage: false });
+            setFormData({ name: '', price: '', description: '', imageUrls: [], type: 'Studio', isGroupPackage: false });
         }
     };
 
@@ -220,20 +215,17 @@ const ServicesSettingsTab = () => {
     };
     
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setImageFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+        if (e.target.files) {
+            setImageFiles(prev => [...prev, ...Array.from(e.target.files!)]);
         }
     };
 
-    const handleRemoveImage = () => {
-        setImageFile(null);
-        setImagePreview(null);
+    const handleRemoveExistingImage = (urlToRemove: string) => {
+        setFormData(prev => ({...prev, imageUrls: prev.imageUrls.filter(url => url !== urlToRemove)}));
+    };
+
+    const handleRemoveNewImage = (fileToRemove: File) => {
+        setImageFiles(prev => prev.filter(file => file !== fileToRemove));
     };
 
     const handleFormSubmit = async (e: React.FormEvent) => {
@@ -241,35 +233,29 @@ const ServicesSettingsTab = () => {
         if (!currentUser) return;
     
         const { mode, type, itemData, parentId } = modalState;
+        
+        let finalImageUrls = [...formData.imageUrls];
     
-        let imageUrl = itemData?.imageUrl || '';
-        if (imageFile) {
+        if (imageFiles.length > 0) {
+            const uploadPromises = imageFiles.map(file => 
+                fileToBase64(file).then(imageBase64 => 
+                    fetch('/api/uploadImage', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ imageBase64, folder: 'package_images' })
+                    }).then(res => res.json())
+                )
+            );
+            
             try {
-                const imageBase64 = await fileToBase64(imageFile);
-                const uploadResponse = await fetch('/api/uploadImage', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        imageBase64,
-                        folder: 'package_images',
-                        publicId: itemData?.id ? `package_${itemData.id}` : `package_${Date.now()}`
-                    })
-                });
-    
-                if (!uploadResponse.ok) {
-                    const errorData = await uploadResponse.json();
-                    throw new Error(errorData.message || 'Image upload failed');
-                }
-                const { secure_url } = await uploadResponse.json();
-                imageUrl = secure_url;
+                const uploadResults = await Promise.all(uploadPromises);
+                const newUrls = uploadResults.map(result => result.secure_url);
+                finalImageUrls.push(...newUrls);
             } catch (error) {
                 console.error(error);
-                alert(`Error uploading image: ${(error as Error).message}`);
+                alert(`Error uploading images: ${(error as Error).message}`);
                 return; 
             }
-        } else if (!imagePreview && itemData?.imageUrl) {
-            // This handles the case where the user removes the image
-            imageUrl = '';
         }
     
         if (type === 'package') {
@@ -278,7 +264,7 @@ const ServicesSettingsTab = () => {
                 description: formData.description,
                 type: formData.type as 'Studio' | 'Outdoor',
                 isGroupPackage: formData.isGroupPackage,
-                imageUrl: imageUrl,
+                imageUrls: finalImageUrls,
             };
     
             if (mode === 'add') {
@@ -413,28 +399,30 @@ const ServicesSettingsTab = () => {
                     )}
                     {modalState.type === 'package' && (
                         <>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Gambar Contoh</label>
-                                <div className="mt-1 flex items-center gap-4">
-                                    {imagePreview ? (
-                                        <img src={imagePreview} alt="Preview" className="h-20 w-20 object-cover rounded-md border"/>
-                                    ) : (
-                                        <div className="h-20 w-20 bg-gray-100 rounded-md flex items-center justify-center text-gray-400">
-                                            <Box size={32}/>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <input type="file" id="image-upload" accept="image/*" onChange={handleImageChange} className="hidden"/>
-                                        <label htmlFor="image-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">
-                                            {imagePreview ? 'Ganti Gambar' : 'Upload Gambar'}
-                                        </label>
-                                        {imagePreview && (
-                                            <button type="button" onClick={handleRemoveImage} className="ml-2 text-sm text-red-600 hover:underline">
-                                                Hapus
+                           <div>
+                                <label className="block text-sm font-medium text-gray-700">Gambar Showcase</label>
+                                <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                    {formData.imageUrls.map(url => (
+                                        <div key={url} className="relative group">
+                                            <img src={url} alt="Existing" className="h-24 w-full object-cover rounded-md"/>
+                                            <button type="button" onClick={() => handleRemoveExistingImage(url)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100">
+                                                <Trash2 size={12}/>
                                             </button>
-                                        )}
-                                        <p className="text-xs text-muted mt-1">Gunakan file .jpg atau .png.</p>
-                                    </div>
+                                        </div>
+                                    ))}
+                                    {imageFiles.map(file => (
+                                        <div key={file.name} className="relative group">
+                                            <img src={URL.createObjectURL(file)} alt="Preview" className="h-24 w-full object-cover rounded-md"/>
+                                            <button type="button" onClick={() => handleRemoveNewImage(file)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100">
+                                                <Trash2 size={12}/>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <label htmlFor="image-upload" className="flex flex-col items-center justify-center h-24 w-full border-2 border-dashed rounded-md cursor-pointer hover:bg-gray-50">
+                                        <UploadCloud size={24} className="text-gray-400"/>
+                                        <span className="text-xs text-gray-500">Tambah</span>
+                                        <input type="file" id="image-upload" multiple accept="image/*" onChange={handleImageChange} className="hidden"/>
+                                    </label>
                                 </div>
                             </div>
                              <div>

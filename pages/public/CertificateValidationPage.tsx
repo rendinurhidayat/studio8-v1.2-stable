@@ -91,7 +91,7 @@ const CertificateValidationPage = () => {
         <div className="min-h-screen bg-base-100 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-lg">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-primary">Studio <span className="text-accent">8</span></h1>
+                    <h1 className="text-3xl font-bold text-primary">STUDIO <span className="text-accent">8</span></h1>
                     <p className="text-muted">Verifikasi Keaslian Sertifikat</p>
                 </div>
                 <div className="bg-white p-8 rounded-2xl shadow-xl border">

@@ -11,11 +11,24 @@ interface MediaModalProps {
   onClose: () => void;
 }
 
+const getOptimizedMediaUrl = (url: string, width: number): string => {
+    if (!url || !url.includes('res.cloudinary.com')) {
+        return url;
+    }
+    const parts = url.split('/upload/');
+    if (parts.length !== 2) {
+        return url;
+    }
+    // This transformation works for both images and videos on Cloudinary
+    const transformations = `w_${width},c_limit,q_auto,f_auto`;
+    return `${parts[0]}/upload/${transformations}/${parts[1]}`;
+};
+
 const MediaViewer: React.FC<{ work: HighlightWork }> = ({ work }) => {
     if (work.type === 'Video') {
-      return <video src={work.mediaUrl} controls autoPlay className="w-full h-full object-contain" />;
+      return <video src={getOptimizedMediaUrl(work.mediaUrl, 1200)} controls autoPlay className="w-full h-full object-contain" />;
     }
-    return <img src={work.mediaUrl} alt={work.title} className="w-full h-full object-contain" />;
+    return <img src={getOptimizedMediaUrl(work.mediaUrl, 1200)} alt={work.title} className="w-full h-full object-contain" />;
 };
 
 const InfoItem: React.FC<{ icon: React.ReactNode, label: string, value?: string }> = ({ icon, label, value }) => {

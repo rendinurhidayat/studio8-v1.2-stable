@@ -60,7 +60,7 @@ const InternLoginPage = () => {
                     <ArrowLeft />
                 </Link>
                 <div className="text-center">
-                    <h1 className="text-3xl font-bold text-primary">Studio 8</h1>
+                    <h1 className="text-3xl font-bold text-primary">STUDIO 8</h1>
                     <p className="mt-2 text-muted">Intern Dashboard ✨</p>
                     <p className="text-sm text-muted">Login dengan akun Google yang terdaftar</p>
                 </div>

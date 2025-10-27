@@ -71,7 +71,7 @@ const Header = () => {
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/80 backdrop-blur-sm shadow-md' : 'bg-transparent'}`}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-20">
-        <h1 className={`text-2xl font-bold transition-colors ${scrolled ? 'text-base-content' : 'text-primary-content'}`}>Studio <span className={scrolled ? 'text-primary' : 'text-primary-content'}>8</span></h1>
+        <h1 className={`text-2xl font-bold transition-colors ${scrolled ? 'text-base-content' : 'text-primary-content'}`}>STUDIO <span className={scrolled ? 'text-primary' : 'text-primary-content'}>8</span></h1>
         
         <div className="hidden md:flex items-center gap-6">
             <nav className="flex items-center space-x-8">
@@ -106,75 +106,105 @@ const Header = () => {
   );
 }
 
-const heroImages = [
-    '/images/hero-1.jpg',
-    '/images/hero-2.jpg',
-    '/images/hero-3.jpg',
-    '/images/hero-4.jpg',
-    '/images/hero-5.jpg',
-];
-
 const HeroSection = () => {
-    const [index, setIndex] = useState(0);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    // Array of 5 placeholder images for the carousel
+    const images = [
+        '/images/hero-1.jpg',
+        '/images/hero-2.jpg',
+        '/images/hero-3.jpg',
+        '/images/hero-4.jpg',
+        '/images/hero-5.jpg',
+    ];
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setIndex(prevIndex => (prevIndex + 1) % heroImages.length);
-        }, 5000); // Change image every 5 seconds
-        return () => clearInterval(interval);
-    }, []);
+        // Automatically cycle through images every 4 seconds
+        const timer = setInterval(() => {
+            setCurrentImageIndex(prevIndex => (prevIndex + 1) % images.length);
+        }, 4000);
+        return () => clearInterval(timer); // Cleanup on component unmount
+    }, [images.length]);
+
+    const container = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.2,
+                delayChildren: 0.3,
+            },
+        },
+    };
+
+    const item = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0 },
+    };
 
     return (
-        <section className="relative min-h-screen flex items-center justify-center text-center text-white overflow-hidden">
-            <AnimatePresence>
-                <motion.div
-                    key={index}
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${heroImages[index]})` }}
-                    initial={{ opacity: 0, scale: 1.1, filter: 'blur(4px)' }}
-                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, scale: 1.1, filter: 'blur(4px)' }}
-                    transition={{ duration: 1.5, ease: 'easeInOut' }}
-                />
-            </AnimatePresence>
-            <div className="absolute inset-0 bg-black bg-opacity-60"></div>
-            <div className="relative z-10 px-4">
-                <motion.h1
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8 }}
-                    className="text-4xl sm:text-5xl md:text-7xl font-extrabold leading-tight tracking-tight drop-shadow-lg"
-                >
-                    STUDIO 8
-                </motion.h1>
-                <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2 }}
-                    className="mt-4 text-base sm:text-lg md:text-xl max-w-2xl mx-auto text-white/90 drop-shadow-md"
-                >
-                    Express Your Time with Happiness.
-                </motion.p>
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.8, delay: 0.4 }}
-                    className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4"
-                >
-                    <Link
-                        to="/pesan-sesi"
-                        className="px-6 py-3 text-base sm:px-8 sm:py-4 sm:text-lg font-semibold text-base-content bg-white rounded-xl shadow-lg hover:bg-base-200 transition-transform transform hover:scale-105 w-full sm:w-auto"
-                    >
+        <section className="bg-[#0a0a0a] text-white flex flex-col md:flex-row items-center justify-between px-6 md:px-12 py-20 min-h-screen">
+          {/* Left Section */}
+          <motion.div 
+            className="flex-1 space-y-6 text-center md:text-left mb-10 md:mb-0 md:pr-12"
+            variants={container}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.p variants={item} className="uppercase tracking-[0.2em] text-gray-400 text-sm">STUDIO 8</motion.p>
+            <motion.h1 variants={item} className="text-4xl md:text-5xl font-bold leading-tight tracking-tight">
+              Abadikan Momenmu dengan Gaya dan Cerita Sendiri.
+            </motion.h1>
+            <motion.p variants={item} className="text-base md:text-lg text-gray-400 leading-relaxed max-w-lg mx-auto md:mx-0">
+              Self Photo, Couple Session, atau Pemotretan Profesional — semua bisa diatur lewat sistem booking yang nyaman.
+            </motion.p>
+            <motion.div 
+                variants={item} 
+                className="flex flex-col items-center md:items-start pt-4 gap-6"
+            >
+                {/* Primary CTA Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
+                    <Link to="/pesan-sesi" className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:scale-105 transition-transform duration-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] w-full sm:w-auto text-center">
                         Booking Sekarang
                     </Link>
-                    <Link
-                        to="/cek-status"
-                        className="px-6 py-3 text-base sm:px-8 sm:py-3 sm:text-lg font-semibold text-white bg-transparent border-2 border-white rounded-xl hover:bg-white hover:text-base-content transition-colors w-full sm:w-auto"
-                    >
-                        Cek Status Booking
+                    <Link to="/paket" className="border border-white/50 text-white/80 px-8 py-3 rounded-full font-semibold hover:bg-white/10 hover:border-white hover:text-white transition-colors duration-300 w-full sm:w-auto text-center">
+                        Lihat Paket & Harga
                     </Link>
-                </motion.div>
-            </div>
+                </div>
+
+                {/* Secondary CTA */}
+                <div className="text-center md:text-left">
+                    <p className="text-sm text-gray-400 mb-2">Udah booking? Cek status booking Mu.</p>
+                    <Link to="/cek-status" className="inline-block border border-accent text-accent px-6 py-2 rounded-full font-semibold hover:bg-accent/10 transition-colors duration-300 text-sm">
+                        Booking Status
+                    </Link>
+                </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Right Section */}
+          <motion.div 
+            className="flex-1 relative w-full h-[300px] md:h-[500px] rounded-2xl overflow-hidden shadow-lg"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+          >
+            <AnimatePresence>
+                <motion.img
+                    key={currentImageIndex}
+                    src={images[currentImageIndex]}
+                    alt="Studio 8 Showcase"
+                    loading="lazy"
+                    decoding="async"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.5, ease: 'easeInOut' }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
+            </AnimatePresence>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          </motion.div>
         </section>
     );
 };
@@ -209,7 +239,7 @@ const AboutSection = () => (
 
         <div className="space-y-6">
           <span className="text-sm font-bold uppercase text-accent tracking-widest">Tentang Kami</span>
-          <h2 className="text-3xl md:text-4xl font-bold text-primary">Studio Space and Creative Hub Kota Banjar.</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-primary">Ruang Kreatifmu di Jantung Kota Banjar.</h2>
           <p className="text-base sm:text-lg text-muted leading-relaxed">
             Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
           </p>
@@ -390,7 +420,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Column 1: Brand */}
           <div className="md:col-span-1">
-            <h2 className="text-2xl font-bold">Studio 8</h2>
+            <h2 className="text-2xl font-bold">STUDIO 8</h2>
             <p className="mt-2 text-primary-content/70 text-sm">Momenmu, gayamu. Studio foto modern di Kota Banjar untuk mengabadikan setiap ekspresi terbaikmu.</p>
           </div>
           

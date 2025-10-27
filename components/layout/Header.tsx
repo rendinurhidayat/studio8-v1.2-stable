@@ -17,7 +17,7 @@ const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar }) => {
           <Menu size={20} />
         </button>
         <div className="text-xl sm:text-2xl font-bold text-primary">
-          Studio <span className="text-accent">8</span>
+          STUDIO <span className="text-accent">8</span>
         </div>
       </div>
       <div className="flex items-center gap-4">

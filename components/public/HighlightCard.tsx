@@ -9,6 +9,18 @@ interface HighlightCardProps {
   onClick: () => void;
 }
 
+const getOptimizedImageUrl = (url: string, width: number): string => {
+    if (!url || !url.includes('res.cloudinary.com')) {
+        return url;
+    }
+    const parts = url.split('/upload/');
+    if (parts.length !== 2) {
+        return url;
+    }
+    const transformations = `w_${width},c_limit,q_auto,f_auto`;
+    return `${parts[0]}/upload/${transformations}/${parts[1]}`;
+};
+
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 50 },
   visible: (i: number) => ({
@@ -34,8 +46,10 @@ const HighlightCard: React.FC<HighlightCardProps> = ({ work, index, onClick }) =
     >
       <div className="relative aspect-video">
         <img 
-          src={work.thumbnailUrl} 
+          src={getOptimizedImageUrl(work.thumbnailUrl, 400)} 
           alt={work.title} 
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover transition-transform duration-300" 
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">

@@ -22,6 +22,7 @@ const SuspenseFallback = () => (
 // Lazy load all page components
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const BookingPage = lazy(() => import('./pages/BookingPage'));
+const PackagesPage = lazy(() => import('./pages/PackagesPage'));
 const StatusPage = lazy(() => import('./pages/StatusPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
 const AdminBookingsPage = lazy(() => import('./pages/admin/AdminBookingsPage'));
@@ -149,6 +150,7 @@ const AppRoutes = () => {
     <Suspense fallback={<SuspenseFallback />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/paket" element={<PackagesPage />} />
           <Route path="/highlight" element={<HighlightPage />} />
           <Route path="/validate/:id" element={<CertificateValidationPage />} />
           <Route path="/jadwal" element={<FeatureRoute feature="publicCalendar"><PublicCalendarPage /></FeatureRoute>} />
