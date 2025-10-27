@@ -46,8 +46,8 @@ const FAQModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, 
 const BookingTypeSelector: React.FC<{ selected: FormType, onSelect: (type: FormType) => void }> = ({ selected, onSelect }) => {
     const types = [
         { id: 'individual', label: 'Sesi Individu', icon: <User size={20}/> },
-        { id: 'institutional', label: 'Grup / Instansi', icon: <Briefcase size={20}/> },
-        { id: 'sponsorship', label: 'Sponsor / Partner', icon: <Award size={20}/> }
+        { id: 'institutional', label: 'Instansi', icon: <Briefcase size={20}/> },
+        { id: 'sponsorship', label: 'Sponsorship', icon: <Award size={20}/> }
     ] as const;
 
     return (

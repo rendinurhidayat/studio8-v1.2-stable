@@ -239,9 +239,9 @@ const AboutSection = () => (
 
         <div className="space-y-6">
           <span className="text-sm font-bold uppercase text-accent tracking-widest">Tentang Kami</span>
-          <h2 className="text-3xl md:text-4xl font-bold text-primary">Ruang Kreatifmu di Jantung Kota Banjar.</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-primary">Studio Space and Creative Hub Kota Banjar.</h2>
           <p className="text-base sm:text-lg text-muted leading-relaxed">
-            Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
+            Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> atau di fotoin <i>photographer profesional</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
           </p>
           <ul className="space-y-4 pt-4 border-t border-base-200">
               <li className="flex items-start gap-4">
@@ -421,7 +421,7 @@ const Footer = () => {
           {/* Column 1: Brand */}
           <div className="md:col-span-1">
             <h2 className="text-2xl font-bold">STUDIO 8</h2>
-            <p className="mt-2 text-primary-content/70 text-sm">Momenmu, gayamu. Studio foto modern di Kota Banjar untuk mengabadikan setiap ekspresi terbaikmu.</p>
+            <p className="mt-2 text-primary-content/70 text-sm">Abadikan waktu, rayakan gayamu — hanya di Studio 8.</p>
           </div>
           
           {/* Column 2: Quick Links */}
