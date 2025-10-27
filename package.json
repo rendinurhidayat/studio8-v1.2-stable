@@ -21,6 +21,8 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
     "lucide-react": "^0.378.0",
+    "pdfkit": "^0.17.2",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-big-calendar": "^1.12.2",
     "react-dom": "^18.2.0",
@@ -29,6 +31,8 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@types/pdfkit": "^0.13.4",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.0",
     "@types/react-big-calendar": "^1.8.9",
     "@types/react-dom": "^18.2.0",
