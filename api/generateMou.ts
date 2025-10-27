@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
-import PDFDocument from 'pdfkit';
+import * as PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         initializeFirebaseAdmin();
         const db = admin.firestore();
         
-        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        const doc = new (PDFDocument as any)({ size: 'A4', margin: 50 });
         const pdfStream = doc;
         
         // --- PDF Content ---

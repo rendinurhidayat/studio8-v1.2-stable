@@ -58,7 +58,7 @@ Feedback Anda:`;
         });
 
         const updatedDoc = await reportRef.get();
-        const updatedData = { id: updatedDoc.id, ...updatedDoc.data() };
+        const updatedData = { id: updatedDoc.id, ...(updatedDoc.data() as any) };
         
         // Convert Firestore Timestamps to strings to be JSON serializable for the response
         if (updatedData.submittedAt && (updatedData.submittedAt as any).toDate) {

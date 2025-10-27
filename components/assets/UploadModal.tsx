@@ -130,7 +130,7 @@ const UploadModal: React.FC<{ isOpen: boolean; onClose: () => void; onUploadComp
                                 <div className="flex flex-col items-center gap-1">
                                     {f.status === 'uploading' && <Loader2 size={18} className="animate-spin text-primary" />}
                                     {f.status === 'success' && <CheckCircle size={18} className="text-success" />}
-                                    {f.status === 'error' && <AlertCircle size={18} className="text-error" title={f.error} />}
+                                    {f.status === 'error' && <AlertCircle size={18} className="text-error" />}
                                     <button onClick={() => setFilesToUpload(p => p.filter(file => file.id !== f.id))} className="text-muted hover:text-error" disabled={isProcessing}><X size={16}/></button>
                                 </div>
                             </div>

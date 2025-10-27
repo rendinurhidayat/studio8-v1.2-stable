@@ -1,6 +1,6 @@
-import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation } from '../types';
-import { notificationService } from './notificationService';
-import { auth, db, storage, firebaseConfig } from '../firebase';
+import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation } from './types';
+import { notificationService } from './services/notificationService';
+import { auth, db, storage, firebaseConfig } from './firebase';
 import firebase from "firebase/compat/app";
 import { format } from 'date-fns';
 

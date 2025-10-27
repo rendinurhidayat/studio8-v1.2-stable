@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
-import PDFDocument from 'pdfkit';
-import QRCode from 'qrcode';
+import * as PDFDocument from 'pdfkit';
+import * as QRCode from 'qrcode';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const qrCodeImage = await QRCode.toDataURL(validationUrl, { errorCorrectionLevel: 'H' });
 
         // 3. Generate PDF with the new dark theme design
-        const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
+        const doc = new (PDFDocument as any)({ size: 'A4', layout: 'landscape', margin: 0 });
         const pdfStream = doc;
 
         const accentColor = '#00AEEF'; // Cyan accent
