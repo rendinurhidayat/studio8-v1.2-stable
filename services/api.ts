@@ -482,7 +482,7 @@ export const createTask = async (task: Omit<Task, 'id'>, currentUserId: string):
     const docRef = await db.collection('tasks').add(task);
     await logActivity(currentUserId, `Menugaskan tugas ke ${task.assigneeName}`, task.text);
     const doc = await docRef.get();
-    return fromFirestore<Task>(doc, ['createdAt', 'dueDate']));
+    return fromFirestore<Task>(doc, ['createdAt', 'dueDate']);
 };
 
 export const updateTask = async (taskId: string, updates: Partial<Task>, currentUserId: string): Promise<void> => {
