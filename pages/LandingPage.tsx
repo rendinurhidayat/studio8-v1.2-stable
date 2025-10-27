@@ -111,11 +111,11 @@ const HeroSection = () => {
 
     // Array of 5 placeholder images for the carousel
     const images = [
-        '/images/carousel-1.jpg',
-        '/images/carousel-2.jpg',
-        '/images/carousel-3.jpg',
-        '/images/carousel-4.jpg',
-        '/images/carousel-5.jpg',
+        '/images/hero-1.jpg',
+        '/images/hero-2.jpg',
+        '/images/hero-3.jpg',
+        '/images/hero-4.jpg',
+        '/images/hero-5.jpg',
     ];
 
     useEffect(() => {
