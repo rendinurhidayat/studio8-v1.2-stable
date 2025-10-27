@@ -145,7 +145,7 @@ const HeroSection = () => {
                     transition={{ duration: 0.8 }}
                     className="text-4xl sm:text-5xl md:text-7xl font-extrabold leading-tight tracking-tight drop-shadow-lg"
                 >
-                    Express Your Time with Happiness
+                    STUDIO 8
                 </motion.h1>
                 <motion.p
                     initial={{ opacity: 0, y: 20 }}
@@ -153,7 +153,7 @@ const HeroSection = () => {
                     transition={{ duration: 0.8, delay: 0.2 }}
                     className="mt-4 text-base sm:text-lg md:text-xl max-w-2xl mx-auto text-white/90 drop-shadow-md"
                 >
-                    Studio foto kota banjar dengan konsep studio house.
+                    Express Your Time with Happiness.
                 </motion.p>
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -209,7 +209,7 @@ const AboutSection = () => (
 
         <div className="space-y-6">
           <span className="text-sm font-bold uppercase text-accent tracking-widest">Tentang Kami</span>
-          <h2 className="text-3xl md:text-4xl font-bold text-primary">Ruang Kreatifmu di Jantung Kota Banjar.</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-primary">Studio Space and Creative Hub Kota Banjar.</h2>
           <p className="text-base sm:text-lg text-muted leading-relaxed">
             Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
           </p>
