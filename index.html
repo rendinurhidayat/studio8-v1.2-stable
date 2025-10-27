@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0a1a2f" />
+    <link rel="apple-touch-icon" href="/images/icons/icon-192x192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Studio 8" />
+
     <title>Studio 8 | Abadikan Momen Berharga Anda</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,6 +39,16 @@
               'success': '#16a34a',
               'warning': '#f59e0b',
               'error': '#dc2626',
+              'neon-blue': '#00AEEF',
+              'gold': '#D9A441',
+              'dark': {
+                  'bg': '#0F0F0F',
+                  'card': '#1A1A1A',
+                  'text': '#FFFFFF',
+                  'border': '#374151',
+                  'accent-blue': '#00AEEF',
+                  'accent-gold': '#D9A441'
+              }
             },
             borderRadius: {
               'xl': '12px',
@@ -56,6 +75,7 @@
       }
     </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
   // --- Injected Configuration ---
@@ -92,10 +112,19 @@
     "vite": "https://aistudiocdn.com/vite@^7.1.12",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.0",
     "@vercel/node": "https://aistudiocdn.com/@vercel/node@^5.5.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+    "buffer": "https://aistudiocdn.com/buffer@^6.0.3",
+    "firebase-admin": "https://aistudiocdn.com/firebase-admin@^13.5.0",
+    "firebase-admin/": "https://aistudiocdn.com/firebase-admin@^13.5.0/",
+    "next": "https://aistudiocdn.com/next@^16.0.0",
+    "cloudinary": "https://aistudiocdn.com/cloudinary@^2.8.0",
+    "web-push": "https://aistudiocdn.com/web-push@^3.6.7",
+    "qrcode": "https://aistudiocdn.com/qrcode@^1.5.4",
+    "pdfkit": "https://aistudiocdn.com/pdfkit@^0.17.2"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-base-100 text-base-content">
     <div id="root"></div>

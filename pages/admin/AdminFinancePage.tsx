@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getBookings, getPackages, getExpenses, addExpense, deleteExpense } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Booking, Package, BookingStatus, PaymentHistoryStatus, Expense, FeedbackAnalysis } from '../../types';
+import { Booking, Package, BookingStatus, PaymentHistoryStatus, Expense } from '../../types';
 import StatCard from '../../components/admin/StatCard';
 import { DollarSign, ArrowUpCircle, ArrowDownCircle, FileText, Filter, X, Download, PlusCircle, Trash2, PieChart, BarChart, Sparkles, Loader2, Lightbulb, TrendingUp, AlertTriangle } from 'lucide-react';
 import InvoiceModal from '../../components/admin/InvoiceModal';
@@ -17,6 +17,13 @@ import subDays from 'date-fns/subDays';
 import id from 'date-fns/locale/id';
 import { ResponsiveContainer, BarChart as RechartsBarChart, LineChart, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart as RechartsPieChart, Pie, Cell, Legend } from 'recharts';
 import ChartCard from '../../components/admin/ChartCard';
+
+declare global {
+    interface Window {
+        jspdf: any;
+        html2canvas: any;
+    }
+}
 
 // --- Type Definitions for AI Forecast ---
 interface BudgetRecommendation {
@@ -49,7 +56,7 @@ const getPaymentStatus = (booking: Booking): { status: PaymentHistoryStatus, col
     }
 };
 
-const COLORS = ['#3b82f6', '#16a34a', '#f59e0b', '#dc2626', '#6b7280', '#6366f1'];
+const COLORS = ['var(--tw-colors-accent)', 'var(--tw-colors-success)', 'var(--tw-colors-warning)', 'var(--tw-colors-error)', 'var(--tw-colors-muted)', '#6366f1'];
 
 const ExpenseModal: React.FC<{isOpen: boolean, onClose: () => void, onAdd: (desc: string, amount: number) => void}> = ({ isOpen, onClose, onAdd }) => {
     const [description, setDescription] = useState('');
@@ -75,7 +82,7 @@ const ExpenseModal: React.FC<{isOpen: boolean, onClose: () => void, onAdd: (desc
                     <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required className="mt-1 w-full p-2 border rounded-md" placeholder="500000"/>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
-                    <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-100 rounded-md">Batal</button>
+                    <button type="button" onClick={onClose} className="px-4 py-2 bg-base-200 rounded-md">Batal</button>
                     <button type="submit" className="px-4 py-2 bg-primary text-primary-content rounded-md">Simpan</button>
                 </div>
             </form>
@@ -185,17 +192,17 @@ const FinancialForecastingSection: React.FC<{ bookings: Booking[] }> = ({ bookin
                     <button onClick={handleGenerateForecast} disabled={isLoading} className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold disabled:opacity-50">
                         {isLoading ? <><Loader2 size={18} className="animate-spin" /> Menganalisis...</> : <><Sparkles size={18} /> Buat Prediksi & Rencana</>}
                     </button>
-                    {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
+                    {error && <p className="text-error text-sm mt-4">{error}</p>}
                 </div>
             )}
 
             {forecastResult && (
                  <div className="border-t pt-4">
                      <div className="flex justify-end gap-2 mb-4">
-                        <button onClick={handleExportCsv} className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold"><Download size={16}/> Export CSV</button>
-                        <button onClick={handleExportPdf} className="flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold"><Download size={16}/> Export PDF</button>
+                        <button onClick={handleExportCsv} className="flex items-center gap-2 px-3 py-1.5 bg-success text-white rounded-lg hover:bg-success/90 text-sm font-semibold"><Download size={16}/> Export CSV</button>
+                        <button onClick={handleExportPdf} className="flex items-center gap-2 px-3 py-1.5 bg-error text-white rounded-lg hover:bg-error/90 text-sm font-semibold"><Download size={16}/> Export PDF</button>
                     </div>
-                    <div ref={forecastRef} className="p-4 bg-slate-50 rounded-lg">
+                    <div ref={forecastRef} className="p-4 bg-base-100 rounded-lg">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                             {/* Card: Predicted Revenue */}
                             <div className="bg-white p-4 rounded-lg shadow border">
@@ -209,7 +216,7 @@ const FinancialForecastingSection: React.FC<{ bookings: Booking[] }> = ({ bookin
                                      <ResponsiveContainer width="100%" height="100%">
                                         <RechartsPieChart>
                                             <Pie data={budgetChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={5}>
-                                                {budgetChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                                {budgetChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length].replace('var(--tw-colors-', '').replace(')', '')} />)}
                                             </Pie>
                                             <Tooltip formatter={(value) => `Rp ${Number(value).toLocaleString('id-ID')}`} />
                                         </RechartsPieChart>
@@ -235,7 +242,7 @@ const FinancialForecastingSection: React.FC<{ bookings: Booking[] }> = ({ bookin
                                     <Tooltip formatter={(value) => `Rp ${Number(value).toLocaleString('id-ID')}`} />
                                     <Bar dataKey="revenue" name="Pendapatan" radius={[4, 4, 0, 0]}>
                                         {projectionChartData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={index === projectionChartData.length - 1 ? '#f59e0b' : '#3b82f6'} />
+                                            <Cell key={`cell-${index}`} fill={index === projectionChartData.length - 1 ? 'var(--tw-colors-warning)' : 'var(--tw-colors-accent)'} />
                                         ))}
                                     </Bar>
                                 </RechartsBarChart>
@@ -366,9 +373,9 @@ const AdminFinancePage = () => {
             <h1 className="text-3xl font-bold">Dasbor Keuangan & Analitik</h1>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-6">
-                <StatCard title="Pendapatan Minggu Ini" value={`Rp ${weeklyIncome.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-green-100 text-green-600 rounded-full"><DollarSign /></div>} />
-                <StatCard title="Pendapatan Bulan Ini" value={`Rp ${monthlyIncome.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-green-100 text-green-600 rounded-full"><ArrowUpCircle /></div>} />
-                <StatCard title="Pengeluaran Bulan Ini" value={`Rp ${monthlyExpenses.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-red-100 text-red-600 rounded-full"><ArrowDownCircle /></div>} />
+                <StatCard title="Pendapatan Minggu Ini" value={`Rp ${weeklyIncome.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-success/10 text-success rounded-full"><DollarSign /></div>} />
+                <StatCard title="Pendapatan Bulan Ini" value={`Rp ${monthlyIncome.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-success/10 text-success rounded-full"><ArrowUpCircle /></div>} />
+                <StatCard title="Pengeluaran Bulan Ini" value={`Rp ${monthlyExpenses.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-error/10 text-error rounded-full"><ArrowDownCircle /></div>} />
                 <StatCard title="Laba Bulan Ini" value={`Rp ${monthlyProfit.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-indigo-100 text-indigo-600 rounded-full"><PieChart /></div>} />
             </div>
 
@@ -380,7 +387,7 @@ const AdminFinancePage = () => {
                             <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
                             <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `Rp${Number(value) / 1000}k`} />
                             <Tooltip formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, "Pemasukan"]}/>
-                            <Bar dataKey="Pemasukan" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Pemasukan" fill="var(--tw-colors-accent)" radius={[4, 4, 0, 0]} />
                         </RechartsBarChart>
                     </ResponsiveContainer>
                 </ChartCard>
@@ -389,7 +396,7 @@ const AdminFinancePage = () => {
                         <RechartsPieChart>
                             <Pie data={packageRevenueData} cx="50%" cy="50%" labelLine={false} outerRadius={80} dataKey="value" nameKey="name">
                                 {packageRevenueData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length].replace('var(--tw-colors-', '').replace(')', '')} />
                                 ))}
                             </Pie>
                             <Tooltip formatter={(value) => `Rp ${Number(value).toLocaleString('id-ID')}`}/>
@@ -415,7 +422,7 @@ const AdminFinancePage = () => {
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                     <table className="min-w-full">
-                        <thead className="bg-slate-50 sticky top-0"><tr>
+                        <thead className="bg-base-100 sticky top-0"><tr>
                             <th className="px-4 py-2 text-left text-xs font-semibold">Tanggal</th>
                             <th className="px-4 py-2 text-left text-xs font-semibold">Deskripsi</th>
                             <th className="px-4 py-2 text-right text-xs font-semibold">Jumlah</th>
@@ -428,33 +435,33 @@ const AdminFinancePage = () => {
                                     <td className="px-4 py-2 text-sm">{e.description}</td>
                                     <td className="px-4 py-2 text-sm text-right font-semibold">Rp {e.amount.toLocaleString('id-ID')}</td>
                                     <td className="px-4 py-2 text-center">
-                                        <button onClick={() => setExpenseToDelete(e)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
+                                        <button onClick={() => setExpenseToDelete(e)} className="p-1 text-muted hover:text-error"><Trash2 size={16}/></button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                     {expenses.length === 0 && <p className="text-center text-gray-400 p-4">Belum ada pengeluaran tercatat.</p>}
+                     {expenses.length === 0 && <p className="text-center text-muted p-4">Belum ada pengeluaran tercatat.</p>}
                 </div>
             </div>
 
             <div className="bg-white p-4 rounded-lg shadow-md border mb-6">
                 <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
-                        <Filter size={16} className="text-gray-500"/>
+                        <Filter size={16} className="text-muted"/>
                         <span className="font-semibold text-sm">Filter Invoice:</span>
                     </div>
-                    <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="p-2 border rounded-md text-sm bg-gray-50">
+                    <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="p-2 border rounded-md text-sm bg-base-100">
                         <option value="all">Semua Bulan</option>
                         {monthOptions.map(month => (
                             <option key={month} value={month}>{format(new Date(month + '-02'), 'MMMM yyyy', { locale: id})}</option>
                         ))}
                     </select>
-                    <select value={filterPackage} onChange={e => setFilterPackage(e.target.value)} className="p-2 border rounded-md text-sm bg-gray-50">
+                    <select value={filterPackage} onChange={e => setFilterPackage(e.target.value)} className="p-2 border rounded-md text-sm bg-base-100">
                         <option value="all">Semua Paket</option>
                         {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
-                    <button onClick={() => { setFilterMonth('all'); setFilterPackage('all'); }} className="p-2 text-gray-500 hover:text-gray-800">
+                    <button onClick={() => { setFilterMonth('all'); setFilterPackage('all'); }} className="p-2 text-muted hover:text-base-content">
                         <X size={18}/>
                     </button>
                     <div className="flex-grow"></div>
@@ -467,25 +474,25 @@ const AdminFinancePage = () => {
 
             <div className="bg-white shadow-md rounded-lg overflow-hidden">
                 <table className="min-w-full">
-                    <thead className="bg-slate-50">
+                    <thead className="bg-base-100">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Invoice</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Klien</th>
-                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tanggal</th>
-                            <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Total</th>
-                            <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Status</th>
-                            <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Aksi</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Invoice</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Klien</th>
+                            <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Tanggal</th>
+                            <th className="px-6 py-3 text-right text-xs font-semibold text-muted uppercase">Total</th>
+                            <th className="px-6 py-3 text-center text-xs font-semibold text-muted uppercase">Status</th>
+                            <th className="px-6 py-3 text-center text-xs font-semibold text-muted uppercase">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-base-200">
                         {filteredBookings.map(b => {
                             const paymentInfo = getPaymentStatus(b);
                             return (
-                                <tr key={b.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-sm font-mono text-blue-600">{b.bookingCode}</td>
-                                    <td className="px-6 py-4 text-sm font-medium text-gray-800">{b.clientName}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">{format(b.bookingDate, 'dd MMM yyyy')}</td>
-                                    <td className="px-6 py-4 text-sm font-semibold text-right text-gray-800">Rp {b.totalPrice.toLocaleString('id-ID')}</td>
+                                <tr key={b.id} className="hover:bg-base-100/50">
+                                    <td className="px-6 py-4 text-sm font-mono text-accent">{b.bookingCode}</td>
+                                    <td className="px-6 py-4 text-sm font-medium text-base-content">{b.clientName}</td>
+                                    <td className="px-6 py-4 text-sm text-muted">{format(b.bookingDate, 'dd MMM yyyy')}</td>
+                                    <td className="px-6 py-4 text-sm font-semibold text-right text-base-content">Rp {b.totalPrice.toLocaleString('id-ID')}</td>
                                     <td className="px-6 py-4 text-center">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${paymentInfo.color}`}>
                                             {paymentInfo.status}
@@ -505,7 +512,7 @@ const AdminFinancePage = () => {
                         })}
                     </tbody>
                 </table>
-                 {filteredBookings.length === 0 && <p className="text-center text-gray-500 p-8">Tidak ada data yang cocok dengan filter Anda.</p>}
+                 {filteredBookings.length === 0 && <p className="text-center text-muted p-8">Tidak ada data yang cocok dengan filter Anda.</p>}
             </div>
 
             <InvoiceModal

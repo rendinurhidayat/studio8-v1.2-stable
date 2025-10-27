@@ -19,8 +19,19 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const role = searchParams.get('role');
 
+  const getDashboardPath = (role: UserRole) => {
+      switch (role) {
+          case UserRole.Admin: return '/admin/dashboard';
+          case UserRole.Staff: return '/staff/dashboard';
+          case UserRole.AnakMagang:
+          case UserRole.AnakPKL:
+              return '/intern/dashboard';
+          default: return '/';
+      }
+  }
+
   useEffect(() => {
-    if (!role || (role !== UserRole.Admin && role !== UserRole.Staff)) {
+    if (!role || !Object.values(UserRole).includes(role as UserRole)) {
         navigate('/auth');
     }
     // Clear any auth errors when component mounts or role changes
@@ -117,7 +128,7 @@ const LoginPage = () => {
   
   if (user) {
       if (user.role === role) {
-        const dashboardPath = user.role === UserRole.Admin ? '/admin/dashboard' : '/staff/dashboard';
+        const dashboardPath = getDashboardPath(user.role);
         return <Navigate to={dashboardPath} />;
       } else {
          if (!apiError) {

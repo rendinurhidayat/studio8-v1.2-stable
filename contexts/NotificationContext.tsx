@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { Notification, UserRole } from '../types';
 import { notificationService } from '../services/notificationService';
@@ -63,8 +64,15 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
+  const filteredNotifications = user 
+    ? notifications.filter(n => n.recipient === user.role)
+    : [];
+
+  const filteredUnreadCount = filteredNotifications.filter(n => !n.read).length;
+
+
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification }}>
+    <NotificationContext.Provider value={{ notifications: filteredNotifications, unreadCount: filteredUnreadCount, markAsRead, markAllAsRead, addNotification }}>
       {children}
     </NotificationContext.Provider>
   );

@@ -26,6 +26,7 @@ export enum UserRole {
   Fotografer = 'Fotografer',
   EditorFoto = 'Editor Foto',
   EditorVideo = 'Editor Video',
+  EditorAcara = 'Editor Acara',
   Desain = 'Desain',
   AnakMagang = 'Anak Magang',
   AnakPKL = 'Anak PKL',
@@ -64,6 +65,22 @@ export enum InventoryStatus {
     Missing = 'Hilang',
 }
 
+export enum AttendanceStatus {
+    Present = 'Present',
+    Absent = 'Absent',
+    Leave = 'Leave',
+}
+
+export enum InternMood {
+    Baik = 'Baik',
+    Netral = 'Netral',
+    Lelah = 'Lelah',
+}
+
+export enum ReportStatus {
+    Dikirim = 'Dikirim',
+}
+
 export interface User {
   id: string;
   name: string;
@@ -73,6 +90,9 @@ export interface User {
   password?: string;
   asalSekolah?: string;
   jurusan?: string;
+  startDate?: Date;
+  endDate?: Date;
+  totalPoints?: number;
 }
 
 export interface SubPackage {
@@ -133,6 +153,51 @@ export interface Booking {
   pointsValue?: number; // Rupiah value of redeemed points
   referralCodeUsed?: string;
   extraPersonCharge?: number;
+
+  // Institutional Booking Fields
+  bookingType?: 'institutional' | 'individual';
+  institutionName?: string;
+  picName?: string;
+  picContact?: string;
+  numberOfParticipants?: number;
+  activityType?: string;
+  requestLetterUrl?: string;
+  paymentMode?: 'dp' | 'lunas' | 'termin';
+  dueDate?: Date; // For termin payments
+  agreementUrl?: string;
+}
+
+export enum SponsorshipStatus {
+  Pending = 'Pending',
+  Approved = 'Approved',
+  Rejected = 'Rejected',
+  Negotiation = 'Negotiation',
+  MoUDrafted = 'MoU Drafted',
+  AwaitingSignature = 'Awaiting Signature',
+  Active = 'Active',
+}
+
+
+export interface Sponsorship {
+  id: string;
+  eventName: string;
+  institutionName: string;
+  picName: string;
+  picContact: string;
+  partnershipType: string;
+  benefits: string;
+  proposalUrl: string;
+  status: SponsorshipStatus;
+  createdAt: Date;
+  agreementUrl?: string; // MoU URL
+}
+
+export interface CollaborationActivity {
+  id: string;
+  timestamp: Date;
+  action: string;
+  details?: string;
+  userName: string;
 }
 
 export interface Transaction {
@@ -162,12 +227,15 @@ export interface Client {
 export interface Task {
   id: string;
   text: string;
+  description?: string;
   completed: boolean;
   assigneeId: string;
   assigneeName: string;
   creatorId: string;
   creatorName: string;
   createdAt: Date;
+  dueDate?: Date;
+  progress?: number; // 0-100
 }
 
 export interface Expense {
@@ -187,17 +255,35 @@ export interface Feedback {
   publish: boolean;
 }
 
+export interface MentorFeedback {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  feedback: string;
+  rating: number;
+  date: Date;
+  mentorId: string;
+  mentorName: string;
+}
+
 export interface FeedbackAnalysis {
-  overallSentiment: string;
-  positivePoints: string[];
-  areasForImprovement: string[];
-  actionableSuggestions: string[];
+    overallSentiment: string;
+    positivePoints: string[];
+    areasForImprovement: string[];
+    actionableSuggestions: string[];
 }
 
 export interface Insight {
     id: string;
     date: Date;
     insight: string;
+}
+
+export interface AIInsight {
+  id: string;
+  type: 'produktif' | 'santai' | 'tidak fokus' | 'default';
+  insight: string;
+  date: Date;
 }
 
 export interface Notification {
@@ -207,7 +293,7 @@ export interface Notification {
   timestamp: string; // ISO string
   read: boolean;
   link?: string;
-  recipient: UserRole.Admin | UserRole.Staff;
+  recipient: UserRole.Admin | UserRole.Staff | UserRole.AnakMagang | UserRole.AnakPKL;
 }
 
 export interface Promo {
@@ -280,4 +366,241 @@ export interface InventoryItem {
     status: InventoryStatus;
     lastChecked: Date | null;
     notes?: string;
+}
+
+export interface Asset {
+  id: string;
+  url: string; // Cloudinary URL
+  publicId: string; // Cloudinary public ID for deletion
+  fileName: string;
+  fileType: 'image' | 'video';
+  category: string;
+  tags: string[];
+  uploadedBy: string; // User's name
+  uploadedById: string; // User's ID
+  uploadedAt: Date;
+}
+
+export interface Attendance {
+    id: string;
+    userId: string;
+    date: string; // YYYY-MM-DD
+    checkInTime: Date;
+    checkOutTime?: Date;
+    status: AttendanceStatus;
+}
+
+export interface DailyReport {
+    id: string;
+    userId: string;
+    date: string; // YYYY-MM-DD
+    content: string;
+    mood: InternMood;
+    status: ReportStatus;
+    blockers?: string;
+    submittedAt: Date;
+    mentorFeedback?: string;
+}
+
+export interface InternReport {
+  id: string;
+  fileName: string;
+  downloadUrl: string;
+  generatedAt: Date;
+  generatedBy: string; // mentor's name
+}
+
+export interface ChatMessage {
+    id: string;
+    senderId: string;
+    senderName: string;
+    text: string;
+    timestamp: Date;
+}
+
+export interface ChatRoom {
+    id: string; // user1Id_user2Id (sorted)
+    participantIds: string[];
+    participantInfo: {
+        [key: string]: { // userId
+            name: string;
+            email: string;
+        }
+    };
+    lastMessage?: {
+        text: string;
+        timestamp: Date;
+        senderId: string;
+    };
+    createdAt: Date;
+}
+
+export interface HighlightWork {
+  id: string;
+  title: string;
+  author: string;
+  major?: string;
+  mentor?: string;
+  description: string;
+  mediaUrl: string;
+  thumbnailUrl: string;
+  type: 'Video' | 'Image' | 'Design';
+  highlightDate: Date;
+  category: 'Client' | 'PKL' | 'Event' | 'BTS';
+}
+
+export interface Certificate {
+  id: string; // The certificate ID, e.g. CERT-S8-XYZ123
+  studentName: string;
+  major: string;
+  period: string; // e.g., "2 Feb 2026 - 30 Mei 2026"
+  mentor: string;
+  issuedDate: Date;
+  certificateUrl: string; // URL to the PDF on Cloudinary
+  qrValidationUrl: string; // Public URL for validation
+  verified: boolean; // Always true upon creation
+}
+
+export interface DailyProgressTask {
+  title: string;
+  status: 'done' | 'in_progress' | 'pending';
+}
+
+export interface DailyProgress {
+  id: string;
+  studentId: string;
+  date: string; // YYYY-MM-DD
+  tasks: DailyProgressTask[];
+  note: string;
+  documentationUrl?: string;
+  weekNumber: number;
+  submittedAt: Date;
+}
+
+export interface WeeklyEvaluation {
+  id: string;
+  studentId: string;
+  week: number;
+  criteria: {
+    discipline: number;
+    creativity: number;
+    teamwork: number;
+    initiative: number;
+  };
+  mentorNote: string;
+  averageScore: number;
+  mentorId: string;
+  mentorName: string;
+  date: Date;
+}
+
+export interface Badge {
+    id: string;
+    name: string;
+    description: string;
+    icon: string; // lucide-react icon name
+}
+
+export enum QuizCategory {
+    Fotografi = 'Fotografi',
+    Videografi = 'Videografi',
+    Marketing = 'Marketing',
+}
+
+export interface QuizQuestion {
+    id: string;
+    questionText: string;
+    options: string[];
+    correctAnswerIndex: number;
+    explanation?: string;
+}
+
+export interface Quiz {
+    id: string;
+    title: string;
+    category: QuizCategory;
+    questions: QuizQuestion[];
+    createdBy: string; // userId
+    createdAt: Date;
+    timeLimit?: number; // Time limit in minutes
+    isMonthlyExam?: boolean;
+}
+
+export interface QuizResult {
+    id: string;
+    quizId: string;
+    quizTitle: string;
+    studentId: string;
+    studentName: string;
+    score: number; // Percentage
+    answers: {
+        questionId: string;
+        questionText: string;
+        selectedAnswerIndex: number;
+        correctAnswerIndex: number;
+        isCorrect: boolean;
+    }[];
+    submittedAt: Date;
+    quiz?: Quiz; // Optional: Embed the full quiz for review
+    aiFeedback?: string; // AI-generated overall feedback
+}
+
+export enum ForumCategory {
+    Fotografi = 'Fotografi',
+    Videografi = 'Videografi',
+    Marketing = 'Marketing',
+    'Tips & Trik' = 'Tips & Trik',
+    Lainnya = 'Lainnya',
+}
+
+export interface ForumThread {
+    id: string;
+    title: string;
+    category: ForumCategory;
+    content: string;
+    authorId: string;
+    authorName: string;
+    createdAt: Date;
+    replyCount: number;
+    lastReplyAt?: Date;
+}
+
+export interface ForumReply {
+    id: string;
+    threadId: string;
+    content: string;
+    authorId: string;
+    authorName: string;
+    createdAt: Date;
+}
+
+export enum JobType {
+    FullTime = 'Full-time',
+    PartTime = 'Part-time',
+    Freelance = 'Freelance',
+    Internship = 'Internship',
+}
+
+export interface JobPost {
+    id: string;
+    title: string;
+    company: string;
+    location: string;
+    type: JobType;
+    description: string;
+    applyLink: string;
+    postedById: string;
+    postedByName: string;
+    createdAt: Date;
+}
+
+export interface CommunityEvent {
+    id: string;
+    title: string;
+    description: string;
+    eventDate: Date;
+    location: string;
+    createdById: string;
+    createdByName: string;
+    createdAt: Date;
 }

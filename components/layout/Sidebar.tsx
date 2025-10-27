@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types';
-import { LayoutDashboard, CalendarDays, Wallet, Users, Settings, Shield, CheckSquare, ClipboardList, MessageSquare, History, Archive } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Wallet, Users, Settings, Shield, CheckSquare, ClipboardList, MessageSquare, History, Archive, Briefcase, Calendar, FileText, MessagesSquare, GalleryHorizontal, Award, TrendingUp, Star, BookOpenCheck, Library, FolderKanban, Network } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const AdminNavLinks = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
@@ -11,6 +11,14 @@ const AdminNavLinks = [
   { path: '/admin/finance', label: 'Pusat Keuangan', icon: <Wallet size={20} /> },
   { path: '/admin/clients', label: 'Data Klien', icon: <Users size={20} /> },
   { path: '/admin/users', label: 'Manajemen Staf', icon: <Shield size={20} /> },
+  { path: '/admin/interns', label: 'Manajemen Magang', icon: <Briefcase size={20} /> },
+  { path: '/admin/collaboration', label: 'Pusat Kolaborasi', icon: <Award size={20} /> },
+  { path: '/admin/academy', label: 'Akademi', icon: <Library size={20} /> },
+  { path: '/admin/community', label: 'Komunitas', icon: <Network size={20} /> },
+  { path: '/admin/quiz-manager', label: 'Manajemen Kuis', icon: <BookOpenCheck size={20} /> },
+  { path: '/admin/highlight-manager', label: 'Highlight Wall', icon: <GalleryHorizontal size={20} /> },
+  { path: '/admin/assets', label: 'Manajemen Aset', icon: <FolderKanban size={20} /> },
+  { path: '/admin/certificates', label: 'Sertifikat', icon: <Award size={20} /> },
   { path: '/admin/feedback', label: 'Ulasan Klien', icon: <MessageSquare size={20} /> },
   { path: '/admin/settings', label: 'Pengaturan', icon: <Settings size={20} /> },
   { path: '/admin/activity-log', label: 'Log Aktivitas', icon: <History size={20} /> },
@@ -23,6 +31,28 @@ const StaffNavLinks = [
   { path: '/staff/finance', label: 'Keuangan', icon: <Wallet size={20} /> },
   { path: '/staff/tasks', label: 'Tugas Harian', icon: <CheckSquare size={20} /> },
   { path: '/staff/inventory', label: 'Cek Inventaris', icon: <Archive size={20} /> },
+  { path: '/staff/mentoring', label: 'Mentoring', icon: <Briefcase size={20} /> },
+  { path: '/staff/academy', label: 'Akademi', icon: <Library size={20} /> },
+  { path: '/staff/community', label: 'Komunitas', icon: <Network size={20} /> },
+  { path: '/staff/quiz-manager', label: 'Manajemen Kuis', icon: <BookOpenCheck size={20} /> },
+  { path: '/staff/evaluation', label: 'Evaluasi Magang', icon: <Star size={20} /> },
+  { path: '/staff/certificates', label: 'Sertifikat PKL', icon: <Award size={20} /> },
+  { path: '/staff/highlight-manager', label: 'Highlight Wall', icon: <GalleryHorizontal size={20} /> },
+  { path: '/staff/assets', label: 'Manajemen Aset', icon: <FolderKanban size={20} /> },
+  { path: '/staff/chat', label: 'Chat', icon: <MessagesSquare size={20} /> },
+  { path: '/staff/report', label: 'Laporan PKL', icon: <FileText size={20} /> },
+];
+
+const InternNavLinks = [
+  { path: '/intern/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { path: '/intern/tasks', label: 'Tugas & Assignment', icon: <CheckSquare size={20} /> },
+  { path: '/intern/attendance', label: 'Absensi Harian', icon: <Calendar size={20} /> },
+  { path: '/intern/progress', label: 'Progres Harian', icon: <TrendingUp size={20} /> },
+  { path: '/intern/report', label: 'Laporan Harian', icon: <ClipboardList size={20} /> },
+  { path: '/intern/academy', label: 'Akademi', icon: <Library size={20} /> },
+  { path: '/intern/community', label: 'Komunitas', icon: <Network size={20} /> },
+  { path: '/intern/quiz', label: 'Kuis Interaktif', icon: <BookOpenCheck size={20} /> },
+  { path: '/intern/chat', label: 'Chat dengan Mentor', icon: <MessagesSquare size={20} /> },
 ];
 
 const NavLink: React.FC<{ to: string; icon: React.ReactNode; children: React.ReactNode }> = ({ to, icon, children }) => {
@@ -42,33 +72,56 @@ const NavLink: React.FC<{ to: string; icon: React.ReactNode; children: React.Rea
 
 const Sidebar = () => {
   const { user } = useAuth();
-  const navLinks = user?.role === UserRole.Admin ? AdminNavLinks : StaffNavLinks;
+  
+  const getNavLinks = () => {
+      switch(user?.role) {
+          case UserRole.Admin:
+              return AdminNavLinks;
+          case UserRole.AnakMagang:
+          case UserRole.AnakPKL:
+              return InternNavLinks;
+          default:
+              return StaffNavLinks;
+      }
+  };
+
+  const navLinks = getNavLinks();
 
   return (
-    <aside className="w-64 flex-shrink-0 p-4 bg-primary flex flex-col">
-      <div className="flex items-center justify-center h-16 shrink-0">
-        {/* Intentionally empty for spacing, logo is in header */}
+    <motion.aside
+      // On mobile, it's an overlay. On desktop, it pushes content.
+      // The parent `AdminLayout` handles the main content margin shift for desktop.
+      initial={{ width: 0 }}
+      animate={{ width: "16rem" }}
+      exit={{ width: 0, transition: { duration: 0.2, ease: "easeInOut" } }}
+      transition={{ type: "spring", stiffness: 400, damping: 40 }}
+      className="bg-primary flex-shrink-0 overflow-hidden fixed inset-y-0 left-0 z-40 md:relative"
+    >
+      <div className="w-64 h-full flex flex-col p-4">
+        <div className="flex items-center justify-center h-16 shrink-0">
+          {/* Intentionally empty for spacing, logo is in header */}
+        </div>
+        <nav className="mt-6 flex-grow space-y-2">
+          {navLinks.map(link => (
+            <NavLink key={link.path} to={link.path} icon={link.icon}>{link.label}</NavLink>
+          ))}
+        </nav>
+        <div className="shrink-0 p-2">
+           <div className="bg-white/5 p-4 rounded-xl text-center">
+              <p className="text-sm font-semibold text-white">Butuh Bantuan?</p>
+              <p className="text-xs text-white/60 mt-1">Hubungi support kami jika ada kendala.</p>
+              <a 
+                href="https://wa.me/6285724025425"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center mt-3 text-xs bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent/90 w-full"
+              >
+                Hubungi Support
+              </a>
+           </div>
+        </div>
       </div>
-      <nav className="mt-6 flex-grow space-y-2">
-        {navLinks.map(link => (
-          <NavLink key={link.path} to={link.path} icon={link.icon}>{link.label}</NavLink>
-        ))}
-      </nav>
-      <div className="shrink-0 p-2">
-         <div className="bg-white/5 p-4 rounded-xl text-center">
-            <p className="text-sm font-semibold text-white">Butuh Bantuan?</p>
-            <p className="text-xs text-white/60 mt-1">Hubungi support kami jika ada kendala.</p>
-            <a 
-              href="https://wa.me/6285724025425"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-center mt-3 text-xs bg-accent text-white font-semibold py-2 px-4 rounded-lg hover:bg-accent/90 w-full"
-            >
-              Hubungi Support
-            </a>
-         </div>
-      </div>
-    </aside>
+    </motion.aside>
   );
 };
 

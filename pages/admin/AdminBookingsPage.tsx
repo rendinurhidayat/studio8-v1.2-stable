@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     getBookings, 
@@ -294,21 +295,21 @@ const AdminBookingsPage = () => {
 
     const renderListView = () => (
          <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-slate-50">
+            <table className="min-w-full divide-y divide-base-200">
+                <thead className="bg-base-100">
                     <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Klien</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Jadwal</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Detail Paket</th>
-                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total Harga</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status Booking</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Pembayaran</th>
-                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Aksi</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Klien</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Jadwal</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Detail Paket</th>
+                         <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Total Harga</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Status Booking</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted uppercase">Pembayaran</th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-muted uppercase">Aksi</th>
                     </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-base-200">
                     {bookings.map((booking) => (
-                        <tr key={booking.id} className={`hover:bg-gray-50 ${booking.bookingStatus === BookingStatus.RescheduleRequested ? 'bg-orange-50' : ''}`}>
+                        <tr key={booking.id} className={`hover:bg-base-100/50 ${booking.bookingStatus === BookingStatus.RescheduleRequested ? 'bg-orange-50' : ''}`}>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center gap-2">
                                      {booking.bookingStatus === BookingStatus.Completed && booking.googleDriveLink && (
@@ -317,20 +318,20 @@ const AdminBookingsPage = () => {
                                         </a>
                                     )}
                                     <div>
-                                        <div className="text-sm font-medium text-gray-900">{booking.clientName}</div>
-                                        <div className="text-sm text-gray-500">{booking.clientEmail}</div>
+                                        <div className="text-sm font-medium text-base-content">{booking.clientName}</div>
+                                        <div className="text-sm text-muted">{booking.clientEmail}</div>
                                     </div>
                                 </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-base-content">
                                 {booking.bookingDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })}
-                                <span className="text-gray-500"> jam {booking.bookingDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}</span>
+                                <span className="text-muted"> jam {booking.bookingDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}</span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-base-content">
                                 <p className="font-semibold">{booking.package.name}</p>
-                                <p className="text-xs text-gray-500">{booking.selectedSubPackage.name}</p>
+                                <p className="text-xs text-muted">{booking.selectedSubPackage.name}</p>
                             </td>
-                             <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">
+                             <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-base-content">
                                 Rp {booking.totalPrice.toLocaleString('id-ID')}
                              </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -345,33 +346,39 @@ const AdminBookingsPage = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
                                 <div className="flex items-center justify-center gap-1">
                                     {actionLoading[booking.id] ? (
-                                        <Loader2 size={20} className="animate-spin text-gray-500" />
-                                    ) : (
+                                        <Loader2 size={20} className="animate-spin text-muted" />
+                                    ) : booking.bookingStatus === BookingStatus.Pending ? (
                                         <>
-                                        {booking.bookingStatus === BookingStatus.Pending && (
                                             <button onClick={() => handleConfirmClick(booking)} className="flex items-center gap-1.5 p-2 text-xs font-semibold text-green-700 bg-green-100 rounded-md hover:bg-green-200" title="Konfirmasi Booking">
                                                 <CheckCircle size={16}/> Konfirmasi
                                             </button>
-                                        )}
-                                        
-                                        {booking.bookingStatus === BookingStatus.RescheduleRequested && (
-                                             <button onClick={() => handleEditClick(booking)} className="flex items-center gap-1.5 p-2 text-xs font-semibold text-orange-700 bg-orange-100 rounded-md hover:bg-orange-200" title="Proses Reschedule">
-                                                <Clock size={16}/> Reschedule
+                                            <button onClick={() => handleEditClick(booking)} className="p-2 text-muted hover:text-accent hover:bg-base-200 rounded-md" title="Edit Booking">
+                                                <Edit size={16} />
                                             </button>
-                                        )}
+                                            <button onClick={() => handleDeleteClick(booking)} className="flex items-center gap-1.5 p-2 text-xs font-semibold text-red-700 bg-red-100 rounded-md hover:bg-red-200" title="Tolak Booking">
+                                                <XCircle size={16}/> Tolak
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {booking.bookingStatus === BookingStatus.RescheduleRequested && (
+                                                <button onClick={() => handleEditClick(booking)} className="flex items-center gap-1.5 p-2 text-xs font-semibold text-orange-700 bg-orange-100 rounded-md hover:bg-orange-200" title="Proses Reschedule">
+                                                    <Clock size={16}/> Reschedule
+                                                </button>
+                                            )}
 
-                                        {[BookingStatus.Confirmed, BookingStatus.InProgress, BookingStatus.Completed].includes(booking.bookingStatus) && (
-                                             <button onClick={() => handleInvoiceClick(booking)} className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-md" title="Lihat Invoice">
-                                                <FileText size={16} />
+                                            {[BookingStatus.Confirmed, BookingStatus.InProgress, BookingStatus.Completed].includes(booking.bookingStatus) && (
+                                                <button onClick={() => handleInvoiceClick(booking)} className="p-2 text-muted hover:text-indigo-600 hover:bg-base-200 rounded-md" title="Lihat Invoice">
+                                                    <FileText size={16} />
+                                                </button>
+                                            )}
+                                            
+                                            <button onClick={() => handleEditClick(booking)} className="p-2 text-muted hover:text-accent hover:bg-base-200 rounded-md" title="Edit Booking">
+                                                <Edit size={16} />
                                             </button>
-                                        )}
-                                        
-                                        <button onClick={() => handleEditClick(booking)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-md" title="Edit Booking">
-                                            <Edit size={16} />
-                                        </button>
-                                        <button onClick={() => handleDeleteClick(booking)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-md" title="Hapus Booking">
-                                            <Trash2 size={16} />
-                                        </button>
+                                            <button onClick={() => handleDeleteClick(booking)} className="p-2 text-muted hover:text-error hover:bg-base-200 rounded-md" title="Hapus Booking">
+                                                <Trash2 size={16} />
+                                            </button>
                                         </>
                                     )}
                                 </div>
@@ -389,11 +396,11 @@ const AdminBookingsPage = () => {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold">Manajemen Booking</h1>
-                <div className="flex items-center gap-2 p-1 bg-slate-200 rounded-lg">
-                    <button onClick={() => setView('list')} className={`px-3 py-1.5 text-sm font-semibold flex items-center gap-2 rounded-md ${view === 'list' ? 'bg-white text-slate-800 shadow' : 'text-slate-600'}`}>
+                <div className="flex items-center gap-2 p-1 bg-base-200 rounded-lg">
+                    <button onClick={() => setView('list')} className={`px-3 py-1.5 text-sm font-semibold flex items-center gap-2 rounded-md ${view === 'list' ? 'bg-white text-base-content shadow' : 'text-muted'}`}>
                         <List size={16}/> Daftar
                     </button>
-                     <button onClick={() => setView('calendar')} className={`px-3 py-1.5 text-sm font-semibold flex items-center gap-2 rounded-md ${view === 'calendar' ? 'bg-white text-slate-800 shadow' : 'text-slate-600'}`}>
+                     <button onClick={() => setView('calendar')} className={`px-3 py-1.5 text-sm font-semibold flex items-center gap-2 rounded-md ${view === 'calendar' ? 'bg-white text-base-content shadow' : 'text-muted'}`}>
                        <CalendarIcon size={16}/> Kalender
                     </button>
                 </div>

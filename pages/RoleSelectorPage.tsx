@@ -3,10 +3,10 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { UserRole } from '../types';
-import { ShieldCheck, User, Home } from 'lucide-react';
+import { ShieldCheck, User, Home, Briefcase } from 'lucide-react';
 
 interface RoleCardProps {
-    role: 'Admin' | 'Staff';
+    role: string;
     link: string;
     icon: React.ReactNode;
     description: string;
@@ -36,7 +36,14 @@ const RoleSelectorPage = () => {
     const { user } = useAuth();
 
     if (user) {
-        const dashboardPath = user.role === UserRole.Admin ? '/admin/dashboard' : '/staff/dashboard';
+        let dashboardPath = '/';
+        switch (user.role) {
+            case UserRole.Admin: dashboardPath = '/admin/dashboard'; break;
+            case UserRole.Staff: dashboardPath = '/staff/dashboard'; break;
+            case UserRole.AnakMagang:
+            case UserRole.AnakPKL:
+                dashboardPath = '/intern/dashboard'; break;
+        }
         return <Navigate to={dashboardPath} />;
     }
 
@@ -56,13 +63,13 @@ const RoleSelectorPage = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="w-full max-w-lg flex flex-col md:flex-row gap-8"
+                className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-8"
             >
                 <RoleCard
                     role="Admin"
                     link="/login?role=Admin"
                     icon={<ShieldCheck className="w-8 h-8 text-blue-600"/>}
-                    description="Akses penuh ke sistem manajemen."
+                    description="Akses penuh ke sistem."
                     themeClasses={{
                         iconBg: 'bg-blue-100',
                         hoverBorder: 'hover:border-blue-500'
@@ -72,10 +79,20 @@ const RoleSelectorPage = () => {
                     role="Staff"
                     link="/login?role=Staff"
                     icon={<User className="w-8 h-8 text-green-600"/>}
-                    description="Lihat dan kelola jadwal harian."
+                    description="Kelola jadwal & tugas."
                      themeClasses={{
                         iconBg: 'bg-green-100',
                         hoverBorder: 'hover:border-green-500'
+                    }}
+                />
+                 <RoleCard
+                    role="Internship"
+                    link="/intern-login"
+                    icon={<Briefcase className="w-8 h-8 text-purple-600"/>}
+                    description="Akses absensi & laporan."
+                     themeClasses={{
+                        iconBg: 'bg-purple-100',
+                        hoverBorder: 'hover:border-purple-500'
                     }}
                 />
             </motion.div>

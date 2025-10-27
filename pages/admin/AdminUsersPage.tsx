@@ -1,15 +1,83 @@
-
-
 import React, { useState, useEffect } from 'react';
-import { getUsers, addUser, updateUser, deleteUser, getTasksForUser, createTask, deleteTask } from '../../services/api';
+import { getUsers, addUser, updateUser, deleteUser, getTasksForUser, createTask, deleteTask, addMentorFeedback, getMentorFeedbackForIntern } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { User, UserRole, Task } from '../../types';
-import { PlusCircle, Edit, Trash2, ClipboardList, Loader2, Send } from 'lucide-react';
+import { User, UserRole, Task, MentorFeedback } from '../../types';
+import { PlusCircle, Edit, Trash2, ClipboardList, Loader2, Send, MessageSquare, Star, Eye } from 'lucide-react';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
+// FIX: Removed unused 'parseISO' import that was causing a module resolution error.
 import { format } from 'date-fns';
-// FIX: Switched to default import for locale from date-fns/locale/id.
 import id from 'date-fns/locale/id';
+import StarRating from '../../components/feedback/StarRating';
+
+const FeedbackModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    task: Task;
+    intern: User;
+    existingFeedback: MentorFeedback | null;
+}> = ({ isOpen, onClose, task, intern, existingFeedback }) => {
+    const { user: currentUser } = useAuth();
+    const [rating, setRating] = useState(0);
+    const [feedbackText, setFeedbackText] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (existingFeedback) {
+            setRating(existingFeedback.rating);
+            setFeedbackText(existingFeedback.feedback);
+        } else {
+            setRating(0);
+            setFeedbackText('');
+        }
+    }, [existingFeedback]);
+
+    const handleSubmit = async () => {
+        if (!currentUser || rating === 0 || !feedbackText.trim()) {
+            alert("Rating and feedback text cannot be empty.");
+            return;
+        }
+        setIsSubmitting(true);
+        await addMentorFeedback(intern.id, {
+            taskId: task.id,
+            taskTitle: task.text,
+            feedback: feedbackText,
+            rating,
+            mentorId: currentUser.id,
+            mentorName: currentUser.name,
+        });
+        setIsSubmitting(false);
+        onClose();
+    };
+
+    const isViewing = !!existingFeedback;
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={isViewing ? `Feedback for: ${task.text}` : `Beri Feedback untuk: ${task.text}`}>
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium">Rating</label>
+                    <StarRating value={rating} onChange={setRating} isEditable={!isViewing} size={28}/>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium">Komentar Feedback</label>
+                    <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} rows={4} readOnly={isViewing} className="mt-1 w-full p-2 border rounded read-only:bg-gray-100" />
+                </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+                <button onClick={onClose} className="px-4 py-2 rounded bg-gray-100 text-gray-700 hover:bg-gray-200">
+                    {isViewing ? 'Tutup' : 'Batal'}
+                </button>
+                {!isViewing && (
+                    <button onClick={handleSubmit} disabled={isSubmitting} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : 'Kirim Feedback'}
+                    </button>
+                )}
+            </div>
+        </Modal>
+    );
+};
+
 
 const TaskManagementModal: React.FC<{
     isOpen: boolean;
@@ -18,18 +86,27 @@ const TaskManagementModal: React.FC<{
 }> = ({ isOpen, onClose, user }) => {
     const { user: currentUser } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [mentorFeedbacks, setMentorFeedbacks] = useState<MentorFeedback[]>([]);
     const [loading, setLoading] = useState(false);
     const [newTaskText, setNewTaskText] = useState('');
+    const [newTaskDescription, setNewTaskDescription] = useState('');
+    const [dueDate, setDueDate] = useState('');
+    const [feedbackModalState, setFeedbackModalState] = useState<{isOpen: boolean, task: Task | null, feedback: MentorFeedback | null}>({isOpen: false, task: null, feedback: null});
+
+    const fetchTasksAndFeedback = async () => {
+        setLoading(true);
+        const [userTasks, userFeedback] = await Promise.all([
+            getTasksForUser(user.id),
+            getMentorFeedbackForIntern(user.id),
+        ]);
+        setTasks(userTasks);
+        setMentorFeedbacks(userFeedback);
+        setLoading(false);
+    };
 
     useEffect(() => {
         if (isOpen) {
-            const fetchTasks = async () => {
-                setLoading(true);
-                const userTasks = await getTasksForUser(user.id);
-                setTasks(userTasks);
-                setLoading(false);
-            };
-            fetchTasks();
+            fetchTasksAndFeedback();
         }
     }, [isOpen, user.id]);
     
@@ -39,66 +116,98 @@ const TaskManagementModal: React.FC<{
         
         const newTask: Omit<Task, 'id'> = {
             text: newTaskText,
+            description: newTaskDescription,
             completed: false,
             assigneeId: user.id,
             assigneeName: user.name,
             creatorId: currentUser.id,
             creatorName: currentUser.name,
             createdAt: new Date(),
+            dueDate: dueDate ? new Date(dueDate) : undefined,
+            progress: 0,
         };
 
-        const createdTask = await createTask(newTask, currentUser.id);
-        setTasks(prev => [createdTask, ...prev]);
+        await createTask(newTask, currentUser.id);
         setNewTaskText('');
+        setNewTaskDescription('');
+        setDueDate('');
+        fetchTasksAndFeedback(); // Refresh list
     };
 
     const handleDeleteTask = async (taskId: string) => {
         if (!currentUser) return;
         await deleteTask(taskId, currentUser.id);
-        setTasks(prev => prev.filter(t => t.id !== taskId));
+        fetchTasksAndFeedback(); // Refresh list
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Tugas Khusus untuk ${user.name}`}>
-            <div className="space-y-4 max-h-[60vh] flex flex-col">
-                <form onSubmit={handleAddTask} className="flex gap-2">
-                    <input
-                        type="text"
-                        value={newTaskText}
-                        onChange={e => setNewTaskText(e.target.value)}
-                        placeholder="Ketik tugas baru di sini..."
-                        className="flex-grow p-2 border rounded-lg"
-                    />
-                    <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                        <Send size={16} /> Tugaskan
-                    </button>
-                </form>
+        <>
+            <Modal isOpen={isOpen} onClose={onClose} title={`Tugas Khusus untuk ${user.name}`}>
+                <div className="space-y-4 max-h-[60vh] flex flex-col">
+                    <form onSubmit={handleAddTask} className="space-y-2 p-2 border rounded-lg">
+                        <input type="text" value={newTaskText} onChange={e => setNewTaskText(e.target.value)} placeholder="Judul tugas..." className="w-full p-2 border rounded-lg" required />
+                        <textarea value={newTaskDescription} onChange={e => setNewTaskDescription(e.target.value)} placeholder="Deskripsi tugas (opsional)..." rows={2} className="w-full p-2 border rounded-lg" />
+                        <div className="grid grid-cols-2 gap-2">
+                             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="p-2 border rounded-lg" />
+                            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+                                <Send size={16} /> Tugaskan
+                            </button>
+                        </div>
+                    </form>
 
-                <div className="flex-grow overflow-y-auto pr-2">
-                    {loading ? (
-                        <div className="text-center p-4"><Loader2 className="animate-spin inline-block"/> Memuat tugas...</div>
-                    ) : tasks.length === 0 ? (
-                        <p className="text-center text-gray-500 p-4">Belum ada tugas khusus yang ditugaskan.</p>
-                    ) : (
-                        <ul className="space-y-2">
-                            {tasks.map(task => (
-                                <li key={task.id} className={`p-3 rounded-lg flex justify-between items-center ${task.completed ? 'bg-green-50 text-gray-500' : 'bg-gray-50'}`}>
-                                    <div>
-                                        <p className={`${task.completed ? 'line-through' : ''}`}>{task.text}</p>
-                                        <p className="text-xs text-gray-400">
-                                            Dibuat oleh {task.creatorName} pada {format(task.createdAt, 'd MMM yyyy', { locale: id })}
-                                        </p>
-                                    </div>
-                                    <button onClick={() => handleDeleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-600">
-                                        <Trash2 size={16}/>
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <div className="flex-grow overflow-y-auto pr-2">
+                        {loading ? (
+                            <div className="text-center p-4"><Loader2 className="animate-spin inline-block"/> Memuat tugas...</div>
+                        ) : tasks.length === 0 ? (
+                            <p className="text-center text-gray-500 p-4">Belum ada tugas khusus yang ditugaskan.</p>
+                        ) : (
+                            <ul className="space-y-2">
+                                {tasks.map(task => {
+                                    const feedback = mentorFeedbacks.find(f => f.taskId === task.id);
+                                    return (
+                                    <li key={task.id} className={`p-3 rounded-lg flex justify-between items-start ${task.completed ? 'bg-green-50' : 'bg-gray-50'}`}>
+                                        <div>
+                                            <p className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>{task.text}</p>
+                                            {task.description && <p className="text-sm text-gray-500 mt-1">{task.description}</p>}
+                                            <div className="text-xs text-gray-400 mt-1 space-x-2">
+                                                <span>Dibuat: {format(task.createdAt, 'd MMM yyyy', { locale: id })}</span>
+                                                {task.dueDate && <span>Tenggat: {format(task.dueDate, 'd MMM yyyy', { locale: id })}</span>}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
+                                            {task.completed && (
+                                                feedback ? (
+                                                    <button onClick={() => setFeedbackModalState({isOpen: true, task, feedback})} className="flex items-center gap-1.5 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md">
+                                                        <Eye size={14} /> Lihat Feedback
+                                                    </button>
+                                                ) : (
+                                                    <button onClick={() => setFeedbackModalState({isOpen: true, task, feedback: null})} className="flex items-center gap-1.5 text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-md">
+                                                        <MessageSquare size={14} /> Beri Feedback
+                                                    </button>
+                                                )
+                                            )}
+                                            <button onClick={() => handleDeleteTask(task.id)} className="p-2 text-gray-400 hover:text-red-600">
+                                                <Trash2 size={16}/>
+                                            </button>
+                                        </div>
+                                    </li>
+                                )})}
+                            </ul>
+                        )}
+                    </div>
                 </div>
-            </div>
-        </Modal>
+            </Modal>
+            <FeedbackModal 
+                isOpen={feedbackModalState.isOpen}
+                onClose={() => {
+                    setFeedbackModalState({isOpen: false, task: null, feedback: null});
+                    fetchTasksAndFeedback(); // Refresh feedback data after modal closes
+                }}
+                task={feedbackModalState.task!}
+                intern={user}
+                existingFeedback={feedbackModalState.feedback}
+            />
+        </>
     );
 };
 
@@ -120,6 +229,8 @@ const AdminUsersPage = () => {
       role: UserRole.Staff,
       asalSekolah: '',
       jurusan: '',
+      startDate: '',
+      endDate: '',
   });
 
   const fetchUsers = async () => {
@@ -136,7 +247,7 @@ const AdminUsersPage = () => {
   const openAddModal = () => {
     setIsEditing(false);
     setSelectedUser(null);
-    setFormData({ name: '', email: '', username: '', password: '', role: UserRole.Staff, asalSekolah: '', jurusan: '' });
+    setFormData({ name: '', email: '', username: '', password: '', role: UserRole.Staff, asalSekolah: '', jurusan: '', startDate: '', endDate: '' });
     setIsModalOpen(true);
   };
 
@@ -151,6 +262,8 @@ const AdminUsersPage = () => {
         role: user.role,
         asalSekolah: user.asalSekolah || '',
         jurusan: user.jurusan || '',
+        startDate: user.startDate ? format(user.startDate, 'yyyy-MM-dd') : '',
+        endDate: user.endDate ? format(user.endDate, 'yyyy-MM-dd') : '',
     });
     setIsModalOpen(true);
   };
@@ -169,10 +282,15 @@ const AdminUsersPage = () => {
         dataToSubmit.username = dataToSubmit.username.toLowerCase();
     }
     
-    // Only include school/major if the role requires it
+    // Only include school/major/dates if the role requires it
     if (formData.role !== UserRole.AnakMagang && formData.role !== UserRole.AnakPKL) {
         dataToSubmit.asalSekolah = '';
         dataToSubmit.jurusan = '';
+        dataToSubmit.startDate = '';
+        dataToSubmit.endDate = '';
+    } else {
+        dataToSubmit.startDate = formData.startDate ? new Date(formData.startDate) : undefined;
+        dataToSubmit.endDate = formData.endDate ? new Date(formData.endDate) : undefined;
     }
 
     if (isEditing && selectedUser) {
@@ -180,9 +298,11 @@ const AdminUsersPage = () => {
         const { password, email, ...dataToUpdate } = dataToSubmit;
         await updateUser(selectedUser.id, dataToUpdate, currentUser.id);
     } else {
-        await addUser({
-            ...dataToSubmit,
-        }, currentUser.id);
+        const finalData = { ...dataToSubmit };
+        if (finalData.role === UserRole.AnakMagang || finalData.role === UserRole.AnakPKL) {
+            finalData.totalPoints = 0;
+        }
+        await addUser(finalData, currentUser.id);
     }
     setIsModalOpen(false);
     fetchUsers();
@@ -202,44 +322,44 @@ const AdminUsersPage = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Manajemen Staf</h1>
-        <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <h1 className="text-3xl font-bold">Manajemen Staf & Magang</h1>
+        <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors">
             <PlusCircle size={18} />
             Tambah User Baru
         </button>
       </div>
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <table className="min-w-full leading-normal">
-          <thead className="bg-slate-50">
+          <thead className="bg-base-100">
             <tr>
-              <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+              <th className="px-5 py-3 border-b-2 border-base-200 text-left text-xs font-semibold text-muted uppercase tracking-wider">Name</th>
+              <th className="px-5 py-3 border-b-2 border-base-200 text-left text-xs font-semibold text-muted uppercase tracking-wider">Email</th>
+              <th className="px-5 py-3 border-b-2 border-base-200 text-left text-xs font-semibold text-muted uppercase tracking-wider">Role</th>
+              <th className="px-5 py-3 border-b-2 border-base-200 text-left text-xs font-semibold text-muted uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-5 py-5 border-b border-gray-200 text-sm">
-                    <p className="font-medium text-gray-900">{user.name}</p>
+              <tr key={user.id} className="hover:bg-base-100/50">
+                <td className="px-5 py-5 border-b border-base-200 text-sm">
+                    <p className="font-medium text-base-content">{user.name}</p>
                     {(user.role === UserRole.AnakMagang || user.role === UserRole.AnakPKL) && (
-                        <p className="text-gray-500 text-xs mt-1">
+                        <p className="text-muted text-xs mt-1">
                             {user.asalSekolah} ({user.jurusan})
                         </p>
                     )}
                 </td>
-                <td className="px-5 py-5 border-b border-gray-200 text-sm">{user.email}</td>
-                <td className="px-5 py-5 border-b border-gray-200 text-sm">
-                  <span className={`px-2 py-1 font-semibold leading-tight rounded-full text-xs ${user.role === 'Admin' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                <td className="px-5 py-5 border-b border-base-200 text-sm">{user.email}</td>
+                <td className="px-5 py-5 border-b border-base-200 text-sm">
+                  <span className={`px-2 py-1 font-semibold leading-tight rounded-full text-xs ${user.role === 'Admin' ? 'bg-error/10 text-error' : 'bg-success/10 text-success'}`}>
                     {user.role}
                   </span>
                 </td>
-                <td className="px-5 py-5 border-b border-gray-200 text-sm flex gap-2">
-                  <button onClick={() => openEditModal(user)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors" title="Edit User"><Edit size={16}/></button>
-                   <button onClick={() => setTaskModalUser(user)} className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-gray-100 rounded-full transition-colors" title="Kelola Tugas"><ClipboardList size={16}/></button>
+                <td className="px-5 py-5 border-b border-base-200 text-sm flex gap-2">
+                  <button onClick={() => openEditModal(user)} className="p-2 text-muted hover:text-accent hover:bg-base-200 rounded-full transition-colors" title="Edit User"><Edit size={16}/></button>
+                   <button onClick={() => setTaskModalUser(user)} className="p-2 text-muted hover:text-indigo-600 hover:bg-base-200 rounded-full transition-colors" title="Kelola Tugas"><ClipboardList size={16}/></button>
                   {currentUser?.id !== user.id && (
-                    <button onClick={() => openDeleteModal(user)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-full transition-colors" title="Hapus User"><Trash2 size={16}/></button>
+                    <button onClick={() => openDeleteModal(user)} className="p-2 text-muted hover:text-error hover:bg-base-200 rounded-full transition-colors" title="Hapus User"><Trash2 size={16}/></button>
                   )}
                 </td>
               </tr>
@@ -286,6 +406,16 @@ const AdminUsersPage = () => {
                       <label className="block text-sm font-medium text-gray-700">Jurusan</label>
                       <input type="text" placeholder="Contoh: DKV / Broadcasting" value={formData.jurusan} onChange={e => setFormData({...formData, jurusan: e.target.value})} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"/>
                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Tanggal Mulai</label>
+                            <input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"/>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700">Tanggal Selesai</label>
+                            <input type="date" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"/>
+                        </div>
+                   </div>
                 </>
               )}
 

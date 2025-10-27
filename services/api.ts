@@ -1,4 +1,4 @@
-import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight } from '../types';
+import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent } from '../types';
 import { notificationService } from './notificationService';
 import { auth, db, storage, firebaseConfig } from '../firebase';
 import firebase from "firebase/compat/app";
@@ -12,8 +12,22 @@ type Timestamp = firebase.firestore.Timestamp;
 const fromFirestore = <T>(doc: firebase.firestore.DocumentSnapshot, dateFields: string[] = []): T => {
     const data = { id: doc.id, ...doc.data() } as any;
     for (const field of dateFields) {
-        if (data[field] && (data[field] as Timestamp).toDate) {
-            data[field] = (data[field] as Timestamp).toDate();
+        const fieldParts = field.split('.');
+        let target = data;
+        let exists = true;
+        for (let i = 0; i < fieldParts.length - 1; i++) {
+            if (target[fieldParts[i]]) {
+                target = target[fieldParts[i]];
+            } else {
+                exists = false;
+                break;
+            }
+        }
+        if (exists) {
+            const finalField = fieldParts[fieldParts.length - 1];
+            if (target[finalField] && (target[finalField] as any).toDate) {
+                target[finalField] = (target[finalField] as any).toDate();
+            }
         }
     }
     return data as T;
@@ -46,6 +60,25 @@ export const getActivityLogs = async (): Promise<ActivityLog[]> => {
     return snapshot.docs.map(doc => fromFirestore<ActivityLog>(doc, ['timestamp']));
 };
 
+// --- COLLABORATION ACTIVITY LOGS ---
+export const getCollaborationActivity = async (collection: 'sponsorships' | 'bookings', docId: string): Promise<CollaborationActivity[]> => {
+    const snapshot = await db.collection(collection).doc(docId).collection('activityLog').orderBy('timestamp', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<CollaborationActivity>(doc, ['timestamp']));
+};
+
+export const logCollaborationActivity = async (collection: 'sponsorships' | 'bookings', docId: string, action: string, details: string, userId: string): Promise<void> => {
+    if (!userId) return;
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userName = userDoc.data()?.name || 'Unknown User';
+    
+    await db.collection(collection).doc(docId).collection('activityLog').add({
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        action,
+        details,
+        userName,
+    });
+};
+
 // --- API Functions (Firebase Implementation) ---
 
 // --- DP Calculation Logic ---
@@ -75,6 +108,14 @@ export const getBookings = async (): Promise<Booking[]> => {
     const snapshot = await db.collection('bookings').orderBy('createdAt', 'desc').get();
     return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']));
 };
+
+export const getInstitutionalBookings = async (): Promise<Booking[]> => {
+    const snapshot = await db.collection('bookings')
+      .where('bookingType', '==', 'institutional')
+      .orderBy('createdAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'dueDate']));
+};
+
 
 export const updateBooking = async (bookingId: string, updatedData: Partial<Booking>, currentUserId: string): Promise<Booking | null> => {
     const bookingRef = db.collection('bookings').doc(bookingId);
@@ -278,25 +319,59 @@ export const getTodaysBookings = async (): Promise<Booking[]> => {
     return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt']));
 };
 
+// --- SPONSORSHIP ---
+export const getSponsorships = async (): Promise<Sponsorship[]> => {
+    const snapshot = await db.collection('sponsorships').orderBy('createdAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<Sponsorship>(doc, ['createdAt']));
+};
+
+export const updateSponsorship = async (sponsorshipId: string, updatedData: Partial<Sponsorship>, currentUserId: string): Promise<Sponsorship> => {
+    const sponsorshipRef = db.collection('sponsorships').doc(sponsorshipId);
+    await sponsorshipRef.update(updatedData);
+    await logActivity(currentUserId, `Mengubah sponsorship ${updatedData.eventName || sponsorshipId}`, `Status baru: ${updatedData.status}`);
+    const doc = await sponsorshipRef.get();
+    return fromFirestore<Sponsorship>(doc, ['createdAt']);
+};
+
+export const deleteSponsorship = async (sponsorshipId: string, currentUserId: string): Promise<void> => {
+    const docRef = db.collection('sponsorships').doc(sponsorshipId);
+    const doc = await docRef.get();
+    // TODO: delete proposal file from cloudinary
+    await docRef.delete();
+    await logActivity(currentUserId, `Menghapus sponsorship: ${doc.data()?.eventName}`);
+};
+
 // --- USER CRUD (Already on Firebase, verified) ---
 export const getUsers = async (): Promise<User[]> => {
     const snapshot = await db.collection("users").get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as User);
+    return snapshot.docs.map(doc => fromFirestore<User>(doc, ['startDate', 'endDate']));
 };
+
+export const getUserById = async (userId: string): Promise<User | null> => {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+        return null;
+    }
+    return fromFirestore<User>(userDoc, ['startDate', 'endDate']);
+};
+
 
 export const addUser = async (user: Omit<User, 'id'>, currentUserId: string): Promise<User> => {
     const userCredential = await auth.createUserWithEmailAndPassword(user.email, user.password!);
     const firebaseUser = userCredential.user;
     if (!firebaseUser) throw new Error("Failed to create user in Firebase Auth.");
 
-    const newUser: Omit<User, 'id' | 'password'> = {
-        name: user.name, email: user.email, role: user.role, username: user.username?.toLowerCase(),
-        asalSekolah: user.asalSekolah, jurusan: user.jurusan
-    };
-    await db.collection('users').doc(firebaseUser.uid).set(newUser);
-    await logActivity(currentUserId, `Membuat user baru: ${newUser.name}`, `Role: ${newUser.role}`);
-    return { id: firebaseUser.uid, ...newUser };
+    // Create a new object to avoid passing password to Firestore
+    const { password, ...userDataForFirestore } = user;
+    if (userDataForFirestore.username) {
+        userDataForFirestore.username = userDataForFirestore.username.toLowerCase();
+    }
+
+    await db.collection('users').doc(firebaseUser.uid).set(userDataForFirestore);
+    await logActivity(currentUserId, `Membuat user baru: ${user.name}`, `Role: ${user.role}`);
+    return { id: firebaseUser.uid, ...userDataForFirestore };
 };
+
 
 export const updateUser = async (userId: string, updatedData: Partial<Omit<User, 'id' | 'email' | 'password'>>, currentUserId: string): Promise<User | null> => {
     const userDocRef = db.collection('users').doc(userId);
@@ -400,14 +475,14 @@ export const updateDailyTaskStatus = async (userId: string, taskId: string, comp
 
 export const getTasksForUser = async (userId: string): Promise<Task[]> => {
     const snapshot = await db.collection('tasks').where('assigneeId', '==', userId).orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Task>(doc, ['createdAt']));
+    return snapshot.docs.map(doc => fromFirestore<Task>(doc, ['createdAt', 'dueDate']));
 };
 
 export const createTask = async (task: Omit<Task, 'id'>, currentUserId: string): Promise<Task> => {
     const docRef = await db.collection('tasks').add(task);
     await logActivity(currentUserId, `Menugaskan tugas ke ${task.assigneeName}`, task.text);
     const doc = await docRef.get();
-    return fromFirestore<Task>(doc, ['createdAt']);
+    return fromFirestore<Task>(doc, ['createdAt', 'dueDate']));
 };
 
 export const updateTask = async (taskId: string, updates: Partial<Task>, currentUserId: string): Promise<void> => {
@@ -420,6 +495,245 @@ export const deleteTask = async (taskId: string, currentUserId: string): Promise
     await db.collection('tasks').doc(taskId).delete();
     await logActivity(currentUserId, `Menghapus tugas untuk ${doc.data()?.assigneeName}`, doc.data()?.text);
 };
+
+export const addMentorFeedback = async (internId: string, feedbackData: Omit<MentorFeedback, 'id' | 'date'>): Promise<MentorFeedback> => {
+    const feedbackWithDate = { ...feedbackData, date: new Date() };
+    const docRef = await db.collection('users').doc(internId).collection('mentorFeedback').add(feedbackWithDate);
+    const doc = await docRef.get();
+    const data = { id: doc.id, ...doc.data() } as MentorFeedback;
+    if (data.date && (data.date as any).toDate) {
+        data.date = (data.date as any).toDate();
+    }
+    return data;
+};
+
+export const getMentorFeedbackForIntern = async (internId: string): Promise<MentorFeedback[]> => {
+    const snapshot = await db.collection('users').doc(internId).collection('mentorFeedback').orderBy('date', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<MentorFeedback>(doc, ['date']));
+};
+
+
+// FIX: Implement and export updateTaskProgress to track intern task progress.
+export const updateTaskProgress = async (taskId: string, progress: number): Promise<void> => {
+    await db.collection('tasks').doc(taskId).update({ progress });
+};
+
+
+// FIX: Implement and export functions for intern attendance and daily reports.
+// --- INTERN MANAGEMENT ---
+
+export const updateUserPoints = async (userId: string, pointsToAdd: number): Promise<void> => {
+    const userRef = db.collection('users').doc(userId);
+    await userRef.update({
+        totalPoints: firebase.firestore.FieldValue.increment(pointsToAdd)
+    });
+};
+
+export const getInternLeaderboard = async (): Promise<User[]> => {
+    const snapshot = await db.collection('users')
+        .where('role', 'in', [UserRole.AnakMagang, UserRole.AnakPKL])
+        .orderBy('totalPoints', 'desc')
+        .limit(5)
+        .get();
+    
+    return snapshot.docs.map(doc => fromFirestore<User>(doc));
+};
+
+export const getAttendanceForUser = async (userId: string): Promise<Attendance[]> => {
+    const snapshot = await db.collection('attendance').where('userId', '==', userId).orderBy('checkInTime', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']));
+};
+
+export const getTodaysAttendanceForAll = async (): Promise<Attendance[]> => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const snapshot = await db.collection('attendance').where('date', '==', todayStr).get();
+    if (snapshot.empty) return [];
+    return snapshot.docs.map(doc => fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']));
+};
+
+export const getDailyReportsForUser = async (userId: string): Promise<DailyReport[]> => {
+    const snapshot = await db.collection('daily_reports').where('userId', '==', userId).orderBy('submittedAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<DailyReport>(doc, ['submittedAt']));
+};
+
+export const getTodaysAttendance = async (userId: string): Promise<Attendance | null> => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const snapshot = await db.collection('attendance').where('userId', '==', userId).where('date', '==', todayStr).limit(1).get();
+    if (snapshot.empty) return null;
+    return fromFirestore<Attendance>(snapshot.docs[0], ['checkInTime', 'checkOutTime']);
+};
+
+export const checkIn = async (userId: string): Promise<Attendance> => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const existing = await getTodaysAttendance(userId);
+    if (existing) return existing;
+
+    const newAttendanceData = {
+        userId,
+        date: todayStr,
+        checkInTime: new Date(),
+        status: AttendanceStatus.Present,
+    };
+    const docRef = await db.collection('attendance').add(newAttendanceData);
+    const doc = await docRef.get();
+    return fromFirestore<Attendance>(doc, ['checkInTime']);
+};
+
+export const checkOut = async (userId: string, attendanceId: string): Promise<Attendance> => {
+    const docRef = db.collection('attendance').doc(attendanceId);
+    await docRef.update({ checkOutTime: new Date() });
+    const doc = await docRef.get();
+    return fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']);
+};
+
+export const getTodaysReport = async (userId: string): Promise<DailyReport | null> => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const snapshot = await db.collection('daily_reports').where('userId', '==', userId).where('date', '==', todayStr).limit(1).get();
+    if (snapshot.empty) return null;
+    return fromFirestore<DailyReport>(snapshot.docs[0], ['submittedAt']);
+};
+
+export const submitDailyReport = async (reportData: Omit<DailyReport, 'id' | 'submittedAt' | 'date' | 'status'>): Promise<DailyReport> => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const newReportData = {
+        ...reportData,
+        date: todayStr,
+        submittedAt: new Date(),
+        status: ReportStatus.Dikirim,
+    };
+    const docRef = await db.collection('daily_reports').add(newReportData);
+    const doc = await docRef.get();
+    return fromFirestore<DailyReport>(doc, ['submittedAt']);
+};
+
+export const generateAiFeedbackForReport = async (reportId: string, reportContent: string): Promise<DailyReport> => {
+    const response = await fetch('/api/generateAiFeedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId, reportContent }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate AI feedback');
+    }
+    const data = await response.json();
+    // Convert ISO string back to Date object to match the type
+    if (data.submittedAt) {
+        data.submittedAt = new Date(data.submittedAt);
+    }
+    return data as DailyReport;
+};
+
+
+export const checkAndSendReportReminders = async () => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    
+    // 1. Get all interns
+    const usersSnapshot = await db.collection('users').where('role', 'in', [UserRole.AnakMagang, UserRole.AnakPKL]).get();
+    const interns = usersSnapshot.docs.map(doc => fromFirestore<User>(doc));
+
+    // 2. Get today's reports
+    const reportsSnapshot = await db.collection('daily_reports').where('date', '==', todayStr).get();
+    const submittedInternIds = new Set(reportsSnapshot.docs.map(doc => doc.data().userId));
+
+    // 3. Find interns who haven't submitted
+    const internsToRemind = interns.filter(intern => !submittedInternIds.has(intern.id));
+
+    // 4. Log reminder
+    if (internsToRemind.length > 0) {
+        console.log(`[REMINDER SIMULATION @ ${new Date().toLocaleTimeString()}]`);
+        console.log("Mengirim pengingat laporan harian kepada intern berikut:");
+        internsToRemind.forEach(intern => {
+            console.log(`- ${intern.name} (${intern.email})`);
+        });
+    } else {
+        console.log(`[REMINDER SIMULATION @ ${new Date().toLocaleTimeString()}] Semua intern sudah mengirimkan laporan hari ini.`);
+    }
+};
+
+export const saveInternReport = async (internId: string, pdfBlob: Blob, mentorName: string): Promise<InternReport> => {
+    const fileName = `Laporan_Progres_${internId}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.pdf`;
+    const storageRef = storage.ref(`intern_reports/${internId}/${fileName}`);
+    
+    // Upload the file
+    const uploadTask = await storageRef.put(pdfBlob);
+    const downloadUrl = await uploadTask.ref.getDownloadURL();
+
+    // Save metadata to Firestore
+    const reportData = {
+        fileName,
+        downloadUrl,
+        generatedAt: new Date(),
+        generatedBy: mentorName,
+    };
+
+    const docRef = await db.collection('users').doc(internId).collection('reports').add(reportData);
+
+    return { id: docRef.id, ...reportData, generatedAt: reportData.generatedAt };
+};
+
+export const getInternReports = async (internId: string): Promise<InternReport[]> => {
+  const snapshot = await db.collection('users').doc(internId).collection('reports').orderBy('generatedAt', 'desc').get();
+  return snapshot.docs.map(doc => fromFirestore<InternReport>(doc, ['generatedAt']));
+};
+
+export const getLatestAIInsight = async (userId: string): Promise<AIInsight | null> => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const snapshot = await db.collection('users').doc(userId).collection('aiInsights')
+        .where('date', '>=', todayStart)
+        .orderBy('date', 'desc')
+        .limit(1)
+        .get();
+
+    if (snapshot.empty) {
+        return null;
+    }
+    return fromFirestore<AIInsight>(snapshot.docs[0], ['date']);
+};
+
+// --- Progress & Evaluation ---
+export const addDailyProgress = async (progressData: Omit<DailyProgress, 'id' | 'submittedAt'>): Promise<DailyProgress> => {
+    const dataToSave = {
+        ...progressData,
+        submittedAt: new Date(),
+    };
+    const docRef = await db.collection('progress').add(dataToSave);
+    const doc = await docRef.get();
+    return fromFirestore<DailyProgress>(doc, ['submittedAt']);
+};
+
+export const getDailyProgressForUser = async (userId: string): Promise<DailyProgress[]> => {
+    const snapshot = await db.collection('progress').where('studentId', '==', userId).orderBy('submittedAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<DailyProgress>(doc, ['submittedAt']));
+};
+
+export const addWeeklyEvaluation = async (evalData: Omit<WeeklyEvaluation, 'id' | 'date'>): Promise<WeeklyEvaluation> => {
+    const dataToSave = {
+        ...evalData,
+        date: new Date(),
+    };
+    const docRef = await db.collection('weekly_evaluations').add(dataToSave);
+    const doc = await docRef.get();
+    return fromFirestore<WeeklyEvaluation>(doc, ['date']);
+};
+
+export const getWeeklyEvaluationsForStudent = async (studentId: string): Promise<WeeklyEvaluation[]> => {
+    const snapshot = await db.collection('weekly_evaluations').where('studentId', '==', studentId).orderBy('week', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<WeeklyEvaluation>(doc, ['date']));
+};
+
+export const getAllWeeklyEvaluations = async (): Promise<WeeklyEvaluation[]> => {
+    const snapshot = await db.collection('weekly_evaluations').get();
+    return snapshot.docs.map(doc => fromFirestore<WeeklyEvaluation>(doc, ['date']));
+};
+
+export const getAllDailyProgress = async (): Promise<DailyProgress[]> => {
+    const snapshot = await db.collection('progress').get();
+    return snapshot.docs.map(doc => fromFirestore<DailyProgress>(doc, ['submittedAt']));
+};
+
 
 // --- Financial, Client, Settings, Promos, Inventory, Feedback... ---
 
@@ -624,6 +938,275 @@ export const deleteFeedback = async (id: string, currentUserId: string): Promise
     await db.collection('feedbacks').doc(id).delete();
     await logActivity(currentUserId, `Menghapus feedback ${id}`, `Dari: ${doc.data()?.nama}`);
 };
+
+// --- CERTIFICATES ---
+export const getCertificates = async (): Promise<Certificate[]> => {
+    const snapshot = await db.collection('certificates').orderBy('issuedDate', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<Certificate>(doc, ['issuedDate']));
+};
+
+export const getCertificateById = async (id: string): Promise<Certificate | null> => {
+    const doc = await db.collection('certificates').doc(id).get();
+    if (!doc.exists) return null;
+    return fromFirestore<Certificate>(doc, ['issuedDate']);
+};
+
+
+// --- CHAT ---
+
+export const findOrCreateChatRoom = async (user1: User, user2: User): Promise<string> => {
+    const participantIds = [user1.id, user2.id].sort();
+    const roomId = participantIds.join('_');
+    const roomRef = db.collection('chats').doc(roomId);
+    const doc = await roomRef.get();
+
+    if (doc.exists) {
+        return roomId;
+    }
+
+    const newRoom: Omit<ChatRoom, 'id'> = {
+        participantIds,
+        participantInfo: {
+            [user1.id]: { name: user1.name, email: user1.email },
+            [user2.id]: { name: user2.name, email: user2.email },
+        },
+        createdAt: new Date(),
+    };
+    await roomRef.set(newRoom);
+    return roomId;
+};
+
+export const getChatRoomsForUser = (userId: string, callback: (rooms: ChatRoom[]) => void): (() => void) => {
+    return db.collection('chats')
+        .where('participantIds', 'array-contains', userId)
+        .orderBy('lastMessage.timestamp', 'desc')
+        .onSnapshot(snapshot => {
+            const rooms = snapshot.docs.map(doc => fromFirestore<ChatRoom>(doc, ['createdAt', 'lastMessage.timestamp']));
+            callback(rooms);
+        });
+};
+
+export const getMessagesStream = (roomId: string, callback: (messages: ChatMessage[]) => void): (() => void) => {
+    return db.collection('chats').doc(roomId).collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot(snapshot => {
+            const messages = snapshot.docs.map(doc => fromFirestore<ChatMessage>(doc, ['timestamp']));
+            callback(messages);
+        });
+};
+
+export const sendMessage = async (roomId: string, senderId: string, senderName: string, text: string): Promise<void> => {
+    const roomRef = db.collection('chats').doc(roomId);
+    const messageRef = roomRef.collection('messages').doc();
+
+    const timestamp = new Date();
+    const messageData: Omit<ChatMessage, 'id'> = {
+        senderId,
+        senderName,
+        text,
+        timestamp,
+    };
+
+    const lastMessageData = {
+        text,
+        timestamp,
+        senderId,
+    };
+
+    const batch = db.batch();
+    batch.set(messageRef, messageData);
+    batch.update(roomRef, { lastMessage: lastMessageData });
+    await batch.commit();
+};
+
+// --- HIGHLIGHT WALL ---
+export const getHighlightWorks = async (): Promise<HighlightWork[]> => {
+    const snapshot = await db.collection('highlightWorks').orderBy('highlightDate', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<HighlightWork>(doc, ['highlightDate']));
+};
+
+export const addHighlightWork = async (workData: Omit<HighlightWork, 'id'>, currentUserId: string): Promise<HighlightWork> => {
+    const docRef = await db.collection('highlightWorks').add(workData);
+    await logActivity(currentUserId, `Menambah karya highlight baru: ${workData.title}`);
+    const doc = await docRef.get();
+    return fromFirestore<HighlightWork>(doc, ['highlightDate']);
+};
+
+export const updateHighlightWork = async (workId: string, workData: Partial<Omit<HighlightWork, 'id'>>, currentUserId: string): Promise<void> => {
+    await db.collection('highlightWorks').doc(workId).update(workData);
+    await logActivity(currentUserId, `Mengubah karya highlight: ${workData.title || workId}`);
+};
+
+export const deleteHighlightWork = async (workId: string, currentUserId: string): Promise<void> => {
+    const doc = await db.collection('highlightWorks').doc(workId).get();
+    const workTitle = doc.data()?.title || workId;
+    // Note: This doesn't delete the file from Cloudinary. That would require a backend function.
+    await db.collection('highlightWorks').doc(workId).delete();
+    await logActivity(currentUserId, `Menghapus karya highlight: ${workTitle}`);
+};
+
+export const getHighlightWorkById = async (id: string): Promise<HighlightWork | null> => {
+    const doc = await db.collection('highlightWorks').doc(id).get();
+    if (!doc.exists) return null;
+    return fromFirestore<HighlightWork>(doc, ['highlightDate']);
+};
+
+// --- QUIZZES ---
+export const getQuizzes = async (): Promise<Quiz[]> => {
+    const snapshot = await db.collection('quizzes').orderBy('createdAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<Quiz>(doc, ['createdAt']));
+};
+
+export const getQuizById = async (quizId: string): Promise<Quiz | null> => {
+    const doc = await db.collection('quizzes').doc(quizId).get();
+    if (!doc.exists) return null;
+    return fromFirestore<Quiz>(doc, ['createdAt']);
+};
+
+export const createQuiz = async (quizData: Omit<Quiz, 'id' | 'createdAt'>, currentUserId: string): Promise<Quiz> => {
+    const dataToSave = {
+        ...quizData,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const docRef = await db.collection('quizzes').add(dataToSave);
+    await logActivity(currentUserId, `Membuat kuis baru: ${quizData.title}`);
+    const doc = await docRef.get();
+    return fromFirestore<Quiz>(doc, ['createdAt']);
+};
+
+export const updateQuiz = async (quizId: string, quizData: Partial<Omit<Quiz, 'id'>>, currentUserId: string): Promise<void> => {
+    await db.collection('quizzes').doc(quizId).update(quizData);
+    await logActivity(currentUserId, `Mengubah kuis: ${quizData.title || quizId}`);
+};
+
+export const deleteQuiz = async (quizId: string, currentUserId: string): Promise<void> => {
+    const doc = await db.collection('quizzes').doc(quizId).get();
+    const quizTitle = doc.data()?.title || quizId;
+    await db.collection('quizzes').doc(quizId).delete();
+    await logActivity(currentUserId, `Menghapus kuis: ${quizTitle}`);
+};
+
+export const submitQuizResult = async (resultData: Omit<QuizResult, 'id' | 'submittedAt'>): Promise<string> => {
+    const dataToSave = {
+        ...resultData,
+        submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const docRef = await db.collection('quiz_results').add(dataToSave);
+    return docRef.id;
+};
+
+export const getQuizResultById = async (resultId: string): Promise<QuizResult | null> => {
+    const doc = await db.collection('quiz_results').doc(resultId).get();
+    if (!doc.exists) return null;
+    return fromFirestore<QuizResult>(doc, ['submittedAt']);
+};
+
+export const getQuizResultsForStudent = async (studentId: string): Promise<QuizResult[]> => {
+    const snapshot = await db.collection('quiz_results').where('studentId', '==', studentId).orderBy('submittedAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
+};
+
+export const getWeeklyQuizResults = async (): Promise<QuizResult[]> => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const snapshot = await db.collection('quiz_results').where('submittedAt', '>=', oneWeekAgo).orderBy('submittedAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
+};
+
+export const getResultsForQuiz = async (quizId: string): Promise<QuizResult[]> => {
+    const snapshot = await db.collection('quiz_results').where('quizId', '==', quizId).orderBy('submittedAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
+};
+
+export const updateQuizResult = async (resultId: string, updates: Partial<QuizResult>): Promise<void> => {
+    await db.collection('quiz_results').doc(resultId).update(updates);
+};
+
+// --- ASSETS ---
+export const getAssets = async (): Promise<Asset[]> => {
+    const snapshot = await db.collection('assets').orderBy('uploadedAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<Asset>(doc, ['uploadedAt']));
+};
+
+export const addAsset = async (assetData: Omit<Asset, 'id' | 'uploadedAt'>, currentUserId: string): Promise<Asset> => {
+    const dataToSave = {
+        ...assetData,
+        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const docRef = await db.collection('assets').add(dataToSave);
+    await logActivity(currentUserId, `Mengunggah aset baru: ${assetData.fileName}`);
+    const doc = await docRef.get();
+    return fromFirestore<Asset>(doc, ['uploadedAt']);
+};
+
+// --- COMMUNITY PORTAL ---
+export const getForumThreads = async (): Promise<ForumThread[]> => {
+    const snapshot = await db.collection('forum_threads').orderBy('lastReplyAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<ForumThread>(doc, ['createdAt', 'lastReplyAt']));
+};
+
+export const getForumThreadById = async (threadId: string): Promise<ForumThread | null> => {
+    const doc = await db.collection('forum_threads').doc(threadId).get();
+    return doc.exists ? fromFirestore<ForumThread>(doc, ['createdAt', 'lastReplyAt']) : null;
+};
+
+export const addForumThread = async (threadData: Omit<ForumThread, 'id' | 'createdAt' | 'replyCount' | 'lastReplyAt'>): Promise<ForumThread> => {
+    const dataToSave = { ...threadData, createdAt: new Date(), replyCount: 0, lastReplyAt: new Date() };
+    const docRef = await db.collection('forum_threads').add(dataToSave);
+    const doc = await docRef.get();
+    return fromFirestore<ForumThread>(doc, ['createdAt', 'lastReplyAt']);
+};
+
+export const getRepliesForThread = (threadId: string, callback: (replies: ForumReply[]) => void): (() => void) => {
+    return db.collection('forum_threads').doc(threadId).collection('replies')
+        .orderBy('createdAt', 'asc')
+        .onSnapshot(snapshot => {
+            const replies = snapshot.docs.map(doc => fromFirestore<ForumReply>(doc, ['createdAt']));
+            callback(replies);
+        });
+};
+
+export const addReplyToThread = async (threadId: string, replyData: Omit<ForumReply, 'id' | 'threadId' | 'createdAt'>): Promise<ForumReply> => {
+    const threadRef = db.collection('forum_threads').doc(threadId);
+    const replyRef = threadRef.collection('replies').doc();
+    const newReply = { ...replyData, threadId, createdAt: new Date() };
+
+    await db.runTransaction(async (transaction) => {
+        transaction.set(replyRef, newReply);
+        transaction.update(threadRef, {
+            replyCount: firebase.firestore.FieldValue.increment(1),
+            lastReplyAt: new Date(),
+        });
+    });
+
+    const doc = await replyRef.get();
+    return fromFirestore<ForumReply>(doc, ['createdAt']);
+};
+
+export const getJobPosts = async (): Promise<JobPost[]> => {
+    const snapshot = await db.collection('job_posts').orderBy('createdAt', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<JobPost>(doc, ['createdAt']));
+};
+
+export const addJobPost = async (jobData: Omit<JobPost, 'id' | 'createdAt'>): Promise<JobPost> => {
+    const dataToSave = { ...jobData, createdAt: new Date() };
+    const docRef = await db.collection('job_posts').add(dataToSave);
+    const doc = await docRef.get();
+    return fromFirestore<JobPost>(doc, ['createdAt']);
+};
+
+export const getEvents = async (): Promise<CommunityEvent[]> => {
+    const snapshot = await db.collection('events').orderBy('eventDate', 'asc').get();
+    return snapshot.docs.map(doc => fromFirestore<CommunityEvent>(doc, ['createdAt', 'eventDate']));
+};
+
+export const addEvent = async (eventData: Omit<CommunityEvent, 'id' | 'createdAt'>): Promise<CommunityEvent> => {
+    const dataToSave = { ...eventData, createdAt: new Date() };
+    const docRef = await db.collection('events').add(dataToSave);
+    const doc = await docRef.get();
+    return fromFirestore<CommunityEvent>(doc, ['createdAt', 'eventDate']);
+};
+
 
 // --- The rest of the API functions (Promos, Inventory, etc.) follow the same Firestore pattern ---
 export const getPromos = async (): Promise<Promo[]> => {

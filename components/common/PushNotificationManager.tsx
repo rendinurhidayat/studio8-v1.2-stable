@@ -39,8 +39,12 @@ const PushNotificationManager: React.FC = () => {
                 }
             }
         };
+        
+        // Service worker is now registered in App.tsx, we just wait for it to be ready
+        checkSubscription().catch(error => {
+            console.error('Error checking push subscription status:', error);
+        });
 
-        navigator.serviceWorker.register('/sw.js').then(checkSubscription);
     }, [user]);
 
     const subscribeUser = async () => {
