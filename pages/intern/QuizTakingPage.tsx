@@ -114,6 +114,9 @@ const QuizTakingPage = () => {
                         transition={{ duration: 0.3 }}
                         className="mt-8"
                     >
+                        {currentQuestion.imageUrl && (
+                            <img src={currentQuestion.imageUrl} alt="Ilustrasi pertanyaan" className="mb-4 rounded-lg max-h-64 w-full object-contain bg-base-200 p-2" />
+                        )}
                         <p className="text-xl font-semibold mb-6">{currentQuestion.questionText}</p>
                         <div className="space-y-3">
                             {currentQuestion.options.map((option, index) => (

@@ -59,6 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return await handleAnalyzeQuizResult(ai, payload, res);
             case 'generateMarketingInsight':
                 return await handleGenerateMarketingInsight(ai, payload, res);
+            case 'generateClassDescription':
+                return await handleGenerateClassDescription(ai, payload, res);
             default:
                 return res.status(400).json({ message: `Unknown action: ${action}` });
         }
@@ -69,6 +71,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // --- Individual Action Handlers ---
+
+async function handleGenerateClassDescription(ai: GoogleGenAI, payload: any, res: VercelResponse) {
+    const { topic } = payload;
+    if (!topic) {
+        return res.status(400).json({ message: 'Topic is required.' });
+    }
+
+    const prompt = `Anda adalah seorang instruktur ahli di Studio 8. Buat deskripsi singkat (2-3 kalimat) yang menarik dan informatif untuk kelas praktek mingguan dengan topik "${topic}". Jelaskan secara singkat apa yang akan dipelajari peserta dan manfaatnya. Gunakan bahasa yang santai dan memotivasi.`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+    
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send(response.text);
+}
+
 
 async function handleAnalyzeFeedback(ai: GoogleGenAI, payload: any, res: VercelResponse) {
     const { feedbackText } = payload;
@@ -249,13 +269,20 @@ async function handleGenerateQuizQuestions(ai: GoogleGenAI, payload: any, res: V
     }
     const questionSchema = {
         type: Type.OBJECT,
-        properties: { id: { type: Type.STRING }, questionText: { type: Type.STRING }, options: { type: Type.ARRAY, items: { type: Type.STRING } }, correctAnswerIndex: { type: Type.NUMBER }, explanation: { type: Type.STRING } },
-        required: ["id", "questionText", "options", "correctAnswerIndex", "explanation"]
+        properties: { 
+            id: { type: Type.STRING }, 
+            questionText: { type: Type.STRING }, 
+            options: { type: Type.ARRAY, items: { type: Type.STRING } }, 
+            correctAnswerIndex: { type: Type.NUMBER }, 
+            explanation: { type: Type.STRING },
+            imagePrompt: { type: Type.STRING, description: "Deskripsi untuk gambar relevan, atau string kosong." }
+        },
+        required: ["id", "questionText", "options", "correctAnswerIndex", "explanation", "imagePrompt"]
     };
     const schema = { type: Type.ARRAY, items: questionSchema };
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
-        contents: `Buat ${numQuestions} soal kuis pilihan ganda (4 pilihan) tentang "${topic}" dengan kategori "${category}". Pastikan ada satu jawaban yang benar. Berikan penjelasan singkat untuk setiap jawaban yang benar.\n\nFormat output harus berupa array JSON dari objek, sesuai dengan skema berikut.`,
+        contents: `Buat ${numQuestions} soal kuis pilihan ganda (4 pilihan) tentang "${topic}" dengan kategori "${category}". Pastikan ada satu jawaban yang benar. Berikan penjelasan singkat untuk setiap jawaban yang benar. Untuk setiap pertanyaan, berikan juga "imagePrompt", yaitu deskripsi singkat dalam Bahasa Indonesia untuk membuat gambar yang relevan secara visual dengan pertanyaan tersebut. Jika tidak ada gambar yang relevan, berikan string kosong untuk imagePrompt.\n\nFormat output harus berupa array JSON dari objek, sesuai dengan skema berikut.`,
         config: { responseMimeType: 'application/json', responseSchema: schema }
     });
     const questions = JSON.parse(response.text);

@@ -513,6 +513,7 @@ export interface QuizQuestion {
     options: string[];
     correctAnswerIndex: number;
     explanation?: string;
+    imageUrl?: string;
 }
 
 export interface Quiz {
@@ -543,6 +544,16 @@ export interface QuizResult {
     submittedAt: Date;
     quiz?: Quiz; // Optional: Embed the full quiz for review
     aiFeedback?: string; // AI-generated overall feedback
+}
+
+export interface PracticalClass {
+    id: string;
+    topic: string;
+    description: string;
+    classDate: Date;
+    mentorName: string;
+    maxParticipants: number;
+    registeredInternIds: string[];
 }
 
 export enum ForumCategory {

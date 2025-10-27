@@ -95,31 +95,34 @@ const QuizResultPage = () => {
                 <div className="mt-8">
                     <h2 className="text-2xl font-bold mb-4 flex items-center gap-3"><BookOpen /> Pembahasan</h2>
                     <div className="space-y-4">
-                        {result.answers.map((ans, index) => (
+                        {result.answers.map((ans, index) => {
+                            const question = result.quiz?.questions.find(q=>q.id === ans.questionId);
+                            return (
                             <div key={ans.questionId} className="p-4 bg-white rounded-lg border border-base-200">
+                                {question?.imageUrl && <img src={question.imageUrl} alt="Ilustrasi soal" className="mb-4 rounded-lg max-h-56 w-full object-contain bg-base-100 p-2" />}
                                 <p className="font-semibold">{index + 1}. {ans.questionText}</p>
                                 <div className="mt-3 space-y-2 text-sm">
                                     <div className={`flex items-start gap-2 p-2 rounded ${ans.isCorrect ? 'bg-success/10' : 'bg-error/10'}`}>
                                         {ans.isCorrect ? <Check className="text-success mt-0.5 flex-shrink-0" /> : <X className="text-error mt-0.5 flex-shrink-0" />}
-                                        <p>Jawabanmu: <span className="font-medium">{result.quiz?.questions.find(q=>q.id === ans.questionId)?.options[ans.selectedAnswerIndex] ?? '...'}</span></p>
+                                        <p>Jawabanmu: <span className="font-medium">{question?.options[ans.selectedAnswerIndex] ?? '...'}</span></p>
                                     </div>
                                     {!ans.isCorrect && (
                                         <div className="flex items-start gap-2 p-2 rounded bg-success/10">
                                             <Check className="text-success mt-0.5 flex-shrink-0" />
-                                            <p>Jawaban Benar: <span className="font-medium">{result.quiz?.questions.find(q=>q.id === ans.questionId)?.options[ans.correctAnswerIndex] ?? '...'}</span></p>
+                                            <p>Jawaban Benar: <span className="font-medium">{question?.options[ans.correctAnswerIndex] ?? '...'}</span></p>
                                         </div>
                                     )}
-                                    {!ans.isCorrect && result.quiz?.questions && (
+                                    {!ans.isCorrect && result.quiz?.questions && question && (
                                         <ExplanationPill 
                                             questionText={ans.questionText}
-                                            options={result.quiz.questions.find(q=>q.id === ans.questionId)?.options ?? []}
+                                            options={question.options ?? []}
                                             correctAnswerIndex={ans.correctAnswerIndex}
                                             userAnswerIndex={ans.selectedAnswerIndex}
                                         />
                                     )}
                                 </div>
                             </div>
-                        ))}
+                        )})}
                     </div>
                 </div>
             </div>
