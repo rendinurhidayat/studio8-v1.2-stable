@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let requestLetterUrl = '';
         if (bookingData.requestLetterUrl) {
             if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-                throw new Error("Cloudinary environment variables are not configured on the server.");
+                throw new Error("Server configuration error: Cloudinary credentials are not set.");
             }
             cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -86,9 +86,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             clientEmail: '', // Not required for institutional
             clientPhone: bookingData.picContact,
         };
-        // Remove file content from Firestore object, which is no longer passed
-        // The property was named requestLetterUrl but contained base64 data. Now it should be handled correctly.
-
 
         await db.collection('bookings').add(newBooking);
 

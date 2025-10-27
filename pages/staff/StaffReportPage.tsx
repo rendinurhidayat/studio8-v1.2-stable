@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUsers, getAttendanceForUser, getDailyReportsForUser, getTasksForUser, getMentorFeedbackForIntern, saveInternReport, getInternReports } from '../../services/api';
 import { User, UserRole, Task, MentorFeedback, AttendanceStatus, InternReport } from '../../types';
@@ -7,10 +7,11 @@ import Modal from '../../components/common/Modal';
 import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 
-// jsPDF is loaded from a script tag, so we declare it for TypeScript
+// jsPDF & html2canvas dimuat dari tag script, jadi kita deklarasikan untuk TypeScript
 declare global {
     interface Window {
         jspdf: any;
+        html2canvas: any;
     }
 }
 
@@ -20,6 +21,98 @@ interface ReportData {
     tasksCompleted: number;
     avgRating: number;
 }
+
+const ReportPreviewModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onDownloadAndSave: (pdfBlob: Blob) => void;
+    isSaving: boolean;
+    intern: User | null;
+    reportData: ReportData | null;
+}> = ({ isOpen, onClose, onDownloadAndSave, isSaving, intern, reportData }) => {
+    const reportContentRef = useRef<HTMLDivElement>(null);
+
+    const handleDownload = async () => {
+        if (!reportContentRef.current) return;
+        
+        const { jsPDF } = window.jspdf;
+        const canvas = await window.html2canvas(reportContentRef.current, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        
+        // Simpan sebagai blob untuk diunggah
+        const pdfBlob = pdf.output('blob');
+        onDownloadAndSave(pdfBlob);
+
+        // Unduh di sisi klien
+        pdf.save(`Laporan_${intern?.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    };
+
+    if (!intern || !reportData) return null;
+    
+    const getInternLevel = (points: number): string => {
+        if (points > 150) return 'Mentor Ready';
+        if (points > 50) return 'Contributor';
+        return 'Rookie';
+    };
+
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Pratinjau Laporan untuk ${intern.name}`}>
+            <div className="max-h-[60vh] overflow-y-auto pr-2 bg-gray-50 p-4">
+                <div ref={reportContentRef} className="bg-white p-8">
+                    {/* Header */}
+                    <div className="text-center border-b pb-4">
+                        <h1 className="text-2xl font-bold text-primary">Laporan Progres PKL/Magang</h1>
+                        <p className="text-muted">Studio 8</p>
+                    </div>
+
+                    {/* Intern Details */}
+                    <div className="grid grid-cols-2 gap-4 my-6 text-sm">
+                        <div>
+                            <p className="font-bold">Nama:</p><p>{intern.name}</p>
+                            <p className="font-bold mt-2">Jurusan:</p><p>{intern.jurusan || 'N/A'}</p>
+                            <p className="font-bold mt-2">Asal Sekolah:</p><p>{intern.asalSekolah || 'N/A'}</p>
+                        </div>
+                        <div className="text-right">
+                             <p className="font-bold">Periode:</p><p>{`${intern.startDate ? format(intern.startDate, 'd MMM yyyy', {locale: id}) : 'N/A'} - ${intern.endDate ? format(intern.endDate, 'd MMM yyyy', {locale: id}) : 'N/A'}`}</p>
+                             <p className="font-bold mt-2">Tanggal Laporan:</p><p>{format(new Date(), 'd MMMM yyyy', { locale: id })}</p>
+                        </div>
+                    </div>
+
+                    {/* Performance Metrics */}
+                    <h2 className="font-bold text-lg text-primary mb-2">Ringkasan Kinerja</h2>
+                    <table className="w-full text-sm border">
+                        <thead className="bg-base-100">
+                            <tr>
+                                <th className="p-2 text-left border">Indikator</th>
+                                <th className="p-2 text-left border">Hasil</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td className="p-2 border">Total Hari Hadir</td><td className="p-2 border font-semibold">{reportData.totalAttendance} hari</td></tr>
+                            <tr><td className="p-2 border">Jumlah Laporan Harian</td><td className="p-2 border font-semibold">{reportData.totalReports} laporan</td></tr>
+                            <tr><td className="p-2 border">Jumlah Tugas Selesai</td><td className="p-2 border font-semibold">{reportData.tasksCompleted} tugas</td></tr>
+                            <tr><td className="p-2 border">Rata-rata Rating Mentor</td><td className="p-2 border font-semibold">{reportData.avgRating.toFixed(1)} / 5</td></tr>
+                            <tr><td className="p-2 border">Total Poin</td><td className="p-2 border font-semibold">{intern.totalPoints || 0} poin</td></tr>
+                            <tr><td className="p-2 border">Level Saat Ini</td><td className="p-2 border font-semibold">{getInternLevel(intern.totalPoints || 0)}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+             <div className="mt-6 flex justify-end">
+                <button onClick={handleDownload} disabled={isSaving} className="w-full flex justify-center items-center gap-2 p-3 bg-accent text-accent-content font-semibold rounded-lg hover:bg-accent/90 disabled:opacity-50 transition-colors">
+                    {isSaving ? <Loader2 className="animate-spin" /> : <><Download size={18}/> Download & Simpan ke Riwayat</>}
+                </button>
+            </div>
+        </Modal>
+    );
+};
 
 const StaffReportPage = () => {
     const { user: currentUser } = useAuth();
@@ -81,70 +174,13 @@ const StaffReportPage = () => {
         setIsGenerating(false);
         setIsModalOpen(true);
     };
-
-    const getInternLevel = (points: number): string => {
-        if (points > 150) return 'Mentor Ready';
-        if (points > 50) return 'Contributor';
-        return 'Rookie';
-    };
-
-    const handleDownloadAndSave = async () => {
-        if (!reportData || !selectedInternId || !currentUser) return;
+    
+    const handleDownloadAndSave = async (pdfBlob: Blob) => {
+        if (!selectedInternId || !currentUser) return;
         setIsGenerating(true);
         const intern = interns.find(i => i.id === selectedInternId);
         if (!intern) return;
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(22);
-        doc.setTextColor('#0a1a2f');
-        doc.text("Laporan Progres PKL/Magang", 105, 22, { align: 'center' });
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(12);
-        doc.setTextColor('#6b7280');
-        doc.text("Studio 8", 105, 30, { align: 'center' });
-        
-        const { autoTable } = doc;
-        autoTable({
-            startY: 40,
-            head: [['Kategori', 'Detail']],
-            body: [
-                ['Nama', intern.name],
-                ['Jurusan', intern.jurusan || 'N/A'],
-                ['Asal Sekolah', intern.asalSekolah || 'N/A'],
-                ['Mentor', currentUser.name],
-                ['Periode', `${intern.startDate ? format(intern.startDate, 'd MMMM yyyy', {locale: id}) : 'N/A'} - ${intern.endDate ? format(intern.endDate, 'd MMMM yyyy', {locale: id}) : 'N/A'}`],
-            ],
-            theme: 'grid',
-            headStyles: { fillColor: '#0a1a2f' }
-        });
-
-        autoTable({
-            startY: doc.previousAutoTable.finalY + 15,
-            head: [['Indikator Kinerja', 'Hasil']],
-            body: [
-                ['Total Hari Hadir', reportData.totalAttendance.toString()],
-                ['Jumlah Laporan Harian', reportData.totalReports.toString()],
-                ['Jumlah Tugas Selesai', reportData.tasksCompleted.toString()],
-                ['Rata-rata Rating Mentor', `${reportData.avgRating.toFixed(1)} / 5`],
-                ['Total Poin', (intern.totalPoints || 0).toString()],
-                ['Level Saat Ini', getInternLevel(intern.totalPoints || 0)],
-            ],
-            theme: 'striped',
-            headStyles: { fillColor: '#3b82f6' }
-        });
-        
-        doc.setFontSize(10);
-        doc.setTextColor('#6b7280');
-        doc.text(`Laporan dibuat pada: ${format(new Date(), 'd MMMM yyyy, HH:mm', { locale: id })}`, 14, doc.internal.pageSize.height - 10);
-
-        const fileName = `Laporan_${intern.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-        doc.save(fileName);
-        
-        const pdfBlob = doc.output('blob');
         try {
             await saveInternReport(intern.id, pdfBlob, currentUser.name);
             const reports = await getInternReports(selectedInternId);
@@ -183,7 +219,7 @@ const StaffReportPage = () => {
                             </select>
                         </div>
                         <button onClick={handleGenerateClick} disabled={!selectedInternId || isGenerating} className="w-full flex justify-center items-center gap-2 p-3 bg-primary text-primary-content font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                            {isGenerating ? <Loader2 className="animate-spin" /> : <><FileText size={18}/> Generate Laporan</>}
+                            {isGenerating ? <Loader2 className="animate-spin" /> : <><FileText size={18}/> Generate Pratinjau Laporan</>}
                         </button>
                     </div>
                 )}
@@ -212,26 +248,14 @@ const StaffReportPage = () => {
                 </div>
             )}
             
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Pratinjau Laporan untuk ${selectedIntern?.name}`}>
-                {reportData && selectedIntern && (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4 text-center">
-                            <div className="bg-base-100 p-3 rounded-lg"><p className="font-bold text-2xl text-primary">{reportData.totalAttendance}</p><p className="text-xs text-muted">Hari Hadir</p></div>
-                            <div className="bg-base-100 p-3 rounded-lg"><p className="font-bold text-2xl text-primary">{reportData.totalReports}</p><p className="text-xs text-muted">Laporan Harian</p></div>
-                            <div className="bg-base-100 p-3 rounded-lg"><p className="font-bold text-2xl text-primary">{reportData.tasksCompleted}</p><p className="text-xs text-muted">Tugas Selesai</p></div>
-                            <div className="bg-base-100 p-3 rounded-lg"><p className="font-bold text-2xl text-primary">{reportData.avgRating.toFixed(1)}</p><p className="text-xs text-muted">Avg. Rating</p></div>
-                        </div>
-                         <div className="bg-accent/10 border-l-4 border-accent p-3">
-                            <p className="text-sm text-accent/90">
-                                Laporan akan dibuat dalam format PDF, diunduh ke perangkat Anda, dan disimpan di riwayat laporan intern.
-                            </p>
-                        </div>
-                        <button onClick={handleDownloadAndSave} disabled={isGenerating} className="w-full flex justify-center items-center gap-2 p-3 bg-accent text-accent-content font-semibold rounded-lg hover:bg-accent/90 disabled:opacity-50 transition-colors">
-                            {isGenerating ? <Loader2 className="animate-spin" /> : <><Download size={18}/> Download PDF & Simpan</>}
-                        </button>
-                    </div>
-                )}
-            </Modal>
+           <ReportPreviewModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onDownloadAndSave={handleDownloadAndSave}
+                isSaving={isGenerating}
+                intern={selectedIntern || null}
+                reportData={reportData}
+           />
         </div>
     );
 };

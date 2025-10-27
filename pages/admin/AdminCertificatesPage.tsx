@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getCertificates, getUsers } from '../../services/api';
+import { getCertificates, getUsers, deleteCertificate } from '../../services/api';
 import { Certificate, User, UserRole } from '../../types';
 import Modal from '../../components/common/Modal';
-import { Award, PlusCircle, Download, QrCode, Loader2, Link as LinkIcon } from 'lucide-react';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
+import { Award, PlusCircle, Download, QrCode, Loader2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 
@@ -14,6 +15,7 @@ const AdminCertificatesPage = () => {
     const [loading, setLoading] = useState({ page: true, modal: false });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [error, setError] = useState('');
+    const [certToDelete, setCertToDelete] = useState<Certificate | null>(null);
 
     const [formData, setFormData] = useState({
         studentId: '',
@@ -81,6 +83,14 @@ const AdminCertificatesPage = () => {
         }
     };
     
+    const handleDeleteConfirm = async () => {
+        if (certToDelete && currentUser) {
+            await deleteCertificate(certToDelete.id, currentUser.id);
+            setCertToDelete(null);
+            fetchData();
+        }
+    };
+
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
@@ -115,6 +125,9 @@ const AdminCertificatesPage = () => {
                                     <td className="px-5 py-4 border-b text-sm flex justify-center gap-2">
                                         <a href={cert.certificateUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-full" title="Download PDF"><Download size={16}/></a>
                                         <a href={cert.qrValidationUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-500 hover:text-green-600 hover:bg-gray-100 rounded-full" title="Lihat Halaman Validasi"><QrCode size={16}/></a>
+                                        <button onClick={() => setCertToDelete(cert)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-full" title="Hapus Sertifikat">
+                                            <Trash2 size={16}/>
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -149,6 +162,13 @@ const AdminCertificatesPage = () => {
                     </div>
                 </form>
             </Modal>
+             <ConfirmationModal
+                isOpen={!!certToDelete}
+                onClose={() => setCertToDelete(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Hapus Sertifikat"
+                message={`Anda yakin ingin menghapus sertifikat untuk ${certToDelete?.studentName}? Tindakan ini juga akan menghapus file PDF dari server.`}
+            />
         </div>
     );
 };

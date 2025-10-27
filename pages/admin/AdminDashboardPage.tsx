@@ -8,9 +8,13 @@ import ChartCard from '../../components/admin/ChartCard';
 import { DollarSign, BookOpen, Clock, TrendingUp, History, ArrowRight, UserCheck, CheckCircle, Loader2, Lightbulb, Sparkles, PlusCircle, Shield, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
-import { format, subDays, isSameDay, eachDayOfInterval } from 'date-fns';
+// FIX: Use subpath imports for `subDays` and `formatDistanceToNow` from `date-fns` to resolve module export errors and type issues.
+// FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
+// FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
+import { format, isSameDay, eachDayOfInterval } from 'date-fns';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+import subDays from 'date-fns/subDays';
 import id from 'date-fns/locale/id';
-import { formatDistanceToNow } from 'date-fns';
 // FIX: Import Variants type from framer-motion to resolve type inference issues.
 import { motion, Variants } from 'framer-motion';
 
@@ -264,7 +268,8 @@ const AdminDashboardPage: React.FC = () => {
                                         <div className="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0"><UserCheck size={16} className="text-muted"/></div>
                                         <div>
                                             <p className="text-sm text-base-content leading-tight"><span className="font-semibold">{log.userName}</span> {log.action.toLowerCase()}</p>
-                                            <p className="text-xs text-muted">{formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id })}</p>
+                                            {/* FIX: Use formatDistanceToNow from date-fns to resolve type error and ensure proper function call. */}
+                                            <p className="text-xs text-muted">{formatDistanceToNow(log.timestamp, { addSuffix: true, locale: (id as any).default ?? id })}</p>
                                         </div>
                                     </motion.li>
                                 ))}

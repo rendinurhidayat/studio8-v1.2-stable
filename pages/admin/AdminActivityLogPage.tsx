@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getActivityLogs, getUsers } from '../../services/api';
 import { ActivityLog, User } from '../../types';
-import { formatDistanceToNow } from 'date-fns';
+// FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
+// FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
+// FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import id from 'date-fns/locale/id';
 import { Edit, Trash2, PlusCircle, CheckCircle, Settings, Download, Filter, X, User as UserIcon } from 'lucide-react';
 import { exportToCSV } from '../../utils/export';
@@ -119,7 +122,8 @@ const AdminActivityLogPage = () => {
                                                     {log.details && <span className="text-gray-600"> - {log.details}</span>}
                                                 </p>
                                                 <p className="mt-1 text-xs text-gray-500">
-                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id })}
+                                                    {/* FIX: Use formatDistanceToNow from date-fns to resolve type error and ensure proper function call. */}
+                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: (id as any).default ?? id })}
                                                 </p>
                                             </div>
                                         </div>

@@ -4,7 +4,8 @@ import { getCertificateById } from '../../services/api';
 import { Certificate } from '../../types';
 import { Loader2, CheckCircle, XCircle, Home, Award, User, Calendar, UserCheck } from 'lucide-react';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
+// FIX: Correct `date-fns` locale import from `date-fns/locale` to `date-fns/locale/id`.
+import id from 'date-fns/locale/id';
 
 const CertificateValidationPage = () => {
     const { id: certificateId } = useParams<{ id: string }>();

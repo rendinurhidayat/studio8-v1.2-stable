@@ -4,7 +4,8 @@ import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
+// FIX: Correct `date-fns` locale import from `date-fns/locale` to `date-fns/locale/id`.
+import id from 'date-fns/locale/id';
 
 function initializeFirebaseAdmin(): admin.app.App {
     if (admin.apps.length > 0) {
@@ -103,7 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const dataUrl = `data:application/pdf;base64,${pdfBase64}`;
 
         if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-            throw new Error("Cloudinary environment variables are not configured on the server.");
+            throw new Error("Server configuration error: Cloudinary credentials are not set.");
         }
         cloudinary.config({
             cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

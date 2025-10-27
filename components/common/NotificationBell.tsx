@@ -2,7 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Bell, Check, Info, AlertTriangle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+// FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
+// FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
+// FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import id from 'date-fns/locale/id';
 
 const NotificationBell = () => {
@@ -60,7 +63,8 @@ const NotificationBell = () => {
                                         <div className="flex-1">
                                             <p className="text-sm text-base-content">{notif.message}</p>
                                             <p className="text-xs text-muted mt-1">
-                                                {formatDistanceToNow(new Date(notif.timestamp), { addSuffix: true, locale: id })}
+                                                {/* FIX: Use formatDistanceToNow from date-fns to resolve type error and ensure proper function call. */}
+                                                {formatDistanceToNow(new Date(notif.timestamp), { addSuffix: true, locale: (id as any).default ?? id })}
                                             </p>
                                         </div>
                                         {!notif.read && (

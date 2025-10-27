@@ -784,6 +784,15 @@ export const getClientByEmail = async (email: string): Promise<Client | null> =>
     return fromFirestore<Client>(doc, ['firstBooking', 'lastBooking']);
 };
 
+export const deleteClient = async (clientId: string, currentUserId: string): Promise<void> => {
+    const clientRef = db.collection('clients').doc(clientId);
+    const doc = await clientRef.get();
+    if (!doc.exists) return;
+    const clientData = doc.data();
+    await clientRef.delete();
+    await logActivity(currentUserId, 'Menghapus data klien', `Klien: ${clientData?.name} (${clientData?.email})`);
+};
+
 export const getClientDetailsForBooking = async (email: string): Promise<Client | null> => {
     if (!email || !/\S+@\S+\.\S+/.test(email)) return null;
     return await getClientByEmail(email);
@@ -949,6 +958,29 @@ export const getCertificateById = async (id: string): Promise<Certificate | null
     const doc = await db.collection('certificates').doc(id).get();
     if (!doc.exists) return null;
     return fromFirestore<Certificate>(doc, ['issuedDate']);
+};
+
+export const deleteCertificate = async (certificateId: string, currentUserId: string): Promise<void> => {
+    const certRef = db.collection('certificates').doc(certificateId);
+    const doc = await certRef.get();
+    if (!doc.exists) return;
+    const certData = doc.data() as Certificate;
+
+    try {
+        const response = await fetch('/api/deleteAsset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ publicId: `studio8_certificates/${certificateId}` })
+        });
+        if (!response.ok) {
+            console.error(`Failed to delete certificate ${certificateId} from Cloudinary. It might need manual deletion.`);
+        }
+    } catch (error) {
+        console.error(`Error calling deleteAsset API for ${certificateId}:`, error);
+    }
+    
+    await certRef.delete();
+    await logActivity(currentUserId, 'Menghapus sertifikat', `Sertifikat ${certificateId} untuk ${certData.studentName}`);
 };
 
 

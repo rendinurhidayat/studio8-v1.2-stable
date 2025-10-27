@@ -81,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let requestLetterUrl = '';
         if (bookingData.requestLetterBase64) {
              if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-                throw new Error("Cloudinary environment variables are not configured on the server.");
+                throw new Error("Server configuration error: Cloudinary credentials are not set.");
             }
             cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

@@ -120,7 +120,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         initializeFirebaseAdmin();
         const db = admin.firestore();
 
-        // ... [Existing API helpers: getPackages, getAddOns, etc.] ...
         const getPackages = async (): Promise<Package[]> => {
             const snapshot = await db.collection('packages').get();
             return snapshot.docs.map(doc => fromFirestore<Package>(doc));
@@ -152,11 +151,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const formData = req.body;
         const newBookingCode = `S8-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
         
-        // ... [Existing Cloudinary upload logic] ...
          let paymentProofUrl = '';
         if (formData.paymentProofBase64) {
              if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-                throw new Error("Cloudinary environment variables are not configured on the server.");
+                throw new Error("Server configuration error: Cloudinary credentials are not set.");
             }
              cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -178,7 +176,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
         
-        // ... [Existing validation, calculation, and client management logic] ...
         const [allPackages, allAddOns, settings] = await Promise.all([getPackages(), getAddOns(), getSystemSettings()]);
         const selectedPackage = allPackages.find(p => p.id === formData.packageId);
         if (!selectedPackage) throw new Error("Package not found");

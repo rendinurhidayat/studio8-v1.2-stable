@@ -1,35 +1,58 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
 import PDFDocument from 'pdfkit';
 import * as QRCode from 'qrcode';
+import { format } from 'date-fns';
+// FIX: Correct `date-fns` locale import from `date-fns/locale` to `date-fns/locale/id`.
+import id from 'date-fns/locale/id';
 
-// Initialize Firebase Admin once
-if (!admin.apps.length) {
+// Helper function for robust initialization
+function initializeFirebaseAdmin(): admin.app.App {
+    if (admin.apps.length > 0) {
+        return admin.apps[0]!;
+    }
+    
+    const projectId = process.env.GCP_PROJECT_ID || process.env.VERCEL_PROJECT_ID;
+
     if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
         throw new Error('Server configuration error: FIREBASE_SERVICE_ACCOUNT_JSON is not set.');
     }
 
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-    });
+        if (projectId && serviceAccount.project_id !== projectId) {
+            console.warn(`Project ID mismatch. Vercel Project ID: ${projectId}, Service Account Project ID: ${serviceAccount.project_id}. This may cause issues.`);
+        }
+        
+        return admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+    } catch (e: any) {
+        console.error("Failed to initialize Firebase Admin:", e.message);
+        throw new Error("Server configuration error: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's a valid, single-line JSON string.");
+    }
 }
 
-const db = admin.firestore();
+declare const Buffer: any;
 
-// Helper: convert stream to buffer
-const streamToBuffer = (stream: any): Promise<Buffer> =>
-    new Promise((resolve, reject) => {
+// Function to convert a stream to a buffer
+const streamToBuffer = (stream: any): Promise<any> => {
+    return new Promise((resolve, reject) => {
         const chunks: any[] = [];
         stream.on('data', (chunk: any) => chunks.push(chunk));
         stream.on('error', reject);
         stream.on('end', () => resolve(Buffer.concat(chunks)));
     });
+};
+
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method Not Allowed' });
+    }
 
     try {
         const { studentName, major, period, mentor } = req.body;
@@ -37,57 +60,95 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ message: 'Missing required fields: studentName, major, period, mentor.' });
         }
 
-        // Generate certificate ID & validation URL
+        initializeFirebaseAdmin();
+        const db = admin.firestore();
+        
+        // 1. Generate unique ID
         const certificateId = `CERT-S8-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
         const validationUrl = `https://studio-8-manager-ec159.web.app/#/validate/${certificateId}`;
-
-        // Generate QR code
+        
+        // 2. Generate QR Code
         const qrCodeImage = await QRCode.toDataURL(validationUrl, { errorCorrectionLevel: 'H' });
 
-        // Generate PDF
+        // 3. Generate PDF with the new dark theme design
         const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
         const pdfStream = doc;
-        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#0F0F0F'); // dark bg
+
+        const accentColor = '#00AEEF'; // Cyan accent
+        const darkBgColor = '#0F0F0F';
+        const textColor = '#FFFFFF';
+        const mutedColor = '#E5E5E5';
+
+        // Background
+        doc.rect(0, 0, doc.page.width, doc.page.height).fill(darkBgColor);
 
         // Watermark
         doc.save();
         doc.rotate(-20, { origin: [doc.page.width / 2, doc.page.height / 2] });
-        doc.font('Helvetica-Bold').fontSize(120).fillColor('#FFFFFF').opacity(0.05).text('Studio 8', { align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(120).fillColor(textColor).opacity(0.05).text('Studio 8', {
+            align: 'center',
+        });
         doc.restore();
+        
+        // Header Logo
+        doc.font('Helvetica-Bold').fontSize(20).fillColor(textColor).text('Studio ', 50, 50, { continued: true });
+        doc.fillColor(accentColor).text('8');
+        
+        // Main Content
+        const contentWidth = doc.page.width - 100;
+        const contentX = 50;
+        
+        doc.font('Helvetica-Bold').fontSize(28).fillColor(textColor).text('SERTIFIKAT PKL', contentX, 150, {
+            width: contentWidth,
+            align: 'center'
+        });
 
-        // Header
-        doc.font('Helvetica-Bold').fontSize(20).fillColor('#FFFFFF').text('Studio ', 50, 50, { continued: true });
-        doc.fillColor('#00AEEF').text('8');
+        doc.font('Helvetica').fontSize(16).fillColor(mutedColor).text('Dengan ini menyatakan bahwa:', contentX, 210, {
+            width: contentWidth,
+            align: 'center'
+        });
 
-        // Main content
-        const contentX = 50, contentWidth = doc.page.width - 100;
-        doc.font('Helvetica-Bold').fontSize(28).fillColor('#FFFFFF').text('SERTIFIKAT PKL', contentX, 150, { width: contentWidth, align: 'center' });
-        doc.font('Helvetica').fontSize(16).fillColor('#E5E5E5').text('Dengan ini menyatakan bahwa:', contentX, 210, { width: contentWidth, align: 'center' });
-        doc.font('Helvetica-Bold').fontSize(36).fillColor('#00AEEF').text(studentName, contentX, 250, { width: contentWidth, align: 'center' });
-        doc.font('Helvetica').fontSize(16).fillColor('#E5E5E5').text(`Telah berhasil menyelesaikan program PKL di Studio 8 pada bidang keahlian ${major}.`, contentX, 310, { width: contentWidth, align: 'center' });
-        doc.font('Helvetica-Bold').fontSize(16).fillColor('#FFFFFF').text(period, contentX, 350, { width: contentWidth, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(36).fillColor(accentColor).text(studentName, contentX, 250, {
+            width: contentWidth,
+            align: 'center'
+        });
 
-        // Footer: signature & QR
+        doc.font('Helvetica').fontSize(16).fillColor(mutedColor).text(
+            `Telah berhasil menyelesaikan program Praktik Kerja Lapangan (PKL) di Studio 8 pada bidang keahlian ${major}.`, contentX, 310, {
+            width: contentWidth,
+            align: 'center'
+        });
+        
+        doc.font('Helvetica-Bold').fontSize(16).fillColor(textColor).text(period, contentX, 350, {
+            width: contentWidth,
+            align: 'center'
+        });
+        
+        // Footer (Signature and QR)
         const bottomY = doc.page.height - 100;
-        doc.font('Helvetica-Bold').fontSize(14).fillColor('#FFFFFF').text(mentor, 70, bottomY);
-        doc.moveTo(70, bottomY + 20).lineTo(320, bottomY + 20).dash(3, { space: 4 }).stroke('#E5E5E5');
-        doc.font('Helvetica').fontSize(12).fillColor('#E5E5E5').text('Mentor Lapangan', 70, bottomY + 25);
+        
+        // Signature
+        doc.font('Helvetica-Bold').fontSize(14).fillColor(textColor).text(mentor, 70, bottomY);
+        doc.moveTo(70, bottomY + 20).lineTo(320, bottomY + 20).dash(3, { space: 4 }).stroke(mutedColor);
+        doc.font('Helvetica').fontSize(12).fillColor(mutedColor).text('Mentor Lapangan', 70, bottomY + 25);
+        
+        // QR Code
         const qrSize = 80;
-        const qrX = doc.page.width - qrSize - 70, qrY = bottomY - 10;
+        const qrX = doc.page.width - qrSize - 70;
+        const qrY = bottomY - 10;
         doc.rect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10).fill('white');
         doc.image(qrCodeImage, qrX, qrY, { width: qrSize });
-
+        
         doc.end();
 
-        // Upload PDF ke Cloudinary
+        // 4. Upload PDF to Cloudinary
         const pdfBuffer = await streamToBuffer(pdfStream);
         const pdfBase64 = pdfBuffer.toString('base64');
         const dataUrl = `data:application/pdf;base64,${pdfBase64}`;
 
         if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-            throw new Error("Cloudinary env vars not configured.");
+            throw new Error("Server configuration error: Cloudinary credentials are not set.");
         }
-
         cloudinary.config({
             cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
             api_key: process.env.CLOUDINARY_API_KEY,
@@ -101,8 +162,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         const certificateUrl = uploadResult.secure_url;
 
-        // Save ke Firestore
-        await db.collection('certificates').doc(certificateId).set({
+        // 5. Save data to Firestore
+        const certificateData = {
             id: certificateId,
             studentName,
             major,
@@ -112,11 +173,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             certificateUrl,
             qrValidationUrl: validationUrl,
             verified: true,
-        });
+        };
+        await db.collection('certificates').doc(certificateId).set(certificateData);
 
-        // Activity log
+        // Log activity
         const userSnapshot = await db.collection('users').where('name', '==', mentor).limit(1).get();
-        if (!userSnapshot.empty) {
+        if(!userSnapshot.empty) {
             const adminId = userSnapshot.docs[0].id;
             await db.collection('activity_logs').add({
                 timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -126,7 +188,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 details: `Sertifikat untuk ${studentName}`
             });
         }
-
+        
+        // 6. Return response
         return res.status(200).json({ success: true, url: certificateUrl });
 
     } catch (error: any) {

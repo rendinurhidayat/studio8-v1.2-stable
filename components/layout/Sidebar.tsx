@@ -110,7 +110,7 @@ const Sidebar = () => {
             <p className="text-xs text-white/60">{user?.role}</p>
         </div>
 
-        <nav className="flex-grow space-y-2">
+        <nav className="flex-grow space-y-2 overflow-y-auto pr-2">
           {navLinks.map(link => (
             <NavLink key={link.path} to={link.path} icon={link.icon}>{link.label}</NavLink>
           ))}

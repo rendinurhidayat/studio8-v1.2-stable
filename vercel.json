@@ -30,6 +30,9 @@
         },
         "api/saveSubscription.ts": {
             "maxDuration": 15
+        },
+        "api/deleteAsset.ts": {
+            "maxDuration": 30
         }
     }
 }

@@ -1,21 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { getClients } from '../../services/api';
+import { getClients, deleteClient } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import { Client } from '../../types';
-import { Award } from 'lucide-react';
+import { Award, Trash2 } from 'lucide-react';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 const AdminClientsPage = () => {
+  const { user: currentUser } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+
+  const fetchClients = async () => {
+    setLoading(true);
+    const data = await getClients();
+    setClients(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchClients = async () => {
-      setLoading(true);
-      const data = await getClients();
-      setClients(data);
-      setLoading(false);
-    };
     fetchClients();
   }, []);
+
+  const handleDeleteClick = (client: Client) => {
+    setClientToDelete(client);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (clientToDelete && currentUser) {
+      await deleteClient(clientToDelete.id, currentUser.id);
+      setClientToDelete(null);
+      fetchClients();
+    }
+  };
 
   if (loading) return <div>Loading client data...</div>;
 
@@ -32,8 +49,8 @@ const AdminClientsPage = () => {
               <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Kontak</th>
               <th className="px-5 py-3 border-b-2 border-gray-200 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Tier Loyalitas</th>
               <th className="px-5 py-3 border-b-2 border-gray-200 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Poin</th>
-              <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Kode Referral</th>
-               <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Booking Terakhir</th>
+              <th className="px-5 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Booking Terakhir</th>
+              <th className="px-5 py-3 border-b-2 border-gray-200 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -54,13 +71,24 @@ const AdminClientsPage = () => {
                     )}
                  </td>
                 <td className="px-5 py-5 border-b border-gray-200 text-sm text-center font-semibold">{client.loyaltyPoints || 0}</td>
-                <td className="px-5 py-5 border-b border-gray-200 text-sm font-mono text-blue-600">{client.referralCode}</td>
                 <td className="px-5 py-5 border-b border-gray-200 text-sm text-gray-600">{client.lastBooking.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+                <td className="px-5 py-5 border-b border-gray-200 text-sm text-center">
+                    <button onClick={() => handleDeleteClick(client)} className="p-2 text-muted hover:text-error hover:bg-base-200 rounded-full transition-colors" title="Hapus Klien">
+                        <Trash2 size={16}/>
+                    </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+       <ConfirmationModal
+        isOpen={!!clientToDelete}
+        onClose={() => setClientToDelete(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Data Klien"
+        message={`Apakah Anda yakin ingin menghapus data klien "${clientToDelete?.name}"? Tindakan ini tidak dapat dibatalkan.`}
+      />
     </div>
   );
 };
