@@ -4,7 +4,6 @@ import { getPackages, getAddOns } from '../services/api';
 import { Package, AddOn } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, X, Check, ArrowRight, Home, ChevronLeft, ChevronRight, Sparkles, Filter, ChevronDown } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 
 // --- TYPE EXTENSIONS ---
 interface PackageWithDetails extends Package {
@@ -178,7 +177,7 @@ const PackageModal: React.FC<{ pkg: PackageWithDetails | null; addOns: AddOn[]; 
               )}
               
               <div className="mt-auto pt-6">
-                <Link to={`/pesan-sesi?paketId=${pkg.id}`} className="w-full text-center block bg-primary text-primary-content px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg">
+                <Link to={`/pesan-sesi`} className="w-full text-center block bg-primary text-primary-content px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg">
                   Booking Sekarang
                 </Link>
               </div>
@@ -234,7 +233,7 @@ const AIRecommender: React.FC<{ packages: PackageWithDetails[] }> = ({ packages 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [recommendation, setRecommendation] = useState<{ recommendedPackageName: string; reasoning: string } | null>(null);
-    const ai = useMemo(() => new GoogleGenAI({ apiKey: process.env.API_KEY as string }), []);
+    // const ai = useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string }), []);
 
     const handleGetRecommendation = async () => {
         if (!userQuery.trim()) return;

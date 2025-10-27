@@ -109,6 +109,7 @@ const Header = () => {
 const HeroSection = () => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
+    // Array of 5 placeholder images for the carousel
     const images = [
         '/images/hero-1.jpg',
         '/images/hero-2.jpg',
@@ -118,10 +119,11 @@ const HeroSection = () => {
     ];
 
     useEffect(() => {
+        // Automatically cycle through images every 4 seconds
         const timer = setInterval(() => {
             setCurrentImageIndex(prevIndex => (prevIndex + 1) % images.length);
         }, 4000);
-        return () => clearInterval(timer);
+        return () => clearInterval(timer); // Cleanup on component unmount
     }, [images.length]);
 
     const container = {
@@ -141,78 +143,68 @@ const HeroSection = () => {
     };
 
     return (
-        <section className="relative bg-[#0a0a0a] text-white overflow-hidden">
-            <div className="container mx-auto px-6 md:px-12 min-h-screen flex items-center justify-center">
-                <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-20">
-                    {/* Left Section (Text) */}
-                    <motion.div 
-                        className="space-y-6 text-center lg:text-left"
-                        variants={container}
-                        initial="hidden"
-                        animate="visible"
-                    >
-                        <motion.p variants={item} className="uppercase tracking-[0.2em] text-gray-400 text-sm">STUDIO 8</motion.p>
-                        <motion.h1 variants={item} className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
-                        Express Your Time with Happiness.
-                        </motion.h1>
-                        <motion.p variants={item} className="text-base md:text-lg text-gray-400 leading-relaxed max-w-lg mx-auto lg:mx-0">
-                        Self Photo, Couple Session, atau Pemotretan Profesional — semua bisa diatur lewat sistem booking yang nyaman.
-                        </motion.p>
-                        <motion.div 
-                            variants={item} 
-                            className="flex flex-col items-center lg:items-start pt-4 gap-6"
-                        >
-                            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 w-full sm:w-auto">
-                                <Link to="/pesan-sesi" className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:scale-105 transition-transform duration-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] w-full sm:w-auto text-center">
-                                    Booking Sekarang
-                                </Link>
-                                <Link to="/paket" className="border border-white/50 text-white/80 px-8 py-3 rounded-full font-semibold hover:bg-white/10 hover:border-white hover:text-white transition-colors duration-300 w-full sm:w-auto text-center">
-                                    Lihat Paket & Harga
-                                </Link>
-                            </div>
-
-                            <div className="text-center lg:text-left">
-                                <p className="text-sm text-gray-400 mb-2">Udah booking? Cek status booking mu.</p>
-                                <Link to="/cek-status" className="inline-block border border-accent text-accent px-6 py-2 rounded-full font-semibold hover:bg-accent/10 transition-colors duration-300 text-sm">
-                                    Booking Status
-                                </Link>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-
-                    {/* Right Section (Image) */}
-                    <motion.div 
-                        className="relative w-full aspect-[4/5] max-w-md mx-auto lg:max-w-none lg:mx-0 lg:aspect-auto lg:h-[600px]"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                    >
-                         {/* Decorative shapes */}
-                        <div className="absolute -top-8 -left-8 w-32 h-32 bg-accent/10 rounded-full blur-2xl animate-pulse"></div>
-                        <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-white/5 rounded-full blur-3xl animate-pulse delay-500"></div>
-
-                        <div className="absolute inset-8 sm:inset-12 z-10">
-                            <AnimatePresence>
-                                <motion.img
-                                    key={currentImageIndex}
-                                    src={images[currentImageIndex]}
-                                    alt="Studio 8 Showcase"
-                                    loading="lazy"
-                                    decoding="async"
-                                    initial={{ opacity: 0, scale: 1.1 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 1.1 }}
-                                    transition={{ duration: 1.5, ease: 'easeInOut' }}
-                                    className="absolute inset-0 w-full h-full object-cover rounded-3xl shadow-2xl"
-                                />
-                            </AnimatePresence>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-3xl" />
-                             {/* Border effect */}
-                            <div className="absolute inset-0 rounded-3xl border-2 border-white/10"></div>
-                        </div>
-                    </motion.div>
+        <section className="bg-[#0a0a0a] text-white flex flex-col md:flex-row items-center justify-between px-6 md:px-12 py-20 min-h-screen">
+          {/* Left Section */}
+          <motion.div 
+            className="flex-1 space-y-6 text-center md:text-left mb-10 md:mb-0 md:pr-12"
+            variants={container}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.p variants={item} className="uppercase tracking-[0.2em] text-gray-400 text-sm">STUDIO 8</motion.p>
+            <motion.h1 variants={item} className="text-4xl md:text-5xl font-bold leading-tight tracking-tight">
+              Express Your Time with Happiness.
+            </motion.h1>
+            <motion.p variants={item} className="text-base md:text-lg text-gray-400 leading-relaxed max-w-lg mx-auto md:mx-0">
+              Self Photo, Couple Session, atau Pemotretan Profesional — semua bisa diatur lewat sistem booking yang nyaman.
+            </motion.p>
+            <motion.div 
+                variants={item} 
+                className="flex flex-col items-center md:items-start pt-4 gap-6"
+            >
+                {/* Primary CTA Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
+                    <Link to="/pesan-sesi" className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:scale-105 transition-transform duration-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] w-full sm:w-auto text-center">
+                        Booking Sekarang
+                    </Link>
+                    <Link to="/paket" className="border border-white/50 text-white/80 px-8 py-3 rounded-full font-semibold hover:bg-white/10 hover:border-white hover:text-white transition-colors duration-300 w-full sm:w-auto text-center">
+                        Lihat Paket & Harga
+                    </Link>
                 </div>
-            </div>
+
+                {/* Secondary CTA */}
+                <div className="text-center md:text-left">
+                    <p className="text-sm text-gray-400 mb-2">Udah booking? Cek status booking mu.</p>
+                    <Link to="/cek-status" className="inline-block border border-accent text-accent px-6 py-2 rounded-full font-semibold hover:bg-accent/10 transition-colors duration-300 text-sm">
+                        Booking Status
+                    </Link>
+                </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Right Section */}
+          <motion.div 
+            className="flex-1 relative w-full h-[300px] md:h-[500px] rounded-2xl overflow-hidden shadow-lg"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+          >
+            <AnimatePresence>
+                <motion.img
+                    key={currentImageIndex}
+                    src={images[currentImageIndex]}
+                    alt="Studio 8 Showcase"
+                    loading="lazy"
+                    decoding="async"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.5, ease: 'easeInOut' }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
+            </AnimatePresence>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          </motion.div>
         </section>
     );
 };
@@ -228,7 +220,7 @@ const AboutSection = () => (
       variants={sectionVariants}
     >
       <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-        <div className="relative aspect-[2/3] md:aspect-[3/2]">
+        <div className="relative h-96 md:h-[500px]">
             <motion.img 
                 whileHover={{ scale: 1.05, rotate: -3 }}
                 transition={{ type: 'spring', stiffness: 300 }}
