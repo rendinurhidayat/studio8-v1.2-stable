@@ -111,11 +111,11 @@ const HeroSection = () => {
 
     // Array of 5 placeholder images for the carousel
     const images = [
-        '/images/hero-1.jpg',
-        '/images/hero-2.jpg',
-        '/images/hero-3.jpg',
-        '/images/hero-4.jpg',
-        '/images/hero-5.jpg',
+        '/images/carousel-1.jpg',
+        '/images/carousel-2.jpg',
+        '/images/carousel-3.jpg',
+        '/images/carousel-4.jpg',
+        '/images/carousel-5.jpg',
     ];
 
     useEffect(() => {
@@ -174,9 +174,9 @@ const HeroSection = () => {
 
                 {/* Secondary CTA */}
                 <div className="text-center md:text-left">
-                    <p className="text-sm text-gray-400 mb-2">Udah booking? Cek status booking Mu.</p>
+                    <p className="text-sm text-gray-400 mb-2">Udah booking? Lanjut aja cek status booking mu udah sampe mana.</p>
                     <Link to="/cek-status" className="inline-block border border-accent text-accent px-6 py-2 rounded-full font-semibold hover:bg-accent/10 transition-colors duration-300 text-sm">
-                        Booking Status
+                        Cek Status Pesanan
                     </Link>
                 </div>
             </motion.div>
@@ -239,9 +239,9 @@ const AboutSection = () => (
 
         <div className="space-y-6">
           <span className="text-sm font-bold uppercase text-accent tracking-widest">Tentang Kami</span>
-          <h2 className="text-3xl md:text-4xl font-bold text-primary">Studio Space and Creative Hub Kota Banjar.</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-primary">Ruang Kreatifmu di Jantung Kota Banjar.</h2>
           <p className="text-base sm:text-lg text-muted leading-relaxed">
-            Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> atau di fotoin <i>photographer profesional</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
+            Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
           </p>
           <ul className="space-y-4 pt-4 border-t border-base-200">
               <li className="flex items-start gap-4">
@@ -421,7 +421,7 @@ const Footer = () => {
           {/* Column 1: Brand */}
           <div className="md:col-span-1">
             <h2 className="text-2xl font-bold">STUDIO 8</h2>
-            <p className="mt-2 text-primary-content/70 text-sm">Abadikan waktu, rayakan gayamu — hanya di Studio 8.</p>
+            <p className="mt-2 text-primary-content/70 text-sm">Momenmu, gayamu. Studio foto modern di Kota Banjar untuk mengabadikan setiap ekspresi terbaikmu.</p>
           </div>
           
           {/* Column 2: Quick Links */}

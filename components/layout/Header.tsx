@@ -25,6 +25,13 @@ const Header: React.FC<{ toggleSidebar: () => void }> = ({ toggleSidebar }) => {
             <p className="font-semibold text-base-content">Hai, {user?.name?.split(' ')[0]} 👋</p>
             <p className="text-xs text-muted">{user?.role}</p>
         </div>
+        {user?.photoURL ? (
+            <img src={user.photoURL} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
+        ) : (
+            <div className="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center font-bold text-primary">
+                {user?.name?.charAt(0)}
+            </div>
+        )}
         <NotificationBell />
         <button
           onClick={logout}

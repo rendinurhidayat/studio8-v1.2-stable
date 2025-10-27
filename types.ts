@@ -86,6 +86,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  photoURL?: string;
   username?: string;
   password?: string;
   asalSekolah?: string;
@@ -425,6 +426,7 @@ export interface ChatRoom {
         [key: string]: { // userId
             name: string;
             email: string;
+            photoURL?: string;
         }
     };
     lastMessage?: {

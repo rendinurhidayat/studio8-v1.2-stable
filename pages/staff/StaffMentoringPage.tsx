@@ -1,106 +1,294 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { getUsers, getTodaysAttendanceForAll } from '../../services/api';
-import { User, UserRole, Attendance, AttendanceStatus } from '../../types';
-import { Loader2, User as UserIcon, Award, Briefcase, CheckCircle, XCircle } from 'lucide-react';
+import { getUsers, getAttendanceForUser, getDailyReportsForUser, getTasksForUser } from '../../services/api';
+import { User, UserRole, Attendance, DailyReport, Task, AttendanceStatus } from '../../types';
+import { format, differenceInDays } from 'date-fns';
+import id from 'date-fns/locale/id';
+import Modal from '../../components/common/Modal';
+import { Loader2, Calendar, ClipboardList, CheckSquare, FileText, CalendarCheck, ClipboardCheck } from 'lucide-react';
+import Card from '../../components/common/Card';
+import { motion } from 'framer-motion';
 
-const getInternLevel = (points: number): { level: string, color: string } => {
-    if (points > 150) return { level: 'Mentor Ready', color: 'text-blue-500' };
-    if (points > 50) return { level: 'Contributor', color: 'text-green-500' };
-    return { level: 'Rookie', color: 'text-gray-500' };
-};
+const InternDetailModal: React.FC<{
+    isOpen: boolean,
+    onClose: () => void,
+    intern: User | null
+}> = ({ isOpen, onClose, intern }) => {
+    const [attendance, setAttendance] = useState<Attendance[]>([]);
+    const [reports, setReports] = useState<DailyReport[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [loading, setLoading] = useState(false);
 
-const StaffMentoringPage = () => {
-    const [interns, setInterns] = useState<User[]>([]);
-    const [attendance, setAttendance] = useState<Map<string, Attendance>>(new Map());
+    useEffect(() => {
+        if (isOpen && intern) {
+            const fetchData = async () => {
+                setLoading(true);
+                const [attData, repData, taskData] = await Promise.all([
+                    getAttendanceForUser(intern.id),
+                    getDailyReportsForUser(intern.id),
+                    getTasksForUser(intern.id),
+                ]);
+                setAttendance(attData);
+                setReports(repData);
+                setTasks(taskData);
+                setLoading(false);
+            };
+            fetchData();
+        }
+    }, [isOpen, intern]);
+
+    const attendanceRate = useMemo(() => {
+        if (!intern?.startDate) return 0;
+        const today = new Date();
+        const start = intern.startDate;
+        let workingDays = 0;
+        for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+            const dayOfWeek = d.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Exclude Sunday and Saturday
+                workingDays++;
+            }
+        }
+        const presentDays = attendance.filter(a => a.status === AttendanceStatus.Present).length;
+        return workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0;
+    }, [attendance, intern]);
+
+    const avgTaskProgress = useMemo(() => {
+        if (tasks.length === 0) return 0;
+        const totalProgress = tasks.reduce((sum, task) => sum + (task.progress || 0), 0);
+        return Math.round(totalProgress / tasks.length);
+    }, [tasks]);
+    
+    const internData = useMemo(() => {
+        if (!intern) return { totalDays: 0, daysPassed: 0, progress: 0 };
+        const totalDays = intern.startDate && intern.endDate ? differenceInDays(intern.endDate, intern.startDate) + 1 : 0;
+        const daysPassed = intern.startDate ? differenceInDays(new Date(), intern.startDate) + 1 : 0;
+        const progress = totalDays > 0 ? Math.min(Math.round((daysPassed / totalDays) * 100), 100) : 0;
+        return { totalDays, daysPassed, progress };
+    }, [intern]);
+
+    if (!intern) return null;
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Detail Kinerja: ${intern.name}`}>
+            {loading ? <div className="text-center p-8"><Loader2 className="animate-spin mx-auto"/></div> : (
+                <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <Card>
+                        <h3 className="font-bold text-lg">Ringkasan</h3>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 my-2">
+                            <div className="bg-blue-600 h-2.5 rounded-full" style={{width: `${internData.progress}%`}}></div>
+                        </div>
+                        <p className="text-sm text-gray-600 text-center">{internData.progress}% Periode Magang Selesai</p>
+                        <div className="grid grid-cols-2 gap-4 mt-4 text-center">
+                            <div>
+                                <p className="font-bold text-2xl text-green-600">{attendanceRate}%</p>
+                                <p className="text-xs text-gray-500">Tingkat Kehadiran</p>
+                            </div>
+                             <div>
+                                <p className="font-bold text-2xl text-purple-600">{avgTaskProgress}%</p>
+                                <p className="text-xs text-gray-500">Rata-rata Progres Tugas</p>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <h3 className="font-bold text-lg flex items-center gap-2"><Calendar size={20}/> Riwayat Absensi</h3>
+                        <ul className="space-y-2 mt-2">
+                            {attendance.map(att => (
+                                <li key={att.id} className="text-sm p-2 bg-gray-50 rounded flex justify-between">
+                                    <span>{format(att.checkInTime, 'd MMMM yyyy', { locale: id })}</span>
+                                    <span>{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </Card>
+                    <Card>
+                        <h3 className="font-bold text-lg flex items-center gap-2"><ClipboardList size={20}/> Laporan Harian</h3>
+                        <ul className="space-y-2 mt-2">
+                            {reports.map(rep => (
+                                <li key={rep.id} className="text-sm p-2 bg-gray-50 rounded">
+                                    <div className="flex justify-between items-center">
+                                        <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', { locale: id })}</p>
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{rep.mood}</span>
+                                    </div>
+                                    <p className="text-gray-700 mt-1">{rep.content}</p>
+                                    {rep.blockers && <p className="text-sm text-red-600 mt-1">Kendala: {rep.blockers}</p>}
+                                </li>
+                            ))}
+                        </ul>
+                    </Card>
+                     <Card>
+                        <h3 className="font-bold text-lg flex items-center gap-2"><CheckSquare size={20}/> Progres Tugas Khusus</h3>
+                        <ul className="space-y-3 mt-2">
+                            {tasks.map(task => (
+                                <li key={task.id}>
+                                    <div className="flex justify-between items-center text-sm mb-1">
+                                        <p>{task.text}</p>
+                                        <p className="font-semibold">{task.progress || 0}%</p>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div className="bg-purple-600 h-1.5 rounded-full" style={{width: `${task.progress || 0}%`}}></div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </Card>
+                </div>
+            )}
+        </Modal>
+    );
+}
+
+const StatPill: React.FC<{ icon: React.ReactNode; value: string; label: string; }> = ({ icon, value, label }) => (
+    <div className="text-center p-2 rounded-lg bg-base-100 flex-1">
+        <div className="w-8 h-8 mx-auto bg-primary/10 text-primary rounded-full flex items-center justify-center mb-1">
+            {icon}
+        </div>
+        <p className="font-bold text-lg text-primary">{value}</p>
+        <p className="text-xs text-muted">{label}</p>
+    </div>
+);
+
+const InternProfileCard: React.FC<{ intern: User; onSelect: (intern: User) => void; }> = ({ intern, onSelect }) => {
+    const [stats, setStats] = useState<{
+        attendanceRate: number;
+        totalReports: number;
+        tasksCompletedPercent: number;
+    } | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchInternData = async () => {
             setLoading(true);
-            const [allUsers, allAttendance] = await Promise.all([
-                getUsers(),
-                getTodaysAttendanceForAll(),
-            ]);
+            try {
+                const [attendanceData, reportsData, tasksData] = await Promise.all([
+                    getAttendanceForUser(intern.id),
+                    getDailyReportsForUser(intern.id),
+                    getTasksForUser(intern.id),
+                ]);
 
+                let attendanceRate = 0;
+                if (intern.startDate) {
+                    const today = new Date();
+                    const start = new Date(intern.startDate);
+                    let workingDays = 0;
+                    if (today >= start) {
+                        for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+                            const dayOfWeek = d.getDay();
+                            if (dayOfWeek !== 0 && dayOfWeek !== 6) { 
+                                workingDays++;
+                            }
+                        }
+                    }
+                    const presentDays = attendanceData.filter(a => a.status === AttendanceStatus.Present).length;
+                    attendanceRate = workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0;
+                }
+
+                const tasksCompletedPercent = tasksData.length > 0
+                    ? Math.round((tasksData.filter(t => t.completed).length / tasksData.length) * 100)
+                    : 100;
+
+                setStats({
+                    attendanceRate,
+                    totalReports: reportsData.length,
+                    tasksCompletedPercent,
+                });
+
+            } catch (error) {
+                console.error("Failed to fetch intern stats:", error);
+                setStats(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInternData();
+    }, [intern]);
+
+    const calculateProgress = (startDate?: Date, endDate?: Date) => {
+        if (!startDate || !endDate) return 0;
+        const totalDuration = differenceInDays(new Date(endDate), new Date(startDate));
+        const daysPassed = differenceInDays(new Date(), new Date(startDate));
+        if (totalDuration <= 0 || daysPassed < 0) return 0;
+        return Math.min(Math.round((daysPassed / totalDuration) * 100), 100);
+    };
+
+    const progress = calculateProgress(intern.startDate, intern.endDate);
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -5 }}
+            className="bg-white rounded-2xl shadow-lg border border-base-200/50 p-6 flex flex-col"
+        >
+            <div className="flex-grow">
+                <div className="text-center">
+                    <h3 className="font-bold text-lg text-primary">{intern.name}</h3>
+                    <p className="text-sm text-muted">{intern.asalSekolah} ({intern.jurusan})</p>
+                </div>
+
+                <div className="my-4">
+                    <div className="flex justify-between text-xs text-muted mb-1">
+                        <span>Progres Magang</span>
+                        <span className="font-semibold">{progress}%</span>
+                    </div>
+                    <div className="w-full bg-base-200 rounded-full h-2.5">
+                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center items-center h-24">
+                        <Loader2 className="animate-spin text-primary" />
+                    </div>
+                ) : stats ? (
+                    <div className="flex justify-between items-center gap-2">
+                        <StatPill icon={<CalendarCheck size={16} />} value={`${stats.attendanceRate}%`} label="Kehadiran" />
+                        <StatPill icon={<FileText size={16} />} value={stats.totalReports.toString()} label="Laporan" />
+                        <StatPill icon={<ClipboardCheck size={16} />} value={`${stats.tasksCompletedPercent}%`} label="Tugas" />
+                    </div>
+                ) : (
+                    <div className="text-center text-error text-sm h-24 flex items-center justify-center">Gagal memuat data.</div>
+                )}
+            </div>
+            <button onClick={() => onSelect(intern)} className="mt-6 w-full bg-primary/10 text-primary font-semibold py-2 px-4 rounded-lg hover:bg-primary/20 transition-colors">
+                Lihat Detail
+            </button>
+        </motion.div>
+    );
+};
+
+
+const StaffMentoringPage = () => {
+    const [interns, setInterns] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedIntern, setSelectedIntern] = useState<User | null>(null);
+
+    useEffect(() => {
+        const fetchInterns = async () => {
+            setLoading(true);
+            const allUsers = await getUsers();
             setInterns(allUsers.filter(u => u.role === UserRole.AnakMagang || u.role === UserRole.AnakPKL));
-
-            const attendanceMap = new Map<string, Attendance>();
-            allAttendance.forEach(att => {
-                attendanceMap.set(att.userId, att);
-            });
-            setAttendance(attendanceMap);
             setLoading(false);
         };
-        fetchData();
+        fetchInterns();
     }, []);
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <Loader2 className="animate-spin text-primary" size={48} />
-            </div>
-        );
-    }
+    if (loading) return <div className="text-center p-8"><Loader2 className="animate-spin mx-auto"/></div>;
 
     return (
         <div>
-            <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-primary/10 rounded-lg text-primary">
-                    <Briefcase size={28} />
-                </div>
-                <div>
-                    <h1 className="text-3xl font-bold text-primary">Dasbor Mentoring</h1>
-                    <p className="text-muted mt-1">Pantau aktivitas dan progres semua anak magang secara real-time.</p>
-                </div>
+            <h1 className="text-3xl font-bold">Dasbor Mentoring</h1>
+            <p className="text-muted mt-1 mb-6">Pantau progres, absensi, dan laporan harian anak magang.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {interns.map(intern => (
+                    <InternProfileCard key={intern.id} intern={intern} onSelect={setSelectedIntern} />
+                ))}
             </div>
 
-            {interns.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-xl shadow-sm border">
-                    <p className="text-xl text-gray-500">Tidak ada data intern yang aktif saat ini.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {interns.map(intern => {
-                        const internAttendance = attendance.get(intern.id);
-                        const status = internAttendance ? 'Hadir' : 'Belum Absen';
-                        const levelInfo = getInternLevel(intern.totalPoints || 0);
-
-                        return (
-                            <div key={intern.id} className="bg-white rounded-2xl shadow-lg border border-base-200/50 p-6 flex flex-col justify-between hover:shadow-xl hover:-translate-y-1 transition-all">
-                                <div>
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-bold text-lg text-primary">{intern.name}</h3>
-                                            <p className="text-sm text-muted">{intern.jurusan}</p>
-                                        </div>
-                                        <div className={`flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full ${status === 'Hadir' ? 'bg-success/10 text-success' : 'bg-base-200 text-muted'}`}>
-                                            {status === 'Hadir' ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                                            {status}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                                        <div className="text-center">
-                                            <p className="font-bold text-xl">{intern.totalPoints || 0}</p>
-                                            <p className="text-xs text-muted">Poin</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className={`font-bold text-xl ${levelInfo.color}`}>{levelInfo.level}</p>
-                                            <p className="text-xs text-muted">Level</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <Link to={`/staff/intern/${intern.id}`} className="block text-center mt-6 w-full bg-primary text-primary-content font-semibold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors">
-                                    Lihat Detail
-                                </Link>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            <InternDetailModal isOpen={!!selectedIntern} onClose={() => setSelectedIntern(null)} intern={selectedIntern} />
         </div>
     );
-};
+}
 
 export default StaffMentoringPage;

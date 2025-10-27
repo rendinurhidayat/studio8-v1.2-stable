@@ -1,11 +1,7 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { getActivityLogs, getUsers } from '../../services/api';
 import { ActivityLog, User } from '../../types';
-// FIX: Changed import path to main 'date-fns' entrypoint to resolve type error for 'locale' option.
 import { formatDistanceToNow } from 'date-fns';
-// FIX: Switched to default import for locale from date-fns/locale/id.
 import id from 'date-fns/locale/id';
 import { Edit, Trash2, PlusCircle, CheckCircle, Settings, Download, Filter, X, User as UserIcon } from 'lucide-react';
 import { exportToCSV } from '../../utils/export';
@@ -123,8 +119,7 @@ const AdminActivityLogPage = () => {
                                                     {log.details && <span className="text-gray-600"> - {log.details}</span>}
                                                 </p>
                                                 <p className="mt-1 text-xs text-gray-500">
-                                                    {/* FIX: Cast options to 'any' to bypass faulty type definition for 'locale'. */}
-                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: (id as any).default ?? id })}
+                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id })}
                                                 </p>
                                             </div>
                                         </div>

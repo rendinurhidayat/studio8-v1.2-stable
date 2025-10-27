@@ -1,12 +1,8 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Bell, Check, Info, AlertTriangle } from 'lucide-react';
-// FIX: Changed import path to main 'date-fns' entrypoint to resolve type error for 'locale' option.
 import { formatDistanceToNow } from 'date-fns';
-// FIX: Switched to default import for locale from date-fns/locale/id.
 import id from 'date-fns/locale/id';
 
 const NotificationBell = () => {
@@ -64,8 +60,7 @@ const NotificationBell = () => {
                                         <div className="flex-1">
                                             <p className="text-sm text-base-content">{notif.message}</p>
                                             <p className="text-xs text-muted mt-1">
-                                                {/* FIX: Cast options to 'any' to bypass faulty type definition for 'locale'. */}
-                                                {formatDistanceToNow(new Date(notif.timestamp), { addSuffix: true, locale: (id as any).default ?? id })}
+                                                {formatDistanceToNow(new Date(notif.timestamp), { addSuffix: true, locale: id })}
                                             </p>
                                         </div>
                                         {!notif.read && (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getQuizzes, getQuizResultsForStudent, getPracticalClasses, createPracticalClass, deletePracticalClass, getUsers } from '../../services/api';
+import { getQuizzes, getQuizResultsForStudent, getPracticalClasses, createPracticalClass, deletePracticalClass, getUsers, registerForClass, unregisterFromClass } from '../../services/api';
 import { Quiz, QuizCategory, QuizResult, PracticalClass, UserRole } from '../../types';
 import { Loader2, Camera, Video, TrendingUp, Library, CheckCircle, ArrowRight, PlusCircle, Trash2, BookOpen, Clock, User as UserIcon, Sparkles, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -133,13 +133,32 @@ const PracticalClassManager: React.FC<{
 };
 
 // Viewer for Interns
-const PracticalClassViewer: React.FC<{ classes: PracticalClass[] }> = ({ classes }) => {
-    const { upcomingClass, pastClasses } = useMemo(() => {
+const PracticalClassViewer: React.FC<{ classes: PracticalClass[]; onUpdate: () => void; }> = ({ classes, onUpdate }) => {
+    const { user } = useAuth();
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [modal, setModal] = useState<{ isOpen: boolean, action: 'register' | 'unregister', class: PracticalClass | null }>({ isOpen: false, action: 'register', class: null });
+
+    const handleAction = async () => {
+        if (!user || !modal.class) return;
+        
+        setActionLoading(modal.class.id);
+        
+        if (modal.action === 'register') {
+            await registerForClass(modal.class.id, user.id);
+        } else {
+            await unregisterFromClass(modal.class.id, user.id);
+        }
+        
+        onUpdate();
+        setActionLoading(null);
+        setModal({ isOpen: false, action: 'register', class: null });
+    };
+
+    const { upcomingClasses, pastClasses } = useMemo(() => {
         const now = new Date();
         const sortedClasses = [...classes].sort((a, b) => a.classDate.getTime() - b.classDate.getTime());
-        const upcoming = sortedClasses.filter(c => c.classDate >= now);
         return {
-            upcomingClass: upcoming[0] || null,
+            upcomingClasses: sortedClasses.filter(c => c.classDate >= now),
             pastClasses: sortedClasses.filter(c => c.classDate < now).reverse(),
         };
     }, [classes]);
@@ -147,20 +166,43 @@ const PracticalClassViewer: React.FC<{ classes: PracticalClass[] }> = ({ classes
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-primary/20">
-                <h2 className="text-2xl font-bold text-primary flex items-center gap-3"><BookOpen /> Kelas Wajib Minggu Ini</h2>
-                {upcomingClass ? (
-                    <div className="mt-4 space-y-3">
-                         <h3 className="font-bold text-xl text-accent">{upcomingClass.topic}</h3>
-                         <p className="text-muted">{upcomingClass.description}</p>
-                         <div className="text-sm text-base-content pt-3 border-t space-y-2">
-                            <div className="flex items-center gap-2"><Clock size={16}/> {format(upcomingClass.classDate, 'eeee, d MMMM yyyy, HH:mm', { locale: id })}</div>
-                            <div className="flex items-center gap-2"><UserIcon size={16}/> Mentor: {upcomingClass.mentorName}</div>
-                            {/* FIX: Display participant count in the class viewer. */}
-                            <div className="flex items-center gap-2"><Users size={16}/> Kuota: {upcomingClass.registeredInternIds.length} / {upcomingClass.maxParticipants}</div>
-                         </div>
+                <h2 className="text-2xl font-bold text-primary flex items-center gap-3"><BookOpen /> Kelas Wajib Akan Datang</h2>
+                {upcomingClasses.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {upcomingClasses.map(cls => {
+                            const isRegistered = cls.registeredInternIds.includes(user?.id || '');
+                            const isFull = cls.registeredInternIds.length >= cls.maxParticipants;
+                            return (
+                                <div key={cls.id} className="bg-base-100 p-4 rounded-lg flex flex-col justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-accent">{cls.topic}</h3>
+                                        <p className="text-sm text-muted mt-1">{cls.description}</p>
+                                        <div className="text-xs text-base-content pt-3 mt-3 border-t space-y-2">
+                                            <div className="flex items-center gap-2"><Clock size={16}/> {format(cls.classDate, 'eeee, d MMMM yyyy, HH:mm', { locale: id })}</div>
+                                            <div className="flex items-center gap-2"><UserIcon size={16}/> Mentor: {cls.mentorName}</div>
+                                            <div className="flex items-center gap-2"><Users size={16}/> Kuota: {cls.registeredInternIds.length} / {cls.maxParticipants}</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4">
+                                        {isRegistered ? (
+                                            <div className="flex items-center justify-between">
+                                                <span className="flex items-center gap-2 text-sm font-semibold text-success"><CheckCircle size={16}/> Terdaftar</span>
+                                                <button onClick={() => setModal({ isOpen: true, action: 'unregister', class: cls })} className="text-xs text-error hover:underline">Batalkan</button>
+                                            </div>
+                                        ) : isFull ? (
+                                            <span className="w-full block text-center py-2 text-sm font-semibold text-muted bg-base-200 rounded-lg">Penuh</span>
+                                        ) : (
+                                            <button onClick={() => setModal({ isOpen: true, action: 'register', class: cls })} disabled={actionLoading === cls.id} className="w-full py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50">
+                                                {actionLoading === cls.id ? <Loader2 className="animate-spin mx-auto"/> : 'Daftar Kelas'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
                 ) : (
-                    <p className="mt-4 text-center text-muted py-4">Jadwal kelas wajib minggu ini akan segera diumumkan.</p>
+                    <p className="mt-4 text-center text-muted py-4">Jadwal kelas wajib akan segera diumumkan.</p>
                 )}
             </div>
 
@@ -175,6 +217,13 @@ const PracticalClassViewer: React.FC<{ classes: PracticalClass[] }> = ({ classes
                     ))}
                 </div>
             </div>
+             <ConfirmationModal 
+                isOpen={modal.isOpen}
+                onClose={() => setModal({ isOpen: false, action: 'register', class: null })}
+                onConfirm={handleAction}
+                title={`${modal.action === 'register' ? 'Konfirmasi Pendaftaran' : 'Batalkan Pendaftaran'}`}
+                message={`Anda yakin ingin ${modal.action === 'register' ? 'mendaftar untuk' : 'membatalkan pendaftaran dari'} kelas "${modal.class?.topic}"?`}
+            />
         </div>
     );
 };
@@ -248,7 +297,7 @@ const AcademyPage = () => {
             </div>
 
             <div className="my-8">
-                {isIntern ? <PracticalClassViewer classes={practicalClasses} /> : <PracticalClassManager classes={practicalClasses} onUpdate={fetchData} />}
+                {isIntern ? <PracticalClassViewer classes={practicalClasses} onUpdate={fetchData} /> : <PracticalClassManager classes={practicalClasses} onUpdate={fetchData} />}
             </div>
 
             <div className="space-y-8 mt-12">

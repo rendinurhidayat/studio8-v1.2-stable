@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getUsers, getAttendanceForUser, getDailyReportsForUser, getTasksForUser } from '../../services/api';
 import { User, UserRole, Attendance, DailyReport, Task, AttendanceStatus } from '../../types';
-import { format, differenceInDays, isBefore } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import id from 'date-fns/locale/id';
 import Modal from '../../components/common/Modal';
-import { Loader2, Calendar, ClipboardList, CheckSquare, Percent } from 'lucide-react';
+import { Loader2, Calendar, ClipboardList, CheckSquare, FileText, CalendarCheck, ClipboardCheck } from 'lucide-react';
 import Card from '../../components/common/Card';
+import { motion } from 'framer-motion';
 
 const InternDetailModal: React.FC<{
     isOpen: boolean,
@@ -34,12 +35,6 @@ const InternDetailModal: React.FC<{
             fetchData();
         }
     }, [isOpen, intern]);
-    
-    if (!intern) return null;
-
-    const totalDays = intern.startDate && intern.endDate ? differenceInDays(intern.endDate, intern.startDate) + 1 : 0;
-    const daysPassed = intern.startDate ? differenceInDays(new Date(), intern.startDate) + 1 : 0;
-    const progress = totalDays > 0 ? Math.min(Math.round((daysPassed / totalDays) * 100), 100) : 0;
 
     const attendanceRate = useMemo(() => {
         if (!intern?.startDate) return 0;
@@ -61,6 +56,12 @@ const InternDetailModal: React.FC<{
         const totalProgress = tasks.reduce((sum, task) => sum + (task.progress || 0), 0);
         return Math.round(totalProgress / tasks.length);
     }, [tasks]);
+    
+    if (!intern) return null;
+
+    const totalDays = intern.startDate && intern.endDate ? differenceInDays(intern.endDate, intern.startDate) + 1 : 0;
+    const daysPassed = intern.startDate ? differenceInDays(new Date(), intern.startDate) + 1 : 0;
+    const progress = totalDays > 0 ? Math.min(Math.round((daysPassed / totalDays) * 100), 100) : 0;
 
 
     return (
@@ -90,7 +91,7 @@ const InternDetailModal: React.FC<{
                         <ul className="space-y-2 mt-2">
                             {attendance.map(att => (
                                 <li key={att.id} className="text-sm p-2 bg-gray-50 rounded flex justify-between">
-                                    <span>{format(att.checkInTime, 'd MMMM yyyy', {locale: id})}</span>
+                                    <span>{format(att.checkInTime, 'd MMMM yyyy', { locale: id })}</span>
                                     <span>{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span>
                                 </li>
                             ))}
@@ -102,7 +103,7 @@ const InternDetailModal: React.FC<{
                             {reports.map(rep => (
                                 <li key={rep.id} className="text-sm p-2 bg-gray-50 rounded">
                                     <div className="flex justify-between items-center">
-                                        <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', {locale: id})}</p>
+                                        <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', { locale: id })}</p>
                                         <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{rep.mood}</span>
                                     </div>
                                     <p className="text-gray-700 mt-1">{rep.content}</p>
@@ -133,6 +134,126 @@ const InternDetailModal: React.FC<{
     );
 }
 
+const StatPill: React.FC<{ icon: React.ReactNode; value: string; label: string; }> = ({ icon, value, label }) => (
+    <div className="text-center p-2 rounded-lg bg-base-100 flex-1">
+        <div className="w-8 h-8 mx-auto bg-primary/10 text-primary rounded-full flex items-center justify-center mb-1">
+            {icon}
+        </div>
+        <p className="font-bold text-lg text-primary">{value}</p>
+        <p className="text-xs text-muted">{label}</p>
+    </div>
+);
+
+const InternProfileCard: React.FC<{ intern: User; onSelect: (intern: User) => void; }> = ({ intern, onSelect }) => {
+    const [stats, setStats] = useState<{
+        attendanceRate: number;
+        totalReports: number;
+        tasksCompletedPercent: number;
+    } | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchInternData = async () => {
+            setLoading(true);
+            try {
+                const [attendanceData, reportsData, tasksData] = await Promise.all([
+                    getAttendanceForUser(intern.id),
+                    getDailyReportsForUser(intern.id),
+                    getTasksForUser(intern.id),
+                ]);
+
+                let attendanceRate = 0;
+                if (intern.startDate) {
+                    const today = new Date();
+                    const start = new Date(intern.startDate);
+                    let workingDays = 0;
+                    if (today >= start) {
+                        for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+                            const dayOfWeek = d.getDay();
+                            if (dayOfWeek !== 0 && dayOfWeek !== 6) { 
+                                workingDays++;
+                            }
+                        }
+                    }
+                    const presentDays = attendanceData.filter(a => a.status === AttendanceStatus.Present).length;
+                    attendanceRate = workingDays > 0 ? Math.round((presentDays / workingDays) * 100) : 0;
+                }
+
+                const tasksCompletedPercent = tasksData.length > 0
+                    ? Math.round((tasksData.filter(t => t.completed).length / tasksData.length) * 100)
+                    : 100;
+
+                setStats({
+                    attendanceRate,
+                    totalReports: reportsData.length,
+                    tasksCompletedPercent,
+                });
+
+            } catch (error) {
+                console.error("Failed to fetch intern stats:", error);
+                setStats(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchInternData();
+    }, [intern]);
+
+    const calculateProgress = (startDate?: Date, endDate?: Date) => {
+        if (!startDate || !endDate) return 0;
+        const totalDuration = differenceInDays(new Date(endDate), new Date(startDate));
+        const daysPassed = differenceInDays(new Date(), new Date(startDate));
+        if (totalDuration <= 0 || daysPassed < 0) return 0;
+        return Math.min(Math.round((daysPassed / totalDuration) * 100), 100);
+    };
+
+    const progress = calculateProgress(intern.startDate, intern.endDate);
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -5 }}
+            className="bg-white rounded-2xl shadow-lg border border-base-200/50 p-6 flex flex-col"
+        >
+            <div className="flex-grow">
+                <div className="text-center">
+                    <h3 className="font-bold text-lg text-primary">{intern.name}</h3>
+                    <p className="text-sm text-muted">{intern.asalSekolah} ({intern.jurusan})</p>
+                </div>
+
+                <div className="my-4">
+                    <div className="flex justify-between text-xs text-muted mb-1">
+                        <span>Progres Magang</span>
+                        <span className="font-semibold">{progress}%</span>
+                    </div>
+                    <div className="w-full bg-base-200 rounded-full h-2.5">
+                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center items-center h-24">
+                        <Loader2 className="animate-spin text-primary" />
+                    </div>
+                ) : stats ? (
+                    <div className="flex justify-between items-center gap-2">
+                        <StatPill icon={<CalendarCheck size={16} />} value={`${stats.attendanceRate}%`} label="Kehadiran" />
+                        <StatPill icon={<FileText size={16} />} value={stats.totalReports.toString()} label="Laporan" />
+                        <StatPill icon={<ClipboardCheck size={16} />} value={`${stats.tasksCompletedPercent}%`} label="Tugas" />
+                    </div>
+                ) : (
+                    <div className="text-center text-error text-sm h-24 flex items-center justify-center">Gagal memuat data.</div>
+                )}
+            </div>
+            <button onClick={() => onSelect(intern)} className="mt-6 w-full bg-primary/10 text-primary font-semibold py-2 px-4 rounded-lg hover:bg-primary/20 transition-colors">
+                Lihat Detail
+            </button>
+        </motion.div>
+    );
+};
+
 
 const AdminInternsPage = () => {
     const [interns, setInterns] = useState<User[]>([]);
@@ -149,14 +270,6 @@ const AdminInternsPage = () => {
         fetchInterns();
     }, []);
 
-    const calculateProgress = (intern: User) => {
-        if (!intern.startDate || !intern.endDate) return 0;
-        const totalDuration = differenceInDays(intern.endDate, intern.startDate);
-        const daysPassed = differenceInDays(new Date(), intern.startDate);
-        if (totalDuration <= 0 || daysPassed < 0) return 0;
-        return Math.min(Math.round((daysPassed / totalDuration) * 100), 100);
-    };
-
     if (loading) return <div className="text-center p-8"><Loader2 className="animate-spin mx-auto"/></div>;
 
     return (
@@ -164,41 +277,12 @@ const AdminInternsPage = () => {
             <h1 className="text-3xl font-bold">Manajemen Magang & PKL</h1>
             <p className="text-muted mt-1 mb-6">Pantau progres, absensi, dan laporan harian anak magang.</p>
 
-            <div className="bg-white shadow-md rounded-lg overflow-hidden">
-                <table className="min-w-full leading-normal">
-                    <thead className="bg-slate-50">
-                        <tr>
-                            <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">Nama</th>
-                            <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">Asal Sekolah</th>
-                            <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">Periode</th>
-                            <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold uppercase">Progres</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {interns.map(intern => (
-                            <tr key={intern.id} onClick={() => setSelectedIntern(intern)} className="hover:bg-gray-50 cursor-pointer">
-                                <td className="px-5 py-5 border-b text-sm">
-                                    <p className="font-semibold text-blue-600">{intern.name}</p>
-                                    <p className="text-xs text-gray-500">{intern.role}</p>
-                                </td>
-                                <td className="px-5 py-5 border-b text-sm">{intern.asalSekolah} ({intern.jurusan})</td>
-                                <td className="px-5 py-5 border-b text-sm">
-                                    {intern.startDate ? format(intern.startDate, 'd MMM yyyy', {locale: id}) : 'N/A'} - 
-                                    {intern.endDate ? format(intern.endDate, 'd MMM yyyy', {locale: id}) : 'N/A'}
-                                </td>
-                                <td className="px-5 py-5 border-b text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                            <div className="bg-blue-600 h-2.5 rounded-full" style={{width: `${calculateProgress(intern)}%`}}></div>
-                                        </div>
-                                        <span className="font-semibold">{calculateProgress(intern)}%</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {interns.map(intern => (
+                    <InternProfileCard key={intern.id} intern={intern} onSelect={setSelectedIntern} />
+                ))}
             </div>
+
             <InternDetailModal isOpen={!!selectedIntern} onClose={() => setSelectedIntern(null)} intern={selectedIntern} />
         </div>
     );

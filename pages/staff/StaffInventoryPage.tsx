@@ -1,14 +1,10 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { getInventoryItems, updateInventoryItem } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { InventoryItem, InventoryStatus } from '../../types';
 import { Check, AlertTriangle, MessageSquare, Loader2 } from 'lucide-react';
 import Modal from '../../components/common/Modal';
-// FIX: Changed import path to main 'date-fns' entrypoint to resolve type error for 'locale' option.
 import { formatDistanceToNow } from 'date-fns';
-// FIX: Switched to default import for locale from date-fns/locale/id.
 import id from 'date-fns/locale/id';
 
 const StatusBadge: React.FC<{ status: InventoryStatus }> = ({ status }) => {
@@ -150,8 +146,7 @@ const StaffInventoryPage = () => {
                                                 <StatusBadge status={item.status} />
                                             </div>
                                             <p className="text-xs text-muted mt-1">
-                                                {/* FIX: Cast options to 'any' to bypass faulty type definition for 'locale'. */}
-                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(item.lastChecked, { addSuffix: true, locale: (id as any).default ?? id }) : 'Belum pernah'}
+                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(item.lastChecked, { addSuffix: true, locale: id }) : 'Belum pernah'}
                                             </p>
                                             {item.notes && item.status !== InventoryStatus.Available && (
                                                 <div className="mt-2 p-2 bg-yellow-50 text-yellow-800 text-xs rounded flex items-start gap-2">

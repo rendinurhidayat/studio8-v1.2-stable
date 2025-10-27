@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getPackages, getAddOns, getSystemSettings, getClientDetailsForBooking, validateReferralCode } from '../../services/api';
 import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, Client } from '../../types';
 import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, ArrowRight, ArrowLeft, Send, Home, Search, FileText, Loader2, AlertTriangle, Tag, Award, X } from 'lucide-react';
+import { fileToBase64 as fileUtilToBase64 } from '../../utils/fileUtils';
 
 
 // --- Type Definitions ---
@@ -64,17 +65,14 @@ const calculateDpAmount = (totalPrice: number, pkg: Package | undefined): number
 // --- Helper Functions ---
 const fileToBase64 = (file: File): Promise<{ base64: string, fileName: string, mimeType: string }> => {
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-            const base64String = (reader.result as string).split(',')[1];
+        fileUtilToBase64(file).then(dataUrl => {
+            const base64String = dataUrl.split(',')[1];
             resolve({
                 base64: base64String,
                 fileName: file.name,
                 mimeType: file.type,
             });
-        };
-        reader.onerror = error => reject(error);
+        }).catch(reject);
     });
 };
 
@@ -214,7 +212,7 @@ const Step2Details: React.FC<{formData: FormData, setFormData: Function, errors:
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {packages.map(pkg => (
                         <div key={pkg.id} onClick={() => handlePackageSelect(pkg.id)} className={`p-3 text-center border-2 rounded-xl cursor-pointer transition-all duration-200 flex flex-col items-center gap-2 ${formData.packageId === pkg.id ? 'border-accent bg-accent/10 scale-105' : 'border-base-200 hover:border-base-300'}`}>
-                            {pkg.imageUrls && pkg.imageUrls.length > 0 && <img src={pkg.imageUrls[0]} alt={pkg.name} className="w-full h-20 object-cover rounded-md mb-2"/>}
+                            {pkg.imageUrls && pkg.imageUrls[0] && <img src={pkg.imageUrls[0]} alt={pkg.name} className="w-full h-20 object-cover rounded-md mb-2"/>}
                             <p className="font-semibold text-sm text-base-content">{pkg.name}</p>
                             <p className="text-xs text-muted">{pkg.description}</p>
                         </div>

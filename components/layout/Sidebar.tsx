@@ -32,6 +32,7 @@ const StaffNavLinks = [
   { path: '/staff/tasks', label: 'Tugas Harian', icon: <CheckSquare size={20} /> },
   { path: '/staff/inventory', label: 'Cek Inventaris', icon: <Archive size={20} /> },
   { path: '/staff/mentoring', label: 'Mentoring', icon: <Briefcase size={20} /> },
+  { path: '/staff/report', label: 'Laporan PKL', icon: <FileText size={20} /> },
   { path: '/staff/academy', label: 'Akademi', icon: <Library size={20} /> },
   { path: '/staff/community', label: 'Komunitas', icon: <Network size={20} /> },
   { path: '/staff/quiz-manager', label: 'Manajemen Kuis', icon: <BookOpenCheck size={20} /> },
@@ -40,7 +41,6 @@ const StaffNavLinks = [
   { path: '/staff/highlight-manager', label: 'Highlight Wall', icon: <GalleryHorizontal size={20} /> },
   { path: '/staff/assets', label: 'Manajemen Aset', icon: <FolderKanban size={20} /> },
   { path: '/staff/chat', label: 'Chat', icon: <MessagesSquare size={20} /> },
-  { path: '/staff/report', label: 'Laporan PKL', icon: <FileText size={20} /> },
 ];
 
 const InternNavLinks = [
@@ -98,10 +98,19 @@ const Sidebar = () => {
       className="bg-primary flex-shrink-0 overflow-hidden fixed inset-y-0 left-0 z-40 md:relative"
     >
       <div className="w-64 h-full flex flex-col p-4">
-        <div className="flex items-center justify-center h-16 shrink-0">
-          {/* Intentionally empty for spacing, logo is in header */}
+        <div className="flex flex-col items-center text-center p-4 border-b border-white/10 mb-4">
+            {user?.photoURL ? (
+                 <img src={user.photoURL} alt={user.name} className="w-16 h-16 rounded-full object-cover mb-3 border-2 border-white/20" />
+            ) : (
+                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center font-bold text-white text-2xl mb-3 border-2 border-white/20">
+                    {user?.name?.charAt(0)}
+                </div>
+            )}
+            <p className="font-semibold text-white truncate w-full">{user?.name}</p>
+            <p className="text-xs text-white/60">{user?.role}</p>
         </div>
-        <nav className="mt-6 flex-grow space-y-2">
+
+        <nav className="flex-grow space-y-2">
           {navLinks.map(link => (
             <NavLink key={link.path} to={link.path} icon={link.icon}>{link.label}</NavLink>
           ))}

@@ -39,7 +39,7 @@ const StaffFinancePage = lazy(() => import('./pages/staff/StaffFinancePage'));
 const StaffTasksPage = lazy(() => import('./pages/staff/StaffTasksPage'));
 const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 const AdminFeedbackPage = lazy(() => import('./pages/admin/AdminFeedbackPage'));
-const PublicCalendarPage = lazy(() => import('./pages/client/ClientLoginPage'));
+const PublicCalendarPage = lazy(() => import('./pages/public/PublicCalendarPage'));
 const AdminActivityLogPage = lazy(() => import('./pages/admin/AdminActivityLogPage'));
 const StaffInventoryPage = lazy(() => import('./pages/staff/StaffInventoryPage'));
 const InternDashboardPage = lazy(() => import('./pages/intern/InternDashboardPage'));

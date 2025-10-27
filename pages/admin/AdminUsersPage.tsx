@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { getUsers, addUser, updateUser, deleteUser, getTasksForUser, createTask, deleteTask, addMentorFeedback, getMentorFeedbackForIntern } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, UserRole, Task, MentorFeedback } from '../../types';
-import { PlusCircle, Edit, Trash2, ClipboardList, Loader2, Send, MessageSquare, Star, Eye } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ClipboardList, Loader2, Send, MessageSquare, Star, Eye, Image as ImageIcon } from 'lucide-react';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-// FIX: Removed unused 'parseISO' import that was causing a module resolution error.
 import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 import StarRating from '../../components/feedback/StarRating';
+import { fileToBase64 } from '../../utils/fileUtils';
 
 const FeedbackModal: React.FC<{
     isOpen: boolean;
@@ -197,16 +197,18 @@ const TaskManagementModal: React.FC<{
                     </div>
                 </div>
             </Modal>
-            <FeedbackModal 
-                isOpen={feedbackModalState.isOpen}
-                onClose={() => {
-                    setFeedbackModalState({isOpen: false, task: null, feedback: null});
-                    fetchTasksAndFeedback(); // Refresh feedback data after modal closes
-                }}
-                task={feedbackModalState.task!}
-                intern={user}
-                existingFeedback={feedbackModalState.feedback}
-            />
+            {feedbackModalState.task && (
+                <FeedbackModal 
+                    isOpen={feedbackModalState.isOpen}
+                    onClose={() => {
+                        setFeedbackModalState({isOpen: false, task: null, feedback: null});
+                        fetchTasksAndFeedback(); // Refresh feedback data after modal closes
+                    }}
+                    task={feedbackModalState.task}
+                    intern={user}
+                    existingFeedback={feedbackModalState.feedback}
+                />
+            )}
         </>
     );
 };
@@ -221,12 +223,16 @@ const AdminUsersPage = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [taskModalUser, setTaskModalUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+
   const [formData, setFormData] = useState({
       name: '',
       email: '',
       username: '',
       password: '',
       role: UserRole.Staff,
+      photoURL: '',
       asalSekolah: '',
       jurusan: '',
       startDate: '',
@@ -244,10 +250,15 @@ const AdminUsersPage = () => {
     fetchUsers();
   }, []);
 
+  const resetForm = () => {
+    setFormData({ name: '', email: '', username: '', password: '', role: UserRole.Staff, photoURL: '', asalSekolah: '', jurusan: '', startDate: '', endDate: '' });
+    setPhotoFile(null);
+  }
+
   const openAddModal = () => {
     setIsEditing(false);
     setSelectedUser(null);
-    setFormData({ name: '', email: '', username: '', password: '', role: UserRole.Staff, asalSekolah: '', jurusan: '', startDate: '', endDate: '' });
+    resetForm();
     setIsModalOpen(true);
   };
 
@@ -258,13 +269,15 @@ const AdminUsersPage = () => {
         name: user.name,
         email: user.email,
         username: user.username || '',
-        password: '', // Password is not shown, only updated if changed
+        password: '',
         role: user.role,
+        photoURL: user.photoURL || '',
         asalSekolah: user.asalSekolah || '',
         jurusan: user.jurusan || '',
         startDate: user.startDate ? format(user.startDate, 'yyyy-MM-dd') : '',
         endDate: user.endDate ? format(user.endDate, 'yyyy-MM-dd') : '',
     });
+    setPhotoFile(null);
     setIsModalOpen(true);
   };
   
@@ -273,39 +286,70 @@ const AdminUsersPage = () => {
       setIsConfirmModalOpen(true);
   }
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setFormData(prev => ({ ...prev, photoURL: reader.result as string }));
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
-
-    const dataToSubmit: any = { ...formData };
-    if (dataToSubmit.username) {
-        dataToSubmit.username = dataToSubmit.username.toLowerCase();
-    }
     
-    // Only include school/major/dates if the role requires it
-    if (formData.role !== UserRole.AnakMagang && formData.role !== UserRole.AnakPKL) {
-        dataToSubmit.asalSekolah = '';
-        dataToSubmit.jurusan = '';
-        dataToSubmit.startDate = '';
-        dataToSubmit.endDate = '';
-    } else {
-        dataToSubmit.startDate = formData.startDate ? new Date(formData.startDate) : undefined;
-        dataToSubmit.endDate = formData.endDate ? new Date(formData.endDate) : undefined;
-    }
-
-    if (isEditing && selectedUser) {
-        // Exclude password and email from update payload as they are handled separately by Firebase Auth
-        const { password, email, ...dataToUpdate } = dataToSubmit;
-        await updateUser(selectedUser.id, dataToUpdate, currentUser.id);
-    } else {
-        const finalData = { ...dataToSubmit };
-        if (finalData.role === UserRole.AnakMagang || finalData.role === UserRole.AnakPKL) {
-            finalData.totalPoints = 0;
+    setIsSaving(true);
+    try {
+        let finalPhotoUrl = isEditing ? selectedUser?.photoURL || '' : '';
+        if (photoFile) {
+            const base64 = await fileToBase64(photoFile);
+            const response = await fetch('/api/uploadImage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64: base64, folder: 'profile_pictures' })
+            });
+            if (!response.ok) throw new Error('Gagal mengunggah foto profil.');
+            const result = await response.json();
+            finalPhotoUrl = result.secure_url;
         }
-        await addUser(finalData, currentUser.id);
+
+        const dataToSubmit: any = { ...formData, photoURL: finalPhotoUrl };
+        if (dataToSubmit.username) {
+            dataToSubmit.username = dataToSubmit.username.toLowerCase();
+        }
+        
+        if (formData.role !== UserRole.AnakMagang && formData.role !== UserRole.AnakPKL) {
+            dataToSubmit.asalSekolah = '';
+            dataToSubmit.jurusan = '';
+            dataToSubmit.startDate = '';
+            dataToSubmit.endDate = '';
+        } else {
+            dataToSubmit.startDate = formData.startDate ? new Date(formData.startDate) : undefined;
+            dataToSubmit.endDate = formData.endDate ? new Date(formData.endDate) : undefined;
+        }
+
+        if (isEditing && selectedUser) {
+            const { password, email, ...dataToUpdate } = dataToSubmit;
+            await updateUser(selectedUser.id, dataToUpdate, currentUser.id);
+        } else {
+            const finalData = { ...dataToSubmit };
+            if (finalData.role === UserRole.AnakMagang || finalData.role === UserRole.AnakPKL) {
+                finalData.totalPoints = 0;
+            }
+            await addUser(finalData, currentUser.id);
+        }
+        setIsModalOpen(false);
+        fetchUsers();
+    } catch (error) {
+        console.error("Error submitting user form:", error);
+        alert((error as Error).message);
+    } finally {
+        setIsSaving(false);
     }
-    setIsModalOpen(false);
-    fetchUsers();
   };
   
   const handleDeleteConfirm = async () => {
@@ -342,12 +386,21 @@ const AdminUsersPage = () => {
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-base-100/50">
                 <td className="px-5 py-5 border-b border-base-200 text-sm">
-                    <p className="font-medium text-base-content">{user.name}</p>
-                    {(user.role === UserRole.AnakMagang || user.role === UserRole.AnakPKL) && (
-                        <p className="text-muted text-xs mt-1">
-                            {user.asalSekolah} ({user.jurusan})
-                        </p>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {user.photoURL ? (
+                            <img src={user.photoURL} alt={user.name} className="w-10 h-10 rounded-full object-cover"/>
+                        ) : (
+                            <div className="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center font-bold text-primary flex-shrink-0">{user.name.charAt(0)}</div>
+                        )}
+                        <div>
+                            <p className="font-medium text-base-content">{user.name}</p>
+                            {(user.role === UserRole.AnakMagang || user.role === UserRole.AnakPKL) && (
+                                <p className="text-muted text-xs mt-1">
+                                    {user.asalSekolah} ({user.jurusan})
+                                </p>
+                            )}
+                        </div>
+                    </div>
                 </td>
                 <td className="px-5 py-5 border-b border-base-200 text-sm">{user.email}</td>
                 <td className="px-5 py-5 border-b border-base-200 text-sm">
@@ -369,23 +422,35 @@ const AdminUsersPage = () => {
       </div>
 
       <Modal title={isEditing ? 'Edit User' : 'Tambah User Baru'} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <form onSubmit={handleFormSubmit} className="space-y-4">
-              {/* Form fields */}
+          <form onSubmit={handleFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               <div>
-                  <label className="block text-sm font-medium text-gray-700">Nama Lengkap</label>
-                  <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"/>
+                  <label className="block text-sm font-medium text-gray-700">Foto Profil</label>
+                  <div className="mt-2 flex items-center gap-4">
+                        {formData.photoURL ? (
+                            <img src={formData.photoURL} alt="Preview" className="w-16 h-16 rounded-full object-cover"/>
+                        ) : (
+                            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-400"><ImageIcon size={32} /></div>
+                        )}
+                        <input type="file" accept="image/*" onChange={handlePhotoChange} className="text-sm" />
+                  </div>
               </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required disabled={isEditing} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 disabled:bg-gray-100"/>
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700">Username</label>
-                  <input type="text" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"/>
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700">Password</label>
-                  <input type="password" placeholder={isEditing ? 'Tidak dapat diubah dari sini' : ''} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required={!isEditing} disabled={isEditing} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 disabled:bg-gray-100"/>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Nama Lengkap</label>
+                    <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"/>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required disabled={isEditing} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 disabled:bg-gray-100"/>
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"/>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" placeholder={isEditing ? 'Tidak dapat diubah dari sini' : ''} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required={!isEditing} disabled={isEditing} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 disabled:bg-gray-100"/>
+                </div>
               </div>
               <div>
                   <label className="block text-sm font-medium text-gray-700">Role</label>
@@ -421,7 +486,9 @@ const AdminUsersPage = () => {
 
               <div className="flex justify-end gap-3 pt-4">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Batal</button>
-                  <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Simpan</button>
+                  <button type="submit" disabled={isSaving} className="w-28 flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60">
+                    {isSaving ? <Loader2 className="animate-spin" /> : 'Simpan'}
+                  </button>
               </div>
           </form>
       </Modal>

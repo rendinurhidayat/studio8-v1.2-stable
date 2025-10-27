@@ -11,8 +11,9 @@ import {
 import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, FeatureToggles, Promo, OperationalHours, PaymentMethods, InventoryItem, InventoryStatus, LoyaltyTier } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import Card from '../../components/common/Card';
+import { fileToBase64 } from '../../utils/fileUtils';
 
 type ModalMode = 'add' | 'edit';
 type ItemType = 'package' | 'addon' | 'subpackage' | 'subaddon' | 'promo' | 'inventory' | 'loyaltyTier';
@@ -24,21 +25,6 @@ interface ModalState {
     itemData?: any;
     parentId?: string;
 }
-
-const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-             if (typeof reader.result === 'string') {
-                resolve(reader.result);
-            } else {
-                reject(new Error('FileReader result is not a string'));
-            }
-        };
-        reader.onerror = error => reject(error);
-    });
-};
 
 const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void }> = ({ enabled, onChange }) => (
     <button type="button" onClick={onChange} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${enabled ? 'bg-primary' : 'bg-base-300'}`}>
@@ -163,18 +149,27 @@ const GeneralSettingsTab = () => {
     );
 };
 
+interface ImageUpload {
+    id: string;
+    file: File;
+    preview: string;
+    status: 'pending' | 'uploading' | 'success' | 'error';
+    error?: string;
+}
+
 const ServicesSettingsTab = () => {
     const { user: currentUser } = useAuth();
     const [packages, setPackages] = useState<Package[]>([]);
     const [addOns, setAddOns] = useState<AddOn[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'package' });
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     
     const [formData, setFormData] = useState({
         name: '', price: '', description: '', imageUrls: [] as string[], type: 'Studio', isGroupPackage: false
     });
-    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imageUploads, setImageUploads] = useState<ImageUpload[]>([]);
 
 
     const fetchData = async () => {
@@ -190,7 +185,7 @@ const ServicesSettingsTab = () => {
     }, []);
 
     const openModal = (mode: ModalMode, type: ItemType, itemData?: any, parentId?: string) => {
-        setImageFiles([]);
+        setImageUploads([]);
         setModalState({ isOpen: true, mode, type, itemData, parentId });
         
         if (mode === 'edit' && itemData) {
@@ -216,7 +211,14 @@ const ServicesSettingsTab = () => {
     
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setImageFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+            // FIX: Explicitly type 'file' as File to resolve type inference errors when iterating over a FileList.
+            const newFiles: ImageUpload[] = Array.from(e.target.files).map((file: File) => ({
+                id: `${file.name}-${file.lastModified}-${Math.random()}`,
+                file,
+                preview: URL.createObjectURL(file),
+                status: 'pending'
+            }));
+            setImageUploads(prev => [...prev, ...newFiles]);
         }
     };
 
@@ -224,75 +226,89 @@ const ServicesSettingsTab = () => {
         setFormData(prev => ({...prev, imageUrls: prev.imageUrls.filter(url => url !== urlToRemove)}));
     };
 
-    const handleRemoveNewImage = (fileToRemove: File) => {
-        setImageFiles(prev => prev.filter(file => file !== fileToRemove));
+    const handleRemoveNewImage = (idToRemove: string) => {
+        setImageUploads(prev => prev.filter(upload => upload.id !== idToRemove));
     };
 
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) return;
     
-        const { mode, type, itemData, parentId } = modalState;
-        
-        let finalImageUrls = [...formData.imageUrls];
-    
-        if (imageFiles.length > 0) {
-            const uploadPromises = imageFiles.map(file => 
-                fileToBase64(file).then(imageBase64 => 
-                    fetch('/api/uploadImage', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ imageBase64, folder: 'package_images' })
-                    }).then(res => res.json())
-                )
-            );
+        setIsSubmitting(true);
+        try {
+            const { mode, type, itemData, parentId } = modalState;
             
-            try {
-                const uploadResults = await Promise.all(uploadPromises);
-                const newUrls = uploadResults.map(result => result.secure_url);
+            // --- Image Upload Logic ---
+            let finalImageUrls = [...formData.imageUrls];
+            const filesToUpload = imageUploads.filter(f => f.status === 'pending' || f.status === 'error');
+            let hadError = false;
+
+            if (filesToUpload.length > 0) {
+                const newUrls: string[] = [];
+                for (const fileWrapper of filesToUpload) {
+                    setImageUploads(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, status: 'uploading' } : f));
+                    try {
+                        const base64 = await fileToBase64(fileWrapper.file);
+                        const response = await fetch('/api/uploadImage', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ imageBase64: base64, folder: 'package_images' })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || 'Upload gagal');
+                        newUrls.push(result.secure_url);
+                        setImageUploads(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, status: 'success' } : f));
+                    } catch (error) {
+                        hadError = true;
+                        setImageUploads(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, status: 'error', error: (error as Error).message } : f));
+                    }
+                }
+                if (hadError) {
+                    throw new Error('Beberapa gambar gagal diunggah. Silakan hapus dan coba lagi.');
+                }
                 finalImageUrls.push(...newUrls);
-            } catch (error) {
-                console.error(error);
-                alert(`Error uploading images: ${(error as Error).message}`);
-                return; 
             }
-        }
-    
-        if (type === 'package') {
-            const packagePayload = {
-                name: formData.name,
-                description: formData.description,
-                type: formData.type as 'Studio' | 'Outdoor',
-                isGroupPackage: formData.isGroupPackage,
-                imageUrls: finalImageUrls,
-            };
-    
-            if (mode === 'add') {
-                await addPackage({ ...packagePayload, subPackages: [] }, currentUser.id);
-            } else if (itemData) {
-                await updatePackage(itemData.id, packagePayload, currentUser.id);
-            }
-        } else {
-            const price = parseFloat(formData.price);
-            const commonData = { name: formData.name, description: formData.description };
-            const priceData = { ...commonData, price: isNaN(price) ? 0 : price };
-    
-            if (mode === 'edit' && itemData) {
-                switch(type) {
-                    case 'addon': await updateAddOn(itemData.id, { name: formData.name }, currentUser.id); break;
-                    case 'subpackage': await updateSubPackage(parentId!, itemData.id, priceData, currentUser.id); break;
-                    case 'subaddon': await updateSubAddOn(parentId!, itemData.id, {name: formData.name, price: priceData.price}, currentUser.id); break;
+        
+            if (type === 'package') {
+                const packagePayload = {
+                    name: formData.name,
+                    description: formData.description,
+                    type: formData.type as 'Studio' | 'Outdoor',
+                    isGroupPackage: formData.isGroupPackage,
+                    imageUrls: finalImageUrls,
+                };
+        
+                if (mode === 'add') {
+                    await addPackage({ ...packagePayload, subPackages: [] }, currentUser.id);
+                } else if (itemData) {
+                    await updatePackage(itemData.id, packagePayload, currentUser.id);
                 }
-            } else { // add mode
-                 switch(type) {
-                    case 'addon': await addAddOn({name: formData.name, subAddOns: []}, currentUser.id); break;
-                    case 'subpackage': await addSubPackage(parentId!, priceData, currentUser.id); break;
-                    case 'subaddon': await addSubAddOn(parentId!, {name: formData.name, price: priceData.price}, currentUser.id); break;
+            } else {
+                const price = parseFloat(formData.price);
+                const commonData = { name: formData.name, description: formData.description };
+                const priceData = { ...commonData, price: isNaN(price) ? 0 : price };
+        
+                if (mode === 'edit' && itemData) {
+                    switch(type) {
+                        case 'addon': await updateAddOn(itemData.id, { name: formData.name }, currentUser.id); break;
+                        case 'subpackage': await updateSubPackage(parentId!, itemData.id, priceData, currentUser.id); break;
+                        case 'subaddon': await updateSubAddOn(parentId!, itemData.id, {name: formData.name, price: priceData.price}, currentUser.id); break;
+                    }
+                } else { // add mode
+                     switch(type) {
+                        case 'addon': await addAddOn({name: formData.name, subAddOns: []}, currentUser.id); break;
+                        case 'subpackage': await addSubPackage(parentId!, priceData, currentUser.id); break;
+                        case 'subaddon': await addSubAddOn(parentId!, {name: formData.name, price: priceData.price}, currentUser.id); break;
+                    }
                 }
             }
+            closeModal();
+            fetchData();
+        } catch (error) {
+             alert((error as Error).message);
+        } finally {
+            setIsSubmitting(false);
         }
-        closeModal();
-        fetchData();
     };
 
     const handleDelete = async () => {
@@ -380,7 +396,7 @@ const ServicesSettingsTab = () => {
             {renderItemList('Paket Foto', packages, 'package', <Box className="text-blue-600"/>)}
             {renderItemList('Layanan Tambahan', addOns, 'addon', <Puzzle className="text-blue-600"/>)}
             <Modal isOpen={modalState.isOpen} onClose={closeModal} title={getModalTitle()}>
-                <form onSubmit={handleFormSubmit} className="space-y-4">
+                <form onSubmit={handleFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Nama</label>
                         <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"/>
@@ -410,12 +426,17 @@ const ServicesSettingsTab = () => {
                                             </button>
                                         </div>
                                     ))}
-                                    {imageFiles.map(file => (
-                                        <div key={file.name} className="relative group">
-                                            <img src={URL.createObjectURL(file)} alt="Preview" className="h-24 w-full object-cover rounded-md"/>
-                                            <button type="button" onClick={() => handleRemoveNewImage(file)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100">
+                                    {imageUploads.map(upload => (
+                                        <div key={upload.id} className="relative group">
+                                            <img src={upload.preview} alt="Preview" className="h-24 w-full object-cover rounded-md"/>
+                                            <button type="button" onClick={() => handleRemoveNewImage(upload.id)} className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100">
                                                 <Trash2 size={12}/>
                                             </button>
+                                            <div className="absolute bottom-1 right-1 bg-black/50 text-white rounded-full p-0.5">
+                                                {upload.status === 'uploading' && <Loader2 size={12} className="animate-spin" />}
+                                                {upload.status === 'success' && <CheckCircle size={12} className="text-green-400" />}
+                                                {upload.status === 'error' && <AlertCircle size={12} className="text-red-400" />}
+                                            </div>
                                         </div>
                                     ))}
                                     <label htmlFor="image-upload" className="flex flex-col items-center justify-center h-24 w-full border-2 border-dashed rounded-md cursor-pointer hover:bg-gray-50">
@@ -440,7 +461,9 @@ const ServicesSettingsTab = () => {
                     )}
                     <div className="flex justify-end gap-3 pt-4">
                         <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Batal</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Simpan</button>
+                        <button type="submit" disabled={isSubmitting} className="w-28 flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60">
+                            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Simpan'}
+                        </button>
                     </div>
                 </form>
             </Modal>

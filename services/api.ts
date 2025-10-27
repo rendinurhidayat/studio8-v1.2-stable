@@ -606,11 +606,12 @@ export const submitDailyReport = async (reportData: Omit<DailyReport, 'id' | 'su
     return fromFirestore<DailyReport>(doc, ['submittedAt']);
 };
 
+// FIX: Add the missing 'generateAiFeedbackForReport' function.
 export const generateAiFeedbackForReport = async (reportId: string, reportContent: string): Promise<DailyReport> => {
-    const response = await fetch('/api/generateAiFeedback', {
+    const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reportId, reportContent }),
+        body: JSON.stringify({ action: 'generateAiFeedback', reportId, reportContent }),
     });
     if (!response.ok) {
         const errorData = await response.json();
@@ -623,7 +624,6 @@ export const generateAiFeedbackForReport = async (reportId: string, reportConten
     }
     return data as DailyReport;
 };
-
 
 export const checkAndSendReportReminders = async () => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -967,8 +967,8 @@ export const findOrCreateChatRoom = async (user1: User, user2: User): Promise<st
     const newRoom: Omit<ChatRoom, 'id'> = {
         participantIds,
         participantInfo: {
-            [user1.id]: { name: user1.name, email: user1.email },
-            [user2.id]: { name: user2.name, email: user2.email },
+            [user1.id]: { name: user1.name, email: user1.email, photoURL: user1.photoURL },
+            [user2.id]: { name: user2.name, email: user2.email, photoURL: user2.photoURL },
         },
         createdAt: new Date(),
     };
