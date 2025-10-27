@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getPackages, getAddOns } from '../../services/api';
-import { Package, AddOn } from '../../types';
+import { getPackages, getAddOns } from '../services/api';
+import { Package, AddOn } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, X, Check, ArrowRight, Home, ChevronLeft, ChevronRight, Sparkles, Filter, ChevronDown } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
