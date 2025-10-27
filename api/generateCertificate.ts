@@ -89,26 +89,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             align: 'center'
         });
 
-        doc.font('Helvetica').fontSize(16).fillColor(mutedColor).text('Dengan ini menyatakan bahwa:', {
+        doc.font('Helvetica').fontSize(16).fillColor(mutedColor).text('Dengan ini menyatakan bahwa:', contentX, 210, {
             width: contentWidth,
             align: 'center'
-        }, 210);
+        });
 
-        doc.font('Helvetica-Bold').fontSize(36).fillColor(accentColor).text(studentName, {
+        doc.font('Helvetica-Bold').fontSize(36).fillColor(accentColor).text(studentName, contentX, 250, {
             width: contentWidth,
             align: 'center'
-        }, 250);
+        });
 
         doc.font('Helvetica').fontSize(16).fillColor(mutedColor).text(
-            `Telah berhasil menyelesaikan program Praktik Kerja Lapangan (PKL) di Studio 8 pada bidang keahlian ${major}.`, {
+            `Telah berhasil menyelesaikan program Praktik Kerja Lapangan (PKL) di Studio 8 pada bidang keahlian ${major}.`, contentX, 310, {
             width: contentWidth,
             align: 'center'
-        }, 310);
+        });
         
-        doc.font('Helvetica-Bold').fontSize(16).fillColor(textColor).text(period, {
+        doc.font('Helvetica-Bold').fontSize(16).fillColor(textColor).text(period, contentX, 350, {
             width: contentWidth,
             align: 'center'
-        }, 350);
+        });
         
         // Footer (Signature and QR)
         const bottomY = doc.page.height - 100;
