@@ -1,5 +1,6 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+// FIX: Import Variants type from framer-motion to resolve type inference issues.
+import { motion, Variants } from 'framer-motion';
 import { HighlightWork } from '../../types';
 
 interface HighlightCardProps {
@@ -8,7 +9,7 @@ interface HighlightCardProps {
   onClick: () => void;
 }
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 50 },
   visible: (i: number) => ({
     opacity: 1,

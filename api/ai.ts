@@ -269,15 +269,14 @@ async function handleGenerateQuizQuestions(ai: GoogleGenAI, payload: any, res: V
     }
     const questionSchema = {
         type: Type.OBJECT,
-        properties: { 
-            id: { type: Type.STRING }, 
-            questionText: { type: Type.STRING }, 
-            options: { type: Type.ARRAY, items: { type: Type.STRING } }, 
-            correctAnswerIndex: { type: Type.NUMBER }, 
+        properties: {
+            questionText: { type: Type.STRING },
+            options: { type: Type.ARRAY, items: { type: Type.STRING } },
+            correctAnswerIndex: { type: Type.NUMBER },
             explanation: { type: Type.STRING },
-            imagePrompt: { type: Type.STRING, description: "Deskripsi untuk gambar relevan, atau string kosong." }
+            imagePrompt: { type: Type.STRING, description: "Deskripsi singkat untuk gambar relevan, atau string kosong." }
         },
-        required: ["id", "questionText", "options", "correctAnswerIndex", "explanation", "imagePrompt"]
+        required: ["questionText", "options", "correctAnswerIndex", "explanation", "imagePrompt"]
     };
     const schema = { type: Type.ARRAY, items: questionSchema };
     const response = await ai.models.generateContent({

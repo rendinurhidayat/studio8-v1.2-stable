@@ -11,10 +11,11 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContaine
 import { format, subDays, isSameDay, eachDayOfInterval } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { formatDistanceToNow } from 'date-fns';
-import { motion } from 'framer-motion';
+// FIX: Import Variants type from framer-motion to resolve type inference issues.
+import { motion, Variants } from 'framer-motion';
 
 
-const containerVariants = {
+const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
         opacity: 1,
@@ -24,7 +25,7 @@ const containerVariants = {
     },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
     hidden: { y: 20, opacity: 0 },
     visible: {
         y: 0,
