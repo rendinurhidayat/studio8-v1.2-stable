@@ -7,6 +7,44 @@
   "background_color": "#0a1a2f",
   "theme_color": "#0a1a2f",
   "orientation": "portrait-primary",
+  "shortcuts": [
+    {
+      "name": "Open Dashboard",
+      "short_name": "Dashboard",
+      "description": "Go to the main dashboard",
+      "url": "/dashboard",
+      "icons": [
+        { "src": "/images/icons/shortcut-dashboard.png", "sizes": "96x96", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "New Booking",
+      "short_name": "Booking",
+      "description": "Create a new booking",
+      "url": "/bookings/new",
+      "icons": [
+        { "src": "/images/icons/shortcut-booking.png", "sizes": "96x96", "type": "image/png" }
+      ]
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+studio8",
+      "url": "https://studio8.example.com/launch?url=%s"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/screenshots/screen1-640x480.png",
+      "sizes": "640x480",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/screenshots/screen2-1280x720.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
   "icons": [
     {
       "src": "/images/icons/icon-72x72.png",
