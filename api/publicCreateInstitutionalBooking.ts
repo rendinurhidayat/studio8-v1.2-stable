@@ -14,11 +14,31 @@ enum PaymentStatus { Pending = 'Pending' }
 enum UserRole { Admin = 'Admin', Staff = 'Staff' }
 // --- End Type Duplication ---
 
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) return admin.apps[0]!;
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error('Firebase environment variable not set.');
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    return admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+function initializeFirebaseAdmin(): admin.app.App {
+    if (admin.apps.length > 0) {
+        return admin.apps[0]!;
+    }
+    
+    const projectId = process.env.GCP_PROJECT_ID || process.env.VERCEL_PROJECT_ID;
+
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        throw new Error('Server configuration error: FIREBASE_SERVICE_ACCOUNT_JSON is not set.');
+    }
+
+    try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+        if (projectId && serviceAccount.project_id !== projectId) {
+            console.warn(`Project ID mismatch. Vercel Project ID: ${projectId}, Service Account Project ID: ${serviceAccount.project_id}. This may cause issues.`);
+        }
+        
+        return admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+    } catch (e: any) {
+        console.error("Failed to initialize Firebase Admin:", e.message);
+        throw new Error("Server configuration error: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's a valid, single-line JSON string.");
+    }
 }
 
 async function sendPushNotification(bookingData: any) {
@@ -35,7 +55,7 @@ async function sendPushNotification(bookingData: any) {
     const notificationPayload = JSON.stringify({
         title: 'Permintaan Booking Instansi!',
         body: `${bookingData.institutionName} - ${bookingData.activityType}`,
-        url: '/admin/institutional-bookings'
+        url: '/admin/collaboration'
     });
 
     const sendPromises = subscriptionsSnapshot.docs.map(doc => 
@@ -60,6 +80,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let requestLetterUrl = '';
         if (bookingData.requestLetterBase64) {
+             if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+                throw new Error("Cloudinary environment variables are not configured on the server.");
+            }
             cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
                 api_key: process.env.CLOUDINARY_API_KEY,

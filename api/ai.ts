@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
@@ -7,17 +8,27 @@ function initializeFirebaseAdmin(): admin.app.App {
     if (admin.apps.length > 0) {
         return admin.apps[0]!;
     }
+    
+    // Vercel populates this automatically. It's a good check.
+    const projectId = process.env.GCP_PROJECT_ID || process.env.VERCEL_PROJECT_ID;
+
     if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-        throw new Error('Firebase environment variable FIREBASE_SERVICE_ACCOUNT_JSON is not set.');
+        throw new Error('Server configuration error: FIREBASE_SERVICE_ACCOUNT_JSON is not set.');
     }
+
     try {
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+        if (projectId && serviceAccount.project_id !== projectId) {
+            console.warn(`Project ID mismatch. Vercel Project ID: ${projectId}, Service Account Project ID: ${serviceAccount.project_id}. This may cause issues.`);
+        }
+        
         return admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
         });
     } catch (e: any) {
-        console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:", e);
-        throw new Error("The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not a valid JSON string.");
+        console.error("Failed to initialize Firebase Admin:", e.message);
+        throw new Error("Server configuration error: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's a valid, single-line JSON string.");
     }
 }
 
@@ -38,6 +49,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ message: 'API key is not configured on the server.' });
     }
     const ai = new GoogleGenAI({ apiKey });
+
+    // Conditionally initialize Firebase Admin SDK for actions that need it.
+    const actionsRequiringDb = ['analyzeInternReport', 'generateAiFeedback', 'analyzeQuizResult'];
+    if (actionsRequiringDb.includes(action)) {
+        try {
+            initializeFirebaseAdmin();
+        } catch (error: any) {
+            console.error(`Firebase initialization failed for action '${action}':`, error);
+            return res.status(500).json({ message: 'Server configuration error.', error: error.message });
+        }
+    }
 
     try {
         switch (action) {
@@ -95,7 +117,6 @@ async function handleAnalyzeFeedback(ai: GoogleGenAI, payload: any, res: VercelR
     if (!feedbackText) {
         return res.status(400).json({ message: 'feedbackText is required.' });
     }
-    const prompt = `Analisis kumpulan feedback...${feedbackText}...Seluruh respons harus dalam Bahasa Indonesia.`; // Truncated for brevity
     const schema = {
         type: Type.OBJECT,
         properties: {
@@ -197,7 +218,6 @@ async function handleAnalyzeInternReport(ai: GoogleGenAI, payload: any, res: Ver
     if (!userId || !reportContent) {
         return res.status(400).json({ message: 'userId and reportContent are required.' });
     }
-    initializeFirebaseAdmin();
     const db = admin.firestore();
     const schema = {
         type: Type.OBJECT,
@@ -218,6 +238,7 @@ async function handleAnalyzeInternReport(ai: GoogleGenAI, payload: any, res: Ver
         await db.collection('users').doc(userId).collection('aiInsights').add(insightData);
         return res.status(200).json({ success: true, insight: insightData });
     } catch (aiError) {
+        console.error("AI analysis failed during handleAnalyzeInternReport:", aiError);
         const defaultInsight = { type: 'default', insight: 'Tetap semangat hari ini 💪', date: admin.firestore.FieldValue.serverTimestamp() };
         await db.collection('users').doc(userId).collection('aiInsights').add(defaultInsight);
         return res.status(200).json({ success: true, insight: defaultInsight, note: 'AI analysis failed, used default.' });
@@ -229,7 +250,7 @@ async function handleGenerateAiFeedback(ai: GoogleGenAI, payload: any, res: Verc
     if (!reportId || !reportContent) {
         return res.status(400).json({ message: 'reportId and reportContent are required.' });
     }
-    initializeFirebaseAdmin();
+    
     const db = admin.firestore();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
@@ -285,8 +306,7 @@ async function handleGenerateQuizQuestions(ai: GoogleGenAI, payload: any, res: V
         config: { responseMimeType: 'application/json', responseSchema: schema }
     });
     const questions = JSON.parse(response.text);
-    const formattedQuestions = questions.map((q: any, index: number) => ({ ...q, id: `q-${Date.now()}-${index}` }));
-    return res.status(200).json(formattedQuestions);
+    return res.status(200).json(questions);
 }
 
 async function handleAnalyzeQuizResult(ai: GoogleGenAI, payload: any, res: VercelResponse) {
@@ -294,7 +314,7 @@ async function handleAnalyzeQuizResult(ai: GoogleGenAI, payload: any, res: Verce
     if (!resultId) {
         return res.status(400).json({ message: 'resultId is required.' });
     }
-    initializeFirebaseAdmin();
+    
     const db = admin.firestore();
     const resultDoc = await db.collection('quiz_results').doc(resultId).get();
     if (!resultDoc.exists) {
@@ -314,7 +334,7 @@ async function handleAnalyzeQuizResult(ai: GoogleGenAI, payload: any, res: Verce
     const promptContext = incorrectAnswers.map((ans: any) => `- Pertanyaan: "${ans.questionText}", Jawaban Salah: "${getOptionText(ans.questionId, ans.selectedAnswerIndex)}", Jawaban Benar: "${getOptionText(ans.questionId, ans.correctAnswerIndex)}"`).join('\n');
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Anda adalah mentor yang suportif... Berikut adalah daftar kesalahan mereka:\n${promptContext}\n\nBerdasarkan kesalahan-kesalahan ini, berikan analisis singkat dan 2-3 saran konkret...`,
+        contents: `Anda adalah mentor yang suportif. Seorang siswa baru saja menyelesaikan kuis dan membuat beberapa kesalahan.\nBerikut adalah daftar kesalahan mereka:\n${promptContext}\n\nBerdasarkan kesalahan-kesalahan ini, berikan analisis singkat dan 2-3 saran konkret untuk perbaikan. Buatlah dalam format paragraf yang bersahabat dan memotivasi, dalam Bahasa Indonesia.`,
     });
     const feedbackText = response.text;
     await db.collection('quiz_results').doc(resultId).update({ aiFeedback: feedbackText });
@@ -329,7 +349,7 @@ async function handleGenerateMarketingInsight(ai: GoogleGenAI, payload: any, res
     const dataSummary = `- Popularitas Paket: ${packagePopularity.map((p: any) => `${p.name} (${p.value} booking)`).join(', ')}.\n- Tren Pemasukan Harian (7 hari terakhir): ${dailyRevenue.map((d: any) => `${d.name}: Rp ${d.Pemasukan.toLocaleString('id-ID')}`).join(', ')}.`;
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Anda adalah seorang konsultan marketing ahli untuk "Studio 8"... Berdasarkan ringkasan data performa berikut, berikan 2-3 insight atau saran marketing... Data Performa:\n${dataSummary}\n...`,
+        contents: `Anda adalah seorang konsultan marketing ahli untuk "Studio 8", sebuah studio foto modern. Berdasarkan ringkasan data performa berikut, berikan 2-3 insight atau saran marketing yang singkat, konkret, dan actionable dalam Bahasa Indonesia. Fokus pada cara meningkatkan booking atau mempromosikan paket yang populer. Gunakan format poin (bullet points).\n\nData Performa:\n${dataSummary}\n\nContoh output:\n- Paket "Wisuda Berdua" sedang sangat diminati! Buat konten khusus di Instagram Stories untuk menyorot paket ini.\n- Pendapatan cenderung menurun di akhir pekan. Pertimbangkan untuk membuat promo khusus "Weekend Ceria" dengan diskon kecil untuk menarik lebih banyak klien.`,
     });
     const insightText = response.text;
     return res.status(200).json({ insight: insightText });

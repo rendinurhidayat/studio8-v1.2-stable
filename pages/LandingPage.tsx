@@ -184,7 +184,7 @@ const HeroSection = () => {
 
           {/* Right Section */}
           <motion.div 
-            className="flex-1 relative w-full h-[300px] md:h-[500px] rounded-2xl overflow-hidden shadow-lg"
+            className="flex-1 relative w-full aspect-[2/3] md:aspect-[3/2] rounded-2xl overflow-hidden shadow-lg"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
@@ -220,7 +220,7 @@ const AboutSection = () => (
       variants={sectionVariants}
     >
       <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-        <div className="relative h-96 md:h-[500px]">
+        <div className="relative aspect-[2/3] md:aspect-[3/2]">
             <motion.img 
                 whileHover={{ scale: 1.05, rotate: -3 }}
                 transition={{ type: 'spring', stiffness: 300 }}

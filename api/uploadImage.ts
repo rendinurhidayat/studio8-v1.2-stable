@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -20,6 +21,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ message: 'imageBase64 and folder are required.' });
         }
 
+        if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+            throw new Error("Cloudinary environment variables are not configured on the server.");
+        }
         cloudinary.config({
             cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
             api_key: process.env.CLOUDINARY_API_KEY,
@@ -38,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw new Error("Upload succeeded but no secure URL was returned.");
         }
 
-        return res.status(200).json({ secure_url: uploadResult.secure_url });
+        return res.status(200).json({ secure_url: uploadResult.secure_url, public_id: uploadResult.public_id });
 
     } catch (error: any) {
         console.error("API Error in uploadImage:", error);

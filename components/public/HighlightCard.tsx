@@ -44,7 +44,7 @@ const HighlightCard: React.FC<HighlightCardProps> = ({ work, index, onClick }) =
       onClick={onClick}
       className="bg-white rounded-2xl overflow-hidden cursor-pointer group relative shadow-lg hover:shadow-xl border border-base-200"
     >
-      <div className="relative aspect-video">
+      <div className="relative aspect-[3/2]">
         <img 
           src={getOptimizedImageUrl(work.thumbnailUrl, 400)} 
           alt={work.title} 

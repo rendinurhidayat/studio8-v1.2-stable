@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
@@ -21,7 +22,6 @@ interface AddOn { id: string; name: string; subAddOns: SubAddOn[]; }
 interface SubAddOn { id: string; name: string; price: number; }
 interface Client { id: string; name: string; email: string; phone: string; firstBooking: Date | admin.firestore.Timestamp; lastBooking: Date | admin.firestore.Timestamp; totalBookings: number; totalSpent: number; loyaltyPoints: number; referralCode: string; referredBy?: string; loyaltyTier?: string; }
 interface LoyaltyTier { id: string; name: string; bookingThreshold: number; discountPercentage: number; }
-// FIX: Corrected typo 'pointsPerRiah' to 'pointsPerRupiah' to match the 'types.ts' definition and fix property access error.
 interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: LoyaltyTier[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
 // --- End Type Duplication ---
 
@@ -30,20 +30,26 @@ function initializeFirebaseAdmin(): admin.app.App {
     if (admin.apps.length > 0) {
         return admin.apps[0]!;
     }
+    
+    const projectId = process.env.GCP_PROJECT_ID || process.env.VERCEL_PROJECT_ID;
 
     if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-        throw new Error('Firebase environment variable FIREBASE_SERVICE_ACCOUNT_JSON is not set. Please provide the stringified service account JSON.');
+        throw new Error('Server configuration error: FIREBASE_SERVICE_ACCOUNT_JSON is not set.');
     }
 
     try {
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+        if (projectId && serviceAccount.project_id !== projectId) {
+            console.warn(`Project ID mismatch. Vercel Project ID: ${projectId}, Service Account Project ID: ${serviceAccount.project_id}. This may cause issues.`);
+        }
         
         return admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
         });
     } catch (e: any) {
-        console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON:", e);
-        throw new Error("The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not a valid JSON string.");
+        console.error("Failed to initialize Firebase Admin:", e.message);
+        throw new Error("Server configuration error: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's a valid, single-line JSON string.");
     }
 }
 
@@ -60,7 +66,7 @@ async function sendPushNotification(bookingData: any) {
     }
     
     webpush.setVapidDetails(
-        process.env.WEB_PUSH_EMAIL,
+        `mailto:${process.env.WEB_PUSH_EMAIL}`,
         process.env.VITE_VAPID_PUBLIC_KEY,
         process.env.VAPID_PRIVATE_KEY
     );
@@ -149,6 +155,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // ... [Existing Cloudinary upload logic] ...
          let paymentProofUrl = '';
         if (formData.paymentProofBase64) {
+             if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+                throw new Error("Cloudinary environment variables are not configured on the server.");
+            }
              cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
                 api_key: process.env.CLOUDINARY_API_KEY,

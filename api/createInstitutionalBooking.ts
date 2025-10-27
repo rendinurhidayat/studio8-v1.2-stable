@@ -1,3 +1,4 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
@@ -15,11 +16,31 @@ enum BookingStatus { Pending = 'Pending' }
 enum PaymentStatus { Pending = 'Pending' }
 // --- End Type Duplication ---
 
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) return admin.apps[0]!;
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error('Firebase environment variable not set.');
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    return admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+function initializeFirebaseAdmin(): admin.app.App {
+    if (admin.apps.length > 0) {
+        return admin.apps[0]!;
+    }
+    
+    const projectId = process.env.GCP_PROJECT_ID || process.env.VERCEL_PROJECT_ID;
+
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        throw new Error('Server configuration error: FIREBASE_SERVICE_ACCOUNT_JSON is not set.');
+    }
+
+    try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+        if (projectId && serviceAccount.project_id !== projectId) {
+            console.warn(`Project ID mismatch. Vercel Project ID: ${projectId}, Service Account Project ID: ${serviceAccount.project_id}. This may cause issues.`);
+        }
+        
+        return admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+    } catch (e: any) {
+        console.error("Failed to initialize Firebase Admin:", e.message);
+        throw new Error("Server configuration error: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's a valid, single-line JSON string.");
+    }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -40,6 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let requestLetterUrl = '';
         if (bookingData.requestLetterUrl) {
+            if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+                throw new Error("Cloudinary environment variables are not configured on the server.");
+            }
             cloudinary.config({
                 cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
                 api_key: process.env.CLOUDINARY_API_KEY,
@@ -62,8 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             clientEmail: '', // Not required for institutional
             clientPhone: bookingData.picContact,
         };
-        // Remove file content from Firestore object
-        delete newBooking.requestLetterUrl;
+        // Remove file content from Firestore object, which is no longer passed
+        // The property was named requestLetterUrl but contained base64 data. Now it should be handled correctly.
 
 
         await db.collection('bookings').add(newBooking);

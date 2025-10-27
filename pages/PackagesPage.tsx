@@ -167,7 +167,7 @@ const CardCarousel: React.FC<{ images: string[] }> = ({ images }) => {
     }, [images.length]);
 
     return (
-        <div className="relative overflow-hidden aspect-[4/3]">
+        <div className="relative overflow-hidden aspect-[3/2]">
             <AnimatePresence mode="wait">
                 <motion.img
                     key={currentIndex}
