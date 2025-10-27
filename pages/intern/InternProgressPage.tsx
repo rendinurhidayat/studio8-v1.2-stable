@@ -185,12 +185,12 @@ const InternProgressPage = () => {
                                 </div>
                                 <div>
                                     <label className="text-sm font-semibold block mb-2">Dokumentasi (Opsional)</label>
-                                    <div className="flex items-center gap-2 p-3 border-2 border-dashed rounded-lg">
+                                    <label htmlFor="doc-upload" className="flex items-center gap-2 p-3 border-2 border-dashed rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
                                         <Upload size={20} className="text-muted" />
                                         <span className="text-sm text-muted flex-grow truncate">{documentationFile ? documentationFile.name : 'Pilih file...'}</span>
-                                        <label htmlFor="doc-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-md hover:bg-primary/20">Browse</label>
+                                        <span className="text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-md">Browse</span>
                                         <input id="doc-upload" type="file" className="hidden" onChange={e => setDocumentationFile(e.target.files ? e.target.files[0] : null)} accept="image/*,.pdf,.doc,.docx" />
-                                    </div>
+                                    </label>
                                 </div>
                                 {error && <p className="text-xs text-red-500">{error}</p>}
                                 <button type="submit" disabled={isSubmitting} className="w-full flex justify-center items-center gap-2 p-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 disabled:opacity-50">

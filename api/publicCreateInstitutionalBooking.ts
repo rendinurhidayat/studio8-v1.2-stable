@@ -1,4 +1,3 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
@@ -114,6 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             bookingDate: admin.firestore.Timestamp.fromDate(new Date(bookingData.bookingDate)),
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             notes: bookingData.notes,
+            promoCodeUsed: bookingData.promoCode || null,
 
             // Statuses and Payment
             bookingStatus: BookingStatus.Pending,

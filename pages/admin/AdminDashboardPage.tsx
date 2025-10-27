@@ -11,8 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContaine
 // FIX: Use subpath imports for `subDays` and `formatDistanceToNow` from `date-fns` to resolve module export errors and type issues.
 // FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
 // FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
-import { format, isSameDay, eachDayOfInterval } from 'date-fns';
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+import { format, isSameDay, eachDayOfInterval, formatDistanceToNow } from 'date-fns';
 import subDays from 'date-fns/subDays';
 import id from 'date-fns/locale/id';
 // FIX: Import Variants type from framer-motion to resolve type inference issues.

@@ -111,6 +111,7 @@ export interface Package {
     type?: 'Studio' | 'Outdoor';
     imageUrls?: string[];
     isGroupPackage?: boolean;
+    recommendedAddOnIds?: string[];
 }
 
 export interface SubAddOn {
@@ -153,6 +154,7 @@ export interface Booking {
   pointsRedeemed?: number;
   pointsValue?: number; // Rupiah value of redeemed points
   referralCodeUsed?: string;
+  promoCodeUsed?: string;
   extraPersonCharge?: number;
 
   // Institutional Booking Fields

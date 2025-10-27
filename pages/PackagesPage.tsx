@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getPackages, getAddOns } from '../services/api';
-import { Package, AddOn } from '../types';
+import { getPackages, getAddOns } from '../../services/api';
+import { Package, AddOn } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, X, Check, ArrowRight, Home, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, X, Check, ArrowRight, Home, ChevronLeft, ChevronRight, Sparkles, Filter, ChevronDown } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 
 // --- TYPE EXTENSIONS ---
 interface PackageWithDetails extends Package {
@@ -74,6 +75,13 @@ const Header = () => (
 const PackageModal: React.FC<{ pkg: PackageWithDetails | null; addOns: AddOn[]; onClose: () => void }> = ({ pkg, addOns, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  const recommendedAddOns = useMemo(() => {
+    if (!pkg?.recommendedAddOnIds) {
+        return [];
+    }
+    return addOns.filter(addon => pkg.recommendedAddOnIds!.includes(addon.id));
+  }, [pkg, addOns]);
+
   if (!pkg) return null;
 
   const nextSlide = () => {
@@ -129,19 +137,46 @@ const PackageModal: React.FC<{ pkg: PackageWithDetails | null; addOns: AddOn[]; 
             </div>
             <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col overflow-y-auto">
               <h2 className="font-poppins text-3xl font-bold text-primary">{pkg.name}</h2>
-              <p className="mt-2 text-2xl font-semibold text-accent">{pkg.priceDisplay}</p>
               <p className="mt-4 text-muted text-sm leading-relaxed">{pkg.description}</p>
+              
               <div className="mt-6 pt-4 border-t border-base-200">
-                <h3 className="font-semibold text-lg text-primary">Layanan Tambahan Tersedia</h3>
-                <ul className="mt-2 space-y-1 text-sm text-muted">
-                  {addOns.flatMap(addon => addon.subAddOns).map(sub => (
-                    <li key={sub.id} className="flex justify-between">
-                      <span>{sub.name}</span>
-                      <span className="font-semibold text-base-content">Rp {sub.price.toLocaleString('id-ID')}</span>
-                    </li>
+                <h3 className="font-semibold text-lg text-primary">Pilihan Varian Paket</h3>
+                <div className="mt-2 space-y-2">
+                  {pkg.subPackages.map(sub => (
+                    <div key={sub.id} className="p-3 bg-base-100 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold text-base-content">{sub.name}</p>
+                        <p className="font-bold text-accent">Rp {sub.price.toLocaleString('id-ID')}</p>
+                      </div>
+                      {sub.description && (
+                        <p className="text-sm text-muted mt-1">{sub.description}</p>
+                      )}
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
+
+              {recommendedAddOns.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-base-200">
+                      <h3 className="font-semibold text-lg text-primary">Layanan Tambahan Populer</h3>
+                      <div className="mt-2 space-y-3">
+                          {recommendedAddOns.map(addon => (
+                              <div key={addon.id}>
+                                  <p className="font-semibold text-sm text-base-content">{addon.name}</p>
+                                  <ul className="mt-1 space-y-1 text-sm text-muted">
+                                      {addon.subAddOns.map(sub => (
+                                          <li key={sub.id} className="flex justify-between items-center">
+                                              <span>+ {sub.name}</span>
+                                              <span className="font-semibold text-base-content text-right">Rp {sub.price.toLocaleString('id-ID')}</span>
+                                          </li>
+                                      ))}
+                                  </ul>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )}
+              
               <div className="mt-auto pt-6">
                 <Link to={`/pesan-sesi`} className="w-full text-center block bg-primary text-primary-content px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg">
                   Booking Sekarang
@@ -194,6 +229,103 @@ const CardCarousel: React.FC<{ images: string[] }> = ({ images }) => {
     );
 };
 
+const AIRecommender: React.FC<{ packages: PackageWithDetails[] }> = ({ packages }) => {
+    const [userQuery, setUserQuery] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [recommendation, setRecommendation] = useState<{ recommendedPackageName: string; reasoning: string } | null>(null);
+    const ai = useMemo(() => new GoogleGenAI({ apiKey: process.env.API_KEY as string }), []);
+
+    const handleGetRecommendation = async () => {
+        if (!userQuery.trim()) return;
+        setIsLoading(true);
+        setError('');
+        setRecommendation(null);
+
+        try {
+            const packageInfo = packages.map(p => ({
+                name: p.name,
+                description: p.description,
+                subPackages: p.subPackages.map(sp => ({ name: sp.name, price: sp.price }))
+            }));
+
+            const response = await fetch('/api/ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'recommendPackage',
+                    userQuery: userQuery,
+                    packages: packageInfo,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Gagal mendapatkan rekomendasi AI.');
+            }
+
+            const result = await response.json();
+            setRecommendation(result);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const scrollToPackage = (packageName: string) => {
+        const packageId = `package-${packageName.replace(/\s+/g, '-')}`;
+        document.getElementById(packageId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    return (
+        <div className="bg-gradient-to-r from-primary to-blue-900 text-white p-6 md:p-8 rounded-2xl shadow-xl my-8">
+            <div className="flex items-center gap-4">
+                <Sparkles size={40} className="text-gold" />
+                <div>
+                    <h2 className="text-2xl font-bold">Bingung Pilih Paket?</h2>
+                    <p className="text-white/80">Biarkan asisten AI kami membantumu menemukan paket yang sempurna!</p>
+                </div>
+            </div>
+            <div className="mt-4">
+                <textarea
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    placeholder="Contoh: Saya mau foto wisuda sendiri, budget sekitar 200 ribu..."
+                    className="w-full p-3 rounded-lg bg-white/10 text-white placeholder-white/50 border-2 border-transparent focus:border-accent focus:outline-none focus:bg-white/20 transition"
+                    rows={2}
+                />
+                <button
+                    onClick={handleGetRecommendation}
+                    disabled={isLoading}
+                    className="mt-2 w-full flex items-center justify-center gap-2 bg-accent text-accent-content font-bold py-3 px-4 rounded-lg hover:bg-accent/90 transition-transform transform hover:scale-105 disabled:opacity-60"
+                >
+                    {isLoading ? <Loader2 className="animate-spin" /> : "Dapatkan Rekomendasi"}
+                </button>
+            </div>
+            <AnimatePresence>
+                {recommendation && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-4 p-4 bg-black/30 rounded-lg"
+                    >
+                        <p className="text-sm text-white/80">AI merekomendasikan:</p>
+                        <button
+                            onClick={() => scrollToPackage(recommendation.recommendedPackageName)}
+                            className="text-lg font-bold text-gold hover:underline"
+                        >
+                            {recommendation.recommendedPackageName}
+                        </button>
+                        <p className="text-sm mt-1 text-white/90">{recommendation.reasoning}</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        </div>
+    );
+};
+
 
 const PackagesPage = () => {
     const [packages, setPackages] = useState<PackageWithDetails[]>([]);
@@ -209,9 +341,9 @@ const PackagesPage = () => {
                 const [packagesData, addOnsData] = await Promise.all([getPackages(), getAddOns()]);
                 const enhancedPackages = packagesData.map(p => {
                     const defaultImages = [
-                        '/images/placeholder-1.jpg',
-                        '/images/placeholder-2.jpg',
-                        '/images/placeholder-3.jpg'
+                        '/images/hero-1.jpg',
+                        '/images/hero-2.jpg',
+                        '/images/hero-3.jpg'
                     ];
                     return {
                         ...p,
@@ -241,23 +373,36 @@ const PackagesPage = () => {
         <div className="bg-base-100 min-h-screen">
             <Header />
             <main>
+                <div className="max-w-7xl mx-auto px-4">
+                     <AIRecommender packages={packages} />
+                </div>
+               
                 {/* Filter Tabs */}
-                <div className="sticky top-0 z-10 bg-base-100/80 backdrop-blur-sm py-4 border-b">
-                    <div className="max-w-4xl mx-auto flex justify-center items-center gap-2 md:gap-6 px-4 overflow-x-auto">
-                        {CATEGORIES.map(cat => (
-                            <button
-                                key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={`relative px-3 py-2 md:px-4 text-sm md:text-base font-semibold whitespace-nowrap transition-colors ${activeCategory === cat ? 'text-primary' : 'text-muted hover:text-primary'}`}
+                 <div className="sticky top-0 z-10 bg-base-100/80 backdrop-blur-sm py-4 border-y">
+                    <div className="max-w-md mx-auto px-4">
+                        <div className="relative">
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <Filter className="h-5 w-5 text-muted" />
+                            </div>
+                            <select
+                                value={activeCategory}
+                                onChange={(e) => setActiveCategory(e.target.value)}
+                                className="w-full appearance-none bg-white border-2 border-base-200 rounded-xl pl-10 pr-10 py-3 text-base-content font-semibold focus:outline-none focus:ring-2 focus:ring-accent"
+                                aria-label="Filter kategori paket"
                             >
-                                {cat}
-                                {activeCategory === cat && (
-                                    <motion.div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" layoutId="underline" />
-                                )}
-                            </button>
-                        ))}
+                                {CATEGORIES.map(cat => (
+                                    <option key={cat} value={cat}>
+                                        {cat === 'All' ? 'Tampilkan Semua Kategori' : cat}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted">
+                                <ChevronDown className="h-5 w-5" />
+                            </div>
+                        </div>
                     </div>
                 </div>
+
 
                 {/* Package Grid */}
                 <section className="py-12 md:py-16 px-4">
@@ -276,6 +421,7 @@ const PackagesPage = () => {
                                 {filteredPackages.map(pkg => (
                                     <motion.div
                                         key={pkg.id}
+                                        id={`package-${pkg.name.replace(/\s+/g, '-')}`}
                                         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
                                         onClick={() => setSelectedPackage(pkg)}
                                         className="bg-white rounded-2xl overflow-hidden cursor-pointer group border border-base-200 hover:border-accent hover:shadow-xl transition-all duration-300 shadow-lg"

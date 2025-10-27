@@ -3,8 +3,8 @@ import { getActivityLogs, getUsers } from '../../services/api';
 import { ActivityLog, User } from '../../types';
 // FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
 // FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
-// FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+// FIX: Switched 'formatDistanceToNow' to a named import from 'date-fns' to fix the "not callable" type error.
+import { formatDistanceToNow } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { Edit, Trash2, PlusCircle, CheckCircle, Settings, Download, Filter, X, User as UserIcon } from 'lucide-react';
 import { exportToCSV } from '../../utils/export';

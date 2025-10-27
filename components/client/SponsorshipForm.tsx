@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Award, Briefcase, User, Phone, FileText, UploadCloud, CheckCircle, Loader2, AlertTriangle, Send } from 'lucide-react';
@@ -106,12 +105,12 @@ const SponsorshipForm = () => {
                  <TextareaWithIcon Icon={FileText} name="benefits" placeholder="Jelaskan secara singkat benefit yang ditawarkan untuk Studio 8..." value={formData.benefits} onChange={handleChange} required />
                  <div>
                     <label className="text-sm font-semibold text-base-content block mb-2">Upload Proposal (Wajib)</label>
-                    <div className="flex items-center gap-2 p-3 border-2 border-dashed rounded-lg">
+                    <label htmlFor="proposal-upload" className="flex items-center gap-2 p-3 border-2 border-dashed rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
                         <UploadCloud size={20} className="text-muted" />
                         <span className="text-sm text-muted flex-grow truncate">{proposalFile ? proposalFile.name : 'Pilih file (PDF, Doc, Ppt)...'}</span>
-                        <label htmlFor="proposal-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-md hover:bg-primary/20">Browse</label>
+                        <span className="text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-md">Browse</span>
                         <input id="proposal-upload" type="file" className="hidden" onChange={e => setProposalFile(e.target.files ? e.target.files[0] : null)} accept=".pdf,.doc,.docx,.ppt,.pptx" />
-                    </div>
+                    </label>
                 </div>
                  <button type="submit" disabled={isSubmitting} className="w-full flex justify-center items-center gap-2 px-6 py-3 text-sm font-semibold text-primary-content bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-lg disabled:opacity-60">
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <><Send size={16}/> Kirim Proposal</>}

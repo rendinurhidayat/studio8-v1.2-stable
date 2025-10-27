@@ -426,6 +426,24 @@ export const getAddOns = async (): Promise<AddOn[]> => {
 };
 
 // ... (Other CRUD for Packages, Addons, Sub-items would follow a similar pattern using Firestore) ...
+export const validatePromoCode = async (code: string): Promise<{ valid: boolean; message: string; promo?: Promo }> => {
+    if (!code) return { valid: false, message: 'Kode tidak boleh kosong.' };
+    const upperCaseCode = code.toUpperCase();
+    
+    const snapshot = await db.collection('promos')
+        .where('code', '==', upperCaseCode)
+        .where('isActive', '==', true)
+        .limit(1)
+        .get();
+
+    if (snapshot.empty) {
+        return { valid: false, message: 'Kode promo tidak valid atau sudah tidak berlaku.' };
+    }
+    
+    const promo = fromFirestore<Promo>(snapshot.docs[0]);
+    return { valid: true, message: `Promo "${promo.description}" berhasil diterapkan!`, promo };
+};
+
 
 export const validateReferralCode = async (code: string, newClientEmail: string): Promise<{ valid: boolean; message: string }> => {
     if (!code) return { valid: false, message: 'Kode tidak boleh kosong.' };

@@ -41,7 +41,7 @@ const UploadModal: React.FC<{ isOpen: boolean; onClose: () => void; onUploadComp
         setFilesToUpload(prev => [...prev, ...newFiles]);
     };
     
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
         e.preventDefault(); e.stopPropagation(); setIsDragging(false);
         if (e.dataTransfer.files?.length) handleFilesAdded(e.dataTransfer.files);
     };
@@ -107,16 +107,16 @@ const UploadModal: React.FC<{ isOpen: boolean; onClose: () => void; onUploadComp
     return (
         <Modal isOpen={isOpen} onClose={handleClose} title="Upload Aset Baru">
             <div className="space-y-4 max-h-[70vh] flex flex-col">
-                 <div 
+                 <label 
+                    htmlFor="file-upload"
                     onDragEnter={() => setIsDragging(true)} onDragLeave={() => setIsDragging(false)}
                     onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}
-                    className={`p-6 border-2 border-dashed rounded-lg text-center transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-base-300'}`}
+                    className={`p-6 border-2 border-dashed rounded-lg text-center transition-colors cursor-pointer ${isDragging ? 'border-primary bg-primary/10' : 'border-base-300'}`}
                 >
                     <UploadCloud className="mx-auto text-muted" size={40} />
-                    <p className="mt-2 text-muted text-sm">Drag & drop file di sini, atau</p>
-                    <label htmlFor="file-upload" className="font-semibold text-primary hover:underline cursor-pointer">pilih dari komputer</label>
+                    <p className="mt-2 text-muted text-sm">Drag & drop file di sini, atau klik untuk memilih</p>
                     <input id="file-upload" type="file" multiple className="hidden" onChange={(e) => e.target.files && handleFilesAdded(e.target.files)} disabled={isProcessing} />
-                </div>
+                </label>
                 {filesToUpload.length > 0 && (
                     <div className="flex-1 overflow-y-auto pr-2 space-y-3">
                         {filesToUpload.map(f => (

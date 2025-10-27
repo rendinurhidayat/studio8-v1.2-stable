@@ -431,7 +431,12 @@ const AdminUsersPage = () => {
                         ) : (
                             <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-400"><ImageIcon size={32} /></div>
                         )}
-                        <input type="file" accept="image/*" onChange={handlePhotoChange} className="text-sm" />
+                        <div>
+                            <label htmlFor="photo-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">
+                                Pilih Foto
+                            </label>
+                            <input id="photo-upload" type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+                        </div>
                   </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

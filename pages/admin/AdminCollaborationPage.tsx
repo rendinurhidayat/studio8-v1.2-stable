@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 const TabButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
     <button
         onClick={onClick}
-        className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-t-lg transition-colors ${active ? 'bg-white text-primary border-b-2 border-primary' : 'text-muted hover:text-primary bg-base-100'}`}
+        className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-t-lg transition-colors ${active ? 'bg-white text-primary border-b-2 border-primary' : 'text-muted bg-base-100 hover:text-primary'}`}
     >
         {children}
     </button>
@@ -220,6 +220,7 @@ const AdminCollaborationPage = () => {
                                         <p><strong>Jadwal:</strong> {format(b.bookingDate, 'd MMM yyyy, HH:mm', { locale: id })}</p>
                                         <p><strong>PIC:</strong> {b.picName} ({b.picContact})</p>
                                         <p><strong>Peserta:</strong> {b.numberOfParticipants} orang</p>
+                                        {b.promoCodeUsed && <p><strong>Kode Promo:</strong> <span className="font-mono bg-accent/10 text-accent px-2 py-0.5 rounded">{b.promoCodeUsed}</span></p>}
                                     </div>
                                     <div className="flex-grow"></div>
                                     <div className="flex items-center justify-between gap-2 pt-4 border-t">
@@ -278,6 +279,7 @@ const ManageBookingModal: React.FC<{
                  <div><label className="text-sm font-medium">Status</label><select name="bookingStatus" value={formData.bookingStatus} onChange={handleChange} className="w-full p-2 border rounded mt-1">{Object.values(BookingStatus).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
                 <div><label className="text-sm font-medium">Total Harga (Rp)</label><input name="totalPrice" type="number" value={formData.totalPrice || ''} onChange={handleChange} required className="w-full p-2 border rounded mt-1"/></div>
                 <div><label className="text-sm font-medium">Mode Pembayaran</label><select name="paymentMode" value={formData.paymentMode} onChange={handleChange} className="w-full p-2 border rounded mt-1"><option value="dp">DP</option><option value="lunas">Lunas</option><option value="termin">Termin</option></select></div>
+                {formData.promoCodeUsed && <div><label className="text-sm font-medium">Kode Promo Digunakan</label><input type="text" value={formData.promoCodeUsed} readOnly className="w-full p-2 border rounded mt-1 bg-gray-100 font-mono"/></div>}
                 <div className="flex justify-end pt-4"><button type="submit" disabled={isSaving} className="px-4 py-2 bg-primary text-white rounded-lg w-32 flex justify-center">{isSaving ? <Loader2 className="animate-spin"/> : 'Simpan'}</button></div>
             </form>
         </Modal>

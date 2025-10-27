@@ -1,4 +1,3 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
@@ -23,6 +22,7 @@ interface SubAddOn { id: string; name: string; price: number; }
 interface Client { id: string; name: string; email: string; phone: string; firstBooking: Date | admin.firestore.Timestamp; lastBooking: Date | admin.firestore.Timestamp; totalBookings: number; totalSpent: number; loyaltyPoints: number; referralCode: string; referredBy?: string; loyaltyTier?: string; }
 interface LoyaltyTier { id: string; name: string; bookingThreshold: number; discountPercentage: number; }
 interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: LoyaltyTier[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
+interface Promo { id: string; code: string; description: string; discountPercentage: number; isActive: boolean; }
 // --- End Type Duplication ---
 
 // Helper function for robust initialization
@@ -128,6 +128,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const snapshot = await db.collection('addons').get();
             return snapshot.docs.map(doc => fromFirestore<AddOn>(doc));
         };
+        const getPromos = async (): Promise<Promo[]> => {
+            const snapshot = await db.collection('promos').get();
+            return snapshot.docs.map(doc => fromFirestore<Promo>(doc));
+        };
         const getSystemSettings = async (): Promise<SystemSettings> => {
             const defaults: SystemSettings = { loyaltySettings: { pointsPerRupiah: 0.001, rupiahPerPoint: 100, referralBonusPoints: 50, firstBookingReferralDiscount: 15000, loyaltyTiers: [] } };
             const doc = await db.collection('settings').doc('main').get();
@@ -176,7 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
         
-        const [allPackages, allAddOns, settings] = await Promise.all([getPackages(), getAddOns(), getSystemSettings()]);
+        const [allPackages, allAddOns, settings, allPromos] = await Promise.all([getPackages(), getAddOns(), getSystemSettings(), getPromos()]);
         const selectedPackage = allPackages.find(p => p.id === formData.packageId);
         if (!selectedPackage) throw new Error("Package not found");
         const selectedSubPackage = selectedPackage.subPackages.find(sp => sp.id === formData.subPackageId);
@@ -195,26 +199,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         let extraPersonCharge = (selectedPackage.isGroupPackage && formData.people > 2) ? (formData.people - 2) * 15000 : 0;
         let subtotal = selectedSubPackage.price + selectedSubAddOns.reduce((sum, sa) => sum + sa.price, 0) + extraPersonCharge;
-        let discountAmount = 0, discountReason = '', pointsRedeemed = 0, pointsValue = 0, referralCodeUsed = '';
-        if (isNewClient && formData.referralCode) {
-            const referrer = await getClientByReferralCode(formData.referralCode);
-            if (referrer && referrer.email.toLowerCase() !== lowerEmail) {
-                discountAmount = settings.loyaltySettings.firstBookingReferralDiscount;
-                discountReason = `Diskon Referral`; referralCodeUsed = formData.referralCode.toUpperCase(); client.referredBy = referralCodeUsed;
+        
+        let discountAmount = 0, discountReason = '', pointsRedeemed = 0, pointsValue = 0, referralCodeUsed = '', promoCodeUsed = '';
+
+        // --- DISCOUNT LOGIC (SERVER-SIDE) ---
+        // 1. Prioritize Promo Code
+        if (formData.promoCode && formData.promoCode.trim()) {
+            const promo = allPromos.find(p => p.code.toUpperCase() === formData.promoCode.toUpperCase() && p.isActive);
+            if (promo) {
+                promoCodeUsed = promo.code;
+                discountReason = promo.description;
+                discountAmount = subtotal * (promo.discountPercentage / 100);
             }
-        } else if (!isNewClient && client) {
-            const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => b.bookingThreshold - a.bookingThreshold);
-            const clientTier = sortedTiers.find(t => client!.totalBookings >= t.bookingThreshold);
-            if (clientTier) { discountAmount = subtotal * (clientTier.discountPercentage / 100); discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`; }
         }
+        
+        // 2. If no promo, check for referral/loyalty
+        if (!promoCodeUsed) {
+            if (isNewClient && formData.referralCode) {
+                const referrer = await getClientByReferralCode(formData.referralCode);
+                if (referrer && referrer.email.toLowerCase() !== lowerEmail) {
+                    discountAmount = settings.loyaltySettings.firstBookingReferralDiscount;
+                    discountReason = `Diskon Referral`; referralCodeUsed = formData.referralCode.toUpperCase(); client.referredBy = referralCodeUsed;
+                }
+            } else if (!isNewClient && client) {
+                const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => b.bookingThreshold - a.bookingThreshold);
+                const clientTier = sortedTiers.find(t => client!.totalBookings >= t.bookingThreshold);
+                if (clientTier) { discountAmount = subtotal * (clientTier.discountPercentage / 100); discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`; }
+            }
+        }
+
+        // 3. Apply points on top of any existing discount
         if (formData.usePoints && client && client.loyaltyPoints > 0) {
             pointsValue = Math.min(subtotal - discountAmount, client.loyaltyPoints * settings.loyaltySettings.rupiahPerPoint);
             pointsRedeemed = Math.round(pointsValue / settings.loyaltySettings.rupiahPerPoint);
-            discountAmount += pointsValue;
-            discountReason = `${discountReason ? discountReason + ' & ' : ''}${pointsRedeemed.toLocaleString('id-ID')} Poin`;
-            client.loyaltyPoints -= pointsRedeemed;
+            client.loyaltyPoints -= pointsRedeemed; // Update client object before saving
         }
-        let totalPrice = subtotal - discountAmount;
+        
+        let totalPrice = subtotal - discountAmount - pointsValue;
 
         const newBookingData = {
             bookingCode: newBookingCode,
@@ -232,7 +253,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             paymentProofUrl,
             notes: formData.notes,
-            discountAmount, discountReason, referralCodeUsed, pointsRedeemed, pointsValue, extraPersonCharge
+            discountAmount: discountAmount + pointsValue, 
+            discountReason, 
+            referralCodeUsed,
+            promoCodeUsed,
+            pointsRedeemed, 
+            pointsValue, 
+            extraPersonCharge
         };
         
         const bookingRef = db.collection('bookings').doc();

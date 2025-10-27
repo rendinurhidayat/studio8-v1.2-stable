@@ -4,8 +4,8 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { Bell, Check, Info, AlertTriangle } from 'lucide-react';
 // FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
 // FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
-// FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+// FIX: Switched the import for `formatDistanceToNow` to a named import from the main `date-fns` package to resolve a "not callable" type error.
+import { formatDistanceToNow } from 'date-fns';
 import id from 'date-fns/locale/id';
 
 const NotificationBell = () => {

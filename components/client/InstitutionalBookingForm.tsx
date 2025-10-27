@@ -1,7 +1,7 @@
 // FIX: Added import for React and useState to resolve multiple 'cannot find name' errors.
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Briefcase, User, Phone, Users, Calendar, MessageSquare, UploadCloud, CheckCircle, Loader2, AlertTriangle, Send } from 'lucide-react';
+import { Briefcase, User, Phone, Users, Calendar, MessageSquare, UploadCloud, CheckCircle, Loader2, AlertTriangle, Send, Tag } from 'lucide-react';
 
 const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -20,7 +20,8 @@ const InstitutionalBookingForm = () => {
         picContact: '',
         numberOfParticipants: '',
         bookingDate: '',
-        notes: ''
+        notes: '',
+        promoCode: ''
     });
     const [requestLetterFile, setRequestLetterFile] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -98,12 +99,16 @@ const InstitutionalBookingForm = () => {
                  <TextareaWithIcon Icon={MessageSquare} name="notes" placeholder="Ada permintaan atau catatan khusus? Tulis di sini..." value={formData.notes} onChange={handleChange} />
                  <div>
                     <label className="text-sm font-semibold text-base-content block mb-2">Surat Permintaan (Opsional)</label>
-                    <div className="flex items-center gap-2 p-3 border-2 border-dashed rounded-lg">
+                    <label htmlFor="letter-upload" className="flex items-center gap-2 p-3 border-2 border-dashed rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
                         <UploadCloud size={20} className="text-muted" />
                         <span className="text-sm text-muted flex-grow truncate">{requestLetterFile ? requestLetterFile.name : 'Pilih file...'}</span>
-                        <label htmlFor="letter-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-md hover:bg-primary/20">Browse</label>
+                        <span className="text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-md">Browse</span>
                         <input id="letter-upload" type="file" className="hidden" onChange={e => setRequestLetterFile(e.target.files ? e.target.files[0] : null)} accept=".pdf,.doc,.docx,image/*" />
-                    </div>
+                    </label>
+                </div>
+                <div>
+                    <label className="text-sm font-semibold text-base-content block mb-2">Kode Promo / Voucher (Opsional)</label>
+                    <InputWithIcon Icon={Tag} name="promoCode" placeholder="Masukkan kode di sini" value={formData.promoCode} onChange={handleChange} />
                 </div>
                  <button type="submit" disabled={isSubmitting} className="w-full flex justify-center items-center gap-2 px-6 py-3 text-sm font-semibold text-primary-content bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-lg disabled:opacity-60">
                     {isSubmitting ? <Loader2 className="animate-spin" /> : <><Send size={16}/> Kirim Permintaan</>}

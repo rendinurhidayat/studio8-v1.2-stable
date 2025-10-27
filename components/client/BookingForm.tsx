@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPackages, getAddOns, getSystemSettings, getClientDetailsForBooking, validateReferralCode } from '../../services/api';
-import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, Client } from '../../types';
+import { getPackages, getAddOns, getSystemSettings, getClientDetailsForBooking, validateReferralCode, validatePromoCode } from '../../services/api';
+import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, Client, Promo } from '../../types';
 import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, ArrowRight, ArrowLeft, Send, Home, Search, FileText, Loader2, AlertTriangle, Tag, Award, X } from 'lucide-react';
 import { fileToBase64 as fileUtilToBase64 } from '../../utils/fileUtils';
 
@@ -22,6 +22,7 @@ type FormData = {
     paymentMethod: 'QRIS' | 'Bank Transfer' | 'Dana' | 'Shopeepay' | '';
     paymentProof: File | null;
     referralCode: string;
+    promoCode: string;
     usePoints: boolean;
 };
 
@@ -265,9 +266,26 @@ const Step2Details: React.FC<{formData: FormData, setFormData: Function, errors:
 }
 
 const Step3Addons: React.FC<{
-    formData: FormData, setFormData: Function, addOns: AddOn[],
-    referralStatus: ReferralStatus, onValidateReferral: () => void, setReferralStatus: (status: ReferralStatus) => void
-}> = ({ formData, setFormData, addOns, referralStatus, onValidateReferral, setReferralStatus }) => {
+    formData: FormData;
+    setFormData: Function;
+    addOns: AddOn[];
+    referralStatus: ReferralStatus;
+    onValidateReferral: () => void;
+    setReferralStatus: (status: ReferralStatus) => void;
+    promoStatus: ReferralStatus;
+    onValidatePromoCode: () => void;
+    setPromoStatus: (status: ReferralStatus) => void;
+}> = ({
+    formData,
+    setFormData,
+    addOns,
+    referralStatus,
+    onValidateReferral,
+    setReferralStatus,
+    promoStatus,
+    onValidatePromoCode,
+    setPromoStatus
+}) => {
     const handleToggleSubAddOn = (subId: string) => {
         const newSubAddOns = formData.subAddOnIds.includes(subId)
             ? formData.subAddOnIds.filter(id => id !== subId)
@@ -276,6 +294,8 @@ const Step3Addons: React.FC<{
     };
 
     const isReferralApplied = referralStatus.isValid === true;
+    const isPromoApplied = promoStatus.isValid === true;
+    const isAnyCodeApplied = isReferralApplied || isPromoApplied;
 
     return (
         <div className="space-y-4">
@@ -299,33 +319,72 @@ const Step3Addons: React.FC<{
                     </div>
                 ))}
             </div>
-             <TextareaWithIcon Icon={MessageSquare} placeholder="Ada konsep tertentu? Ceritain di sini~" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
-             <div className="pt-4">
-                <label className="text-sm font-semibold text-base-content block mb-2">Punya Kode Referral?</label>
-                <div className="flex gap-2">
-                    <div className="relative flex-grow">
-                        <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted"/>
-                        <input type="text" placeholder="Masukkan kode di sini" disabled={isReferralApplied} value={formData.referralCode} onChange={e => setFormData({ ...formData, referralCode: e.target.value.toUpperCase() })} className="w-full pl-10 pr-3 py-3 text-base-content bg-base-100 border-2 border-base-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors disabled:bg-base-200"/>
+            <TextareaWithIcon Icon={MessageSquare} placeholder="Ada konsep tertentu? Ceritain di sini~" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+            
+            <div className="pt-4 space-y-6">
+                <h3 className="text-lg font-semibold text-primary border-b pb-2">Diskon & Promosi</h3>
+                
+                { (isAnyCodeApplied) &&
+                    <div className="text-xs text-amber-700 bg-amber-50 p-2 rounded-md text-center">Hanya satu kode (promo atau referral) yang dapat digunakan per transaksi.</div>
+                }
+
+                {/* Promo Code Section */}
+                <div>
+                    <label className="text-sm font-semibold text-base-content block mb-1">Kode Promo / Voucher</label>
+                    <p className="text-xs text-muted mb-2">Punya kode voucher diskon? Masukkan di sini untuk mendapatkan potongan harga.</p>
+                    <div className="flex gap-2">
+                        <div className="relative flex-grow">
+                            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted"/>
+                            <input type="text" placeholder="Masukkan kode voucher" disabled={isPromoApplied || isReferralApplied} value={formData.promoCode} onChange={e => setFormData({ ...formData, promoCode: e.target.value.toUpperCase() })} className="w-full pl-10 pr-3 py-3 text-base-content bg-base-100 border-2 border-base-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors disabled:bg-base-200"/>
+                        </div>
+                        {isPromoApplied ? (
+                            <button type="button" onClick={() => { setFormData({...formData, promoCode: ''}); setPromoStatus({ isValid: null, message: '', loading: false }); }} className="p-3 bg-base-200 text-muted rounded-xl hover:bg-base-300"><X size={20}/></button>
+                        ) : (
+                            <button type="button" onClick={onValidatePromoCode} disabled={promoStatus.loading || isReferralApplied} className="px-4 bg-primary text-primary-content rounded-xl hover:bg-primary/90 disabled:opacity-50 w-32 flex justify-center items-center">
+                                {promoStatus.loading ? <Loader2 className="animate-spin"/> : 'Gunakan'}
+                            </button>
+                        )}
                     </div>
-                    {isReferralApplied ? (
-                        <button type="button" onClick={() => { setFormData({...formData, referralCode: ''}); setReferralStatus({ isValid: null, message: '', loading: false }); }} className="p-3 bg-base-200 text-muted rounded-xl hover:bg-base-300"><X size={20}/></button>
-                    ) : (
-                        <button type="button" onClick={onValidateReferral} disabled={referralStatus.loading} className="px-4 bg-primary text-primary-content rounded-xl hover:bg-primary/90 disabled:opacity-50 w-32 flex justify-center items-center">
-                            {referralStatus.loading ? <Loader2 className="animate-spin"/> : 'Validasi'}
-                        </button>
+                    {promoStatus.message && (
+                        <p className={`text-xs mt-1 ${promoStatus.isValid ? 'text-success' : 'text-error'}`}>{promoStatus.message}</p>
                     )}
                 </div>
-                {referralStatus.message && (
-                    <p className={`text-xs mt-1 ${referralStatus.isValid ? 'text-success' : 'text-error'}`}>{referralStatus.message}</p>
-                )}
+
+                {/* Referral Code Section */}
+                <div>
+                    <label className="text-sm font-semibold text-base-content block mb-1">Punya Kode Referral?</label>
+                    <p className="text-xs text-muted mb-2">Gunakan kode dari temanmu untuk mendapatkan diskon di booking pertamamu dan poin bonus untuk temanmu!</p>
+                    <div className="flex gap-2">
+                        <div className="relative flex-grow">
+                            <Award className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted"/>
+                            <input type="text" placeholder="Kode referral teman" disabled={isReferralApplied || isPromoApplied} value={formData.referralCode} onChange={e => setFormData({ ...formData, referralCode: e.target.value.toUpperCase() })} className="w-full pl-10 pr-3 py-3 text-base-content bg-base-100 border-2 border-base-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors disabled:bg-base-200"/>
+                        </div>
+                        {isReferralApplied ? (
+                            <button type="button" onClick={() => { setFormData({...formData, referralCode: ''}); setReferralStatus({ isValid: null, message: '', loading: false }); }} className="p-3 bg-base-200 text-muted rounded-xl hover:bg-base-300"><X size={20}/></button>
+                        ) : (
+                            <button type="button" onClick={onValidateReferral} disabled={referralStatus.loading || isPromoApplied} className="px-4 bg-primary text-primary-content rounded-xl hover:bg-primary/90 disabled:opacity-50 w-32 flex justify-center items-center">
+                                {referralStatus.loading ? <Loader2 className="animate-spin"/> : 'Gunakan'}
+                            </button>
+                        )}
+                    </div>
+                    {referralStatus.message && (
+                        <p className={`text-xs mt-1 ${referralStatus.isValid ? 'text-success' : 'text-error'}`}>{referralStatus.message}</p>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
 
 const Step4Summary: React.FC<{
-    formData: FormData, packages: Package[], addOns: AddOn[], clientData: Client | null, settings: SystemSettings | null, setFormData: Function
-}> = ({ formData, packages, addOns, clientData, settings, setFormData }) => {
+    formData: FormData, 
+    packages: Package[], 
+    addOns: AddOn[], 
+    clientData: Client | null, 
+    settings: SystemSettings | null, 
+    setFormData: Function,
+    validatedPromo: Promo | null
+}> = ({ formData, packages, addOns, clientData, settings, setFormData, validatedPromo }) => {
     
     const selectedPackage = packages.find(p => p.id === formData.packageId);
     const selectedSubPackage = selectedPackage?.subPackages.find(sp => sp.id === formData.subPackageId);
@@ -341,20 +400,27 @@ const Step4Summary: React.FC<{
     let discountReason = '';
     let pointsValue = 0;
     
-    // Calculate loyalty/referral discount
-    if (clientData?.totalBookings === 0 && formData.referralCode) {
-        discountAmount = settings?.loyaltySettings.firstBookingReferralDiscount || 0;
-        discountReason = 'Diskon Referral Pengguna Baru';
-    } else if (clientData && clientData.totalBookings > 0 && settings) {
-        const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => b.bookingThreshold - a.bookingThreshold);
-        const clientTier = sortedTiers.find(t => clientData.totalBookings >= t.bookingThreshold);
-        if (clientTier) {
-            discountAmount = subtotal * (clientTier.discountPercentage / 100);
-            discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`;
+    // 1. Prioritize Promo Code
+    if (validatedPromo) {
+        discountAmount = subtotal * (validatedPromo.discountPercentage / 100);
+        discountReason = validatedPromo.description;
+    } 
+    // 2. If no promo, check for loyalty/referral
+    else {
+        if (clientData?.totalBookings === 0 && formData.referralCode) {
+            discountAmount = settings?.loyaltySettings.firstBookingReferralDiscount || 0;
+            discountReason = 'Diskon Referral Pengguna Baru';
+        } else if (clientData && clientData.totalBookings > 0 && settings) {
+            const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => b.bookingThreshold - a.bookingThreshold);
+            const clientTier = sortedTiers.find(t => clientData.totalBookings >= t.bookingThreshold);
+            if (clientTier) {
+                discountAmount = subtotal * (clientTier.discountPercentage / 100);
+                discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`;
+            }
         }
     }
     
-    // Calculate points redemption
+    // 3. Calculate points redemption
     if (formData.usePoints && clientData && settings && clientData.loyaltyPoints > 0) {
         pointsValue = Math.min(
             subtotal - discountAmount, 
@@ -543,11 +609,12 @@ const Step5Payment: React.FC<{formData: FormData, setFormData: Function, errors:
 
             <div>
                 <label className="text-sm font-semibold text-base-content block mb-2">Upload Bukti Pembayaran</label>
-                <div
+                <label
+                    htmlFor="payment-proof-upload"
                     {...dragEvents}
                     className={`relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-colors ${isDragging ? 'border-accent bg-accent/10' : errors.paymentProof ? 'border-error' : 'border-base-300 hover:border-base-300/80 bg-base-100'}`}
                 >
-                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleFileChange(e.target.files)} accept="image/*,.pdf" />
+                    <input id="payment-proof-upload" type="file" className="hidden" onChange={e => handleFileChange(e.target.files)} accept="image/*,.pdf" />
                     {formData.paymentProof ? (
                         <div className="text-center">
                             <CheckCircle className="w-10 h-10 mx-auto text-success mb-2"/>
@@ -561,7 +628,7 @@ const Step5Payment: React.FC<{formData: FormData, setFormData: Function, errors:
                             <p className="text-sm">atau klik untuk memilih file</p>
                         </div>
                     )}
-                </div>
+                </label>
                  {errors.paymentProof && <p className="text-xs text-error mt-1">{errors.paymentProof}</p>}
             </div>
         </div>
@@ -658,13 +725,15 @@ const BookingForm = () => {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState<FormData>({
         name: '', email: '', whatsapp: '', date: '', time: '', packageId: '', subPackageId: '',
-        people: 1, subAddOnIds: [], notes: '', paymentMethod: '', paymentProof: null, referralCode: '', usePoints: false
+        people: 1, subAddOnIds: [], notes: '', paymentMethod: '', paymentProof: null, referralCode: '', promoCode: '', usePoints: false
     });
     const [errors, setErrors] = useState<Partial<Record<keyof FormData, string> & { api?: string }>>({});
     const [bookingCode, setBookingCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [clientData, setClientData] = useState<Client | null>(null);
     const [referralStatus, setReferralStatus] = useState<ReferralStatus>({ isValid: null, message: '', loading: false });
+    const [promoStatus, setPromoStatus] = useState<ReferralStatus>({ isValid: null, message: '', loading: false });
+    const [validatedPromo, setValidatedPromo] = useState<Promo | null>(null);
 
     const [packages, setPackages] = useState<Package[]>([]);
     const [addOns, setAddOns] = useState<AddOn[]>([]);
@@ -695,6 +764,18 @@ const BookingForm = () => {
         setReferralStatus({ isValid: result.valid, message: result.message, loading: false });
         if (!result.valid) {
             setFormData({...formData, referralCode: ''});
+        }
+    };
+
+    const handleValidatePromoCode = async () => {
+        setPromoStatus({ isValid: null, message: '', loading: true });
+        setValidatedPromo(null);
+        const result = await validatePromoCode(formData.promoCode);
+        setPromoStatus({ isValid: result.valid, message: result.message, loading: false });
+        if (result.valid && result.promo) {
+            setValidatedPromo(result.promo);
+        } else {
+            setFormData({...formData, promoCode: ''});
         }
     };
 
@@ -888,8 +969,8 @@ const BookingForm = () => {
                     >
                         {step === 1 && <Step1Personal formData={formData} setFormData={setFormData} errors={errors} onWhatsappChange={handleWhatsappChange} validateField={validateField} onEmailBlur={handleEmailBlur} />}
                         {step === 2 && <Step2Details formData={formData} setFormData={setFormData} errors={errors} packages={packages} validateField={validateField} />}
-                        {step === 3 && <Step3Addons formData={formData} setFormData={setFormData} addOns={addOns} referralStatus={referralStatus} onValidateReferral={handleValidateReferral} setReferralStatus={setReferralStatus}/>}
-                        {step === 4 && <Step4Summary formData={formData} packages={packages} addOns={addOns} clientData={clientData} settings={settings} setFormData={setFormData} />}
+                        {step === 3 && <Step3Addons formData={formData} setFormData={setFormData} addOns={addOns} referralStatus={referralStatus} onValidateReferral={handleValidateReferral} setReferralStatus={setReferralStatus} promoStatus={promoStatus} onValidatePromoCode={handleValidatePromoCode} setPromoStatus={setPromoStatus}/>}
+                        {step === 4 && <Step4Summary formData={formData} packages={packages} addOns={addOns} clientData={clientData} settings={settings} setFormData={setFormData} validatedPromo={validatedPromo} />}
                         {step === 5 && <Step5Payment formData={formData} setFormData={setFormData} errors={errors} settings={settings} packages={packages}/>}
                         {step === 6 && <ConfirmationStep bookingCode={bookingCode} formData={formData} />}
                     </motion.div>

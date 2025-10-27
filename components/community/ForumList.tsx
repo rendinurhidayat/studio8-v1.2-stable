@@ -6,8 +6,8 @@ import { motion } from 'framer-motion';
 import { Loader2, PlusCircle, MessageSquare } from 'lucide-react';
 // FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
 // FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
-// FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+// FIX: Switched 'formatDistanceToNow' to a named import from 'date-fns' to fix the "not callable" type error.
+import { formatDistanceToNow } from 'date-fns';
 import id from 'date-fns/locale/id';
 import CreateThreadModal from './CreateThreadModal';
 

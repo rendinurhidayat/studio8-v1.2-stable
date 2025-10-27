@@ -83,6 +83,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return await handleGenerateMarketingInsight(ai, payload, res);
             case 'generateClassDescription':
                 return await handleGenerateClassDescription(ai, payload, res);
+             case 'recommendPackage':
+                return await handleRecommendPackage(ai, payload, res);
             default:
                 return res.status(400).json({ message: `Unknown action: ${action}` });
         }
@@ -93,6 +95,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // --- Individual Action Handlers ---
+
+async function handleRecommendPackage(ai: GoogleGenAI, payload: any, res: VercelResponse) {
+    const { userQuery, packages } = payload;
+    if (!userQuery || !packages) {
+        return res.status(400).json({ message: 'userQuery and packages are required.' });
+    }
+
+    const packageListString = packages.map((p: any) => 
+        `- Nama Paket: "${p.name}", Deskripsi: "${p.description}", Harga: ${p.subPackages.map((sp:any) => `Rp ${sp.price}`).join(' / ')}`
+    ).join('\n');
+
+    const prompt = `
+        Anda adalah asisten penjualan yang cerdas dan ramah untuk Studio 8. Tugas Anda adalah merekomendasikan paket foto terbaik berdasarkan kebutuhan pelanggan.
+
+        Berikut adalah daftar paket yang tersedia:
+        ${packageListString}
+
+        Kebutuhan pelanggan: "${userQuery}"
+
+        Tugas:
+        1. Analisis kebutuhan pelanggan.
+        2. Pilih SATU paket yang paling sesuai dari daftar di atas. Nama paket harus persis sama.
+        3. Berikan alasan singkat (1-2 kalimat) mengapa paket tersebut direkomendasikan, dalam Bahasa Indonesia yang ramah.
+
+        Format output Anda HARUS berupa JSON dengan skema berikut:
+    `;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            recommendedPackageName: { type: Type.STRING, description: "Nama paket yang direkomendasikan (harus sama persis)." },
+            reasoning: { type: Type.STRING, description: "Alasan singkat mengapa paket ini cocok." }
+        },
+        required: ["recommendedPackageName", "reasoning"]
+    };
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: schema,
+        }
+    });
+
+    const result = JSON.parse(response.text);
+    return res.status(200).json(result);
+}
+
 
 async function handleGenerateClassDescription(ai: GoogleGenAI, payload: any, res: VercelResponse) {
     const { topic } = payload;

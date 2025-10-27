@@ -206,13 +206,15 @@ const AdminHighlightManagerPage = () => {
                      <div><label className="font-semibold text-sm">Deskripsi</label><textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required rows={3} className="w-full p-2 border rounded mt-1"/></div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="font-semibold text-sm block">File Media (Gambar/Video)</label>
-                            <input type="file" onChange={e => handleFileChange(e, 'media')} className="text-sm mt-1"/>
+                            <label className="font-semibold text-sm block mb-1">File Media (Gambar/Video)</label>
+                            <label htmlFor="media-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">Pilih File</label>
+                            <input id="media-upload" type="file" onChange={e => handleFileChange(e, 'media')} className="hidden"/>
                             {mediaPreview && <img src={mediaPreview} className="w-32 h-20 object-cover rounded-md mt-2" />}
                         </div>
                         <div>
-                            <label className="font-semibold text-sm block">File Thumbnail</label>
-                            <input type="file" onChange={e => handleFileChange(e, 'thumbnail')} className="text-sm mt-1"/>
+                            <label className="font-semibold text-sm block mb-1">File Thumbnail</label>
+                            <label htmlFor="thumbnail-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">Pilih File</label>
+                            <input id="thumbnail-upload" type="file" onChange={e => handleFileChange(e, 'thumbnail')} className="hidden"/>
                              {thumbnailPreview && <img src={thumbnailPreview} className="w-32 h-20 object-cover rounded-md mt-2" />}
                         </div>
                      </div>
