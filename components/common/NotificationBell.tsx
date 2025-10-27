@@ -65,7 +65,7 @@ const NotificationBell = () => {
                                             <p className="text-sm text-base-content">{notif.message}</p>
                                             <p className="text-xs text-muted mt-1">
                                                 {/* FIX: Cast options to 'any' to bypass faulty type definition for 'locale'. */}
-                                                {formatDistanceToNow(new Date(notif.timestamp), { addSuffix: true, locale: id } as any)}
+                                                {formatDistanceToNow(new Date(notif.timestamp), { addSuffix: true, locale: (id as any).default ?? id })}
                                             </p>
                                         </div>
                                         {!notif.read && (

@@ -124,7 +124,7 @@ const AdminActivityLogPage = () => {
                                                 </p>
                                                 <p className="mt-1 text-xs text-gray-500">
                                                     {/* FIX: Cast options to 'any' to bypass faulty type definition for 'locale'. */}
-                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id } as any)}
+                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: (id as any).default ?? id })}
                                                 </p>
                                             </div>
                                         </div>

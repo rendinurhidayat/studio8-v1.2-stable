@@ -84,7 +84,7 @@ const FeedbackForm: React.FC<{ intern: User, tasks: Task[], onFeedbackSent: () =
 
 
 const StaffInternDetailPage = () => {
-    const { id } = useParams<{ id: string }>();
+    const { id: internId } = useParams<{ id: string }>();
     const [intern, setIntern] = useState<User | null>(null);
     const [attendance, setAttendance] = useState<Attendance[]>([]);
     const [reports, setReports] = useState<DailyReport[]>([]);
@@ -95,18 +95,18 @@ const StaffInternDetailPage = () => {
     const [generatingFeedbackId, setGeneratingFeedbackId] = useState<string | null>(null);
 
     const fetchData = async () => {
-        if (!id) return;
+        if (!internId) return;
         setLoading(true);
         const allUsers = await getUsers();
-        const currentIntern = allUsers.find(u => u.id === id);
+        const currentIntern = allUsers.find(u => u.id === internId);
         setIntern(currentIntern || null);
 
         if (currentIntern) {
             const [attData, repData, taskData, feedbackData] = await Promise.all([
-                getAttendanceForUser(id),
-                getDailyReportsForUser(id),
-                getTasksForUser(id),
-                getMentorFeedbackForIntern(id),
+                getAttendanceForUser(internId),
+                getDailyReportsForUser(internId),
+                getTasksForUser(internId),
+                getMentorFeedbackForIntern(internId),
             ]);
             setAttendance(attData);
             setReports(repData);
@@ -118,7 +118,7 @@ const StaffInternDetailPage = () => {
     
     useEffect(() => {
         fetchData();
-    }, [id]);
+    }, [internId]);
 
     const handleGenerateFeedback = async (report: DailyReport) => {
         if (!report.content) return;
@@ -160,12 +160,12 @@ const StaffInternDetailPage = () => {
     const renderTabContent = () => {
         switch(activeTab) {
             case 'attendance':
-                return <ul className="space-y-2 mt-2">{attendance.map(att => <li key={att.id} className="text-sm p-3 bg-base-100 rounded-lg flex justify-between"><span>{format(att.checkInTime, 'eeee, d MMMM yyyy', {locale: id} as any)}</span><span className="font-semibold">{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span></li>)}</ul>;
+                return <ul className="space-y-2 mt-2">{attendance.map(att => <li key={att.id} className="text-sm p-3 bg-base-100 rounded-lg flex justify-between"><span>{format(att.checkInTime, 'eeee, d MMMM yyyy', {locale: (id as any).default ?? id})}</span><span className="font-semibold">{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span></li>)}</ul>;
             case 'reports':
                 return <ul className="space-y-3 mt-2">{reports.map(rep => (
                     <li key={rep.id} className="p-4 bg-base-100 rounded-lg">
                         <div className="flex justify-between items-center">
-                            <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', {locale: id} as any)}</p>
+                            <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', {locale: (id as any).default ?? id})}</p>
                             <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{rep.mood}</span>
                         </div>
                         <p className="text-sm text-gray-700 mt-2">{rep.content}</p>
@@ -203,7 +203,7 @@ const StaffInternDetailPage = () => {
                             <div key={fb.id} className="p-3 bg-base-100 rounded-lg">
                                 <div className="flex justify-between items-center">
                                     <StarRating value={fb.rating} isEditable={false} size={16}/>
-                                    <span className="text-xs text-muted">{format(fb.date, 'd MMM yyyy', {locale: id} as any)}</span>
+                                    <span className="text-xs text-muted">{format(fb.date, 'd MMM yyyy', {locale: (id as any).default ?? id})}</span>
                                 </div>
                                 <p className="text-sm italic my-1">"{fb.feedback}"</p>
                                 <p className="text-xs text-muted">Tugas: "{fb.taskTitle}"</p>

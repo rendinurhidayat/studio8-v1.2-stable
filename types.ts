@@ -552,6 +552,7 @@ export interface PracticalClass {
     description: string;
     classDate: Date;
     mentorName: string;
+    // FIX: Added missing properties to support class registration features.
     maxParticipants: number;
     registeredInternIds: string[];
 }

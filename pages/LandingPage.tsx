@@ -143,7 +143,7 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8 }}
-                    className="text-5xl md:text-7xl font-extrabold leading-tight tracking-tight drop-shadow-lg"
+                    className="text-4xl sm:text-5xl md:text-7xl font-extrabold leading-tight tracking-tight drop-shadow-lg"
                 >
                     Express Your Time with Happiness
                 </motion.h1>
@@ -151,7 +151,7 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2 }}
-                    className="mt-4 text-lg md:text-xl max-w-2xl mx-auto text-white/90 drop-shadow-md"
+                    className="mt-4 text-base sm:text-lg md:text-xl max-w-2xl mx-auto text-white/90 drop-shadow-md"
                 >
                     Studio foto kota banjar dengan konsep studio house.
                 </motion.p>
@@ -163,13 +163,13 @@ const HeroSection = () => {
                 >
                     <Link
                         to="/pesan-sesi"
-                        className="px-8 py-4 text-lg font-semibold text-base-content bg-white rounded-xl shadow-lg hover:bg-base-200 transition-transform transform hover:scale-105 w-full sm:w-auto"
+                        className="px-6 py-3 text-base sm:px-8 sm:py-4 sm:text-lg font-semibold text-base-content bg-white rounded-xl shadow-lg hover:bg-base-200 transition-transform transform hover:scale-105 w-full sm:w-auto"
                     >
                         Booking Sekarang
                     </Link>
                     <Link
                         to="/cek-status"
-                        className="px-8 py-3 text-lg font-semibold text-white bg-transparent border-2 border-white rounded-xl hover:bg-white hover:text-base-content transition-colors w-full sm:w-auto"
+                        className="px-6 py-3 text-base sm:px-8 sm:py-3 sm:text-lg font-semibold text-white bg-transparent border-2 border-white rounded-xl hover:bg-white hover:text-base-content transition-colors w-full sm:w-auto"
                     >
                         Cek Status Booking
                     </Link>
@@ -210,7 +210,7 @@ const AboutSection = () => (
         <div className="space-y-6">
           <span className="text-sm font-bold uppercase text-accent tracking-widest">Tentang Kami</span>
           <h2 className="text-3xl md:text-4xl font-bold text-primary">Ruang Kreatifmu di Jantung Kota Banjar.</h2>
-          <p className="text-lg text-muted leading-relaxed">
+          <p className="text-base sm:text-lg text-muted leading-relaxed">
             Studio 8 adalah studio foto modern dengan konsep <i>self-service</i> yang memberikanmu kebebasan penuh untuk berekspresi. Kami percaya momen berharga tak ternilai, dan semua orang berhak mengabadikannya dengan kualitas profesional tanpa ribet.
           </p>
           <ul className="space-y-4 pt-4 border-t border-base-200">
@@ -363,7 +363,7 @@ const LocationSection = () => (
                         Jl. Banjar - Pangandaran (Depan SMK 4 Banjar, Sukamukti, Kec. Pataruman, Kota Banjar, Jawa Barat 46323
                     </p>
                     <a 
-                        href="https://maps.app.goo.gl/r6N9jQjD5j6E9kFp6"
+                        href="https://maps.app.goo.gl/3RLxGUn5isbUd3UeA"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-block mt-4 text-accent font-semibold hover:underline"
@@ -430,7 +430,7 @@ const Footer = () => {
               Jl. Banjar - Pangandaran (Depan SMK 4 Banjar, Sukamukti), Pataruman, Kota Banjar, Jawa Barat 46323
             </p>
              <a 
-                href="https://maps.app.goo.gl/r6N9jQjD5j6E9kFp6"
+                href="https://maps.app.goo.gl/3RLxGUn5isbUd3UeA"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mt-2 text-sm text-accent font-semibold hover:underline"

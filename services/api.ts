@@ -1,4 +1,4 @@
-import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent } from '../types';
+import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
 import { notificationService } from './notificationService';
 import { auth, db, storage, firebaseConfig } from '../firebase';
 import firebase from "firebase/compat/app";
@@ -1120,6 +1120,42 @@ export const getResultsForQuiz = async (quizId: string): Promise<QuizResult[]> =
 
 export const updateQuizResult = async (resultId: string, updates: Partial<QuizResult>): Promise<void> => {
     await db.collection('quiz_results').doc(resultId).update(updates);
+};
+
+// --- PRACTICAL CLASSES ---
+export const getPracticalClasses = async (): Promise<PracticalClass[]> => {
+    const snapshot = await db.collection('practical_classes').orderBy('classDate', 'desc').get();
+    return snapshot.docs.map(doc => fromFirestore<PracticalClass>(doc, ['classDate']));
+};
+
+export const createPracticalClass = async (classData: Omit<PracticalClass, 'id'>, currentUserId: string): Promise<PracticalClass> => {
+    const docRef = await db.collection('practical_classes').add(classData);
+    await logActivity(currentUserId, `Membuat kelas praktek baru: ${classData.topic}`);
+    const doc = await docRef.get();
+    return fromFirestore<PracticalClass>(doc, ['classDate']);
+};
+
+export const deletePracticalClass = async (classId: string, currentUserId: string): Promise<void> => {
+    const docRef = db.collection('practical_classes').doc(classId);
+    const doc = await docRef.get();
+    const topic = doc.data()?.topic || classId;
+    await docRef.delete();
+    await logActivity(currentUserId, `Menghapus kelas praktek: ${topic}`);
+};
+
+// FIX: Implement and export class registration functions.
+export const registerForClass = async (classId: string, userId: string): Promise<void> => {
+    const classRef = db.collection('practical_classes').doc(classId);
+    await classRef.update({
+        registeredInternIds: firebase.firestore.FieldValue.arrayUnion(userId)
+    });
+};
+
+export const unregisterFromClass = async (classId: string, userId: string): Promise<void> => {
+    const classRef = db.collection('practical_classes').doc(classId);
+    await classRef.update({
+        registeredInternIds: firebase.firestore.FieldValue.arrayRemove(userId)
+    });
 };
 
 // --- ASSETS ---

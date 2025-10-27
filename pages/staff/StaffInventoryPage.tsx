@@ -151,7 +151,7 @@ const StaffInventoryPage = () => {
                                             </div>
                                             <p className="text-xs text-muted mt-1">
                                                 {/* FIX: Cast options to 'any' to bypass faulty type definition for 'locale'. */}
-                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(item.lastChecked, { addSuffix: true, locale: id } as any) : 'Belum pernah'}
+                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(item.lastChecked, { addSuffix: true, locale: (id as any).default ?? id }) : 'Belum pernah'}
                                             </p>
                                             {item.notes && item.status !== InventoryStatus.Available && (
                                                 <div className="mt-2 p-2 bg-yellow-50 text-yellow-800 text-xs rounded flex items-start gap-2">

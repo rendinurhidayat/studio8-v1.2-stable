@@ -126,7 +126,7 @@ const StatusPage = () => {
 
   const canReschedule = booking?.bookingStatus === BookingStatus.Confirmed && (new Date(booking.bookingDate).getTime() - new Date().getTime()) > 7 * 24 * 60 * 60 * 1000;
   
-  const GOOGLE_MAPS_REVIEW_URL = window.appConfig?.googleMapsReviewUrl || "https://maps.app.goo.gl/your-review-link-here";
+  const GOOGLE_MAPS_REVIEW_URL = window.appConfig?.googleMapsReviewUrl || "https://maps.app.goo.gl/3RLxGUn5isbUd3UeA";
 
   const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     const colorClasses: { [key: string]: string } = {
@@ -200,7 +200,7 @@ const StatusPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-12 px-4">
       <div className="w-full max-w-2xl text-center">
-        <h1 className="text-4xl font-bold text-gray-900">Cek Status Pesanan Anda</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Cek Status Pesanan Anda</h1>
         <p className="mt-2 text-gray-600">Masukkan kode booking unik Anda di bawah ini.</p>
       </div>
       
@@ -229,7 +229,7 @@ const StatusPage = () => {
         {booking === null && <p className="text-center text-red-500">Kode booking tidak ditemukan. Mohon periksa kembali.</p>}
         {booking && (
           <div className="bg-white rounded-lg shadow-lg p-8 animate-fade-in">
-            <h2 className="text-2xl font-bold text-gray-900">Detail Pesanan</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Detail Pesanan</h2>
             <div className="mt-6 space-y-4">
               <div className="flex justify-between"><span className="font-medium text-gray-500">Kode Booking:</span> <span className="font-mono text-gray-800">{booking.bookingCode}</span></div>
               <div className="flex justify-between"><span className="font-medium text-gray-500">Nama Klien:</span> <span className="text-gray-800">{booking.clientName}</span></div>
@@ -241,7 +241,7 @@ const StatusPage = () => {
             
             {booking.bookingStatus === BookingStatus.Completed && (
               <div className="mt-6 border-t pt-6 bg-green-50 p-6 rounded-lg">
-                <h3 className="text-xl font-bold text-center text-green-800">Sesi Selesai! 🎉</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-center text-green-800">Sesi Selesai! 🎉</h3>
                 <p className="text-center text-sm text-green-700 mt-1">Terima kasih telah mempercayakan momen Anda pada kami. Ulasan Anda sangat berarti untuk kami.</p>
                 <div className="mt-4 space-y-4">
                   {booking.googleDriveLink && (

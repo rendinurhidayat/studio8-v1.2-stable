@@ -89,7 +89,7 @@ const InputWithIcon: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { Ic
             </span>
             <input
                 {...props}
-                className={`w-full pl-10 pr-3 py-3 text-base-content bg-base-100 border-2 ${error ? 'border-error' : 'border-base-200'} rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors`}
+                className={`w-full pl-10 pr-3 py-2.5 sm:py-3 text-base-content bg-base-100 border-2 ${error ? 'border-error' : 'border-base-200'} rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors`}
             />
         </div>
         {error && <p className="text-xs text-error mt-1">{error}</p>}
@@ -105,7 +105,7 @@ const SelectWithIcon: React.FC<React.SelectHTMLAttributes<HTMLSelectElement> & {
             </span>
             <select
                 {...props}
-                className={`w-full pl-10 pr-10 py-3 text-base-content bg-base-100 border-2 ${error ? 'border-error' : 'border-base-200'} rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors appearance-none`}
+                className={`w-full pl-10 pr-10 py-2.5 sm:py-3 text-base-content bg-base-100 border-2 ${error ? 'border-error' : 'border-base-200'} rounded-xl focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors appearance-none`}
             >
                 {children}
             </select>
@@ -625,14 +625,14 @@ const NavigationButtons: React.FC<{ step: number, handlePrev: () => void, handle
     return (
         <div className={`mt-8 flex ${step === 1 ? 'justify-end' : 'justify-between'}`}>
             {step > 1 && step <= PAYMENT_STEP && (
-                 <button type="button" onClick={handlePrev} className="flex items-center px-6 py-3 text-sm font-semibold text-base-content bg-base-200 rounded-xl hover:bg-base-300 transition-colors disabled:opacity-50" disabled={isLoading}>
+                 <button type="button" onClick={handlePrev} className="flex items-center px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold text-base-content bg-base-200 rounded-xl hover:bg-base-300 transition-colors disabled:opacity-50" disabled={isLoading}>
                     <ArrowLeft className="w-4 h-4 mr-2"/>
                     Kembali
                 </button>
             )}
 
             {isLastFormStep ? (
-                 <button type="submit" className="flex items-center px-6 py-3 text-sm font-semibold text-primary-content bg-primary rounded-xl hover:bg-primary/90 transition-colors flex-grow justify-center ml-2 disabled:opacity-60 shadow-lg" disabled={isLoading}>
+                 <button type="submit" className="flex items-center px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold text-primary-content bg-primary rounded-xl hover:bg-primary/90 transition-colors flex-grow justify-center ml-2 disabled:opacity-60 shadow-lg" disabled={isLoading}>
                     {isLoading ? (
                         <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin"/>
@@ -646,7 +646,7 @@ const NavigationButtons: React.FC<{ step: number, handlePrev: () => void, handle
                     )}
                 </button>
             ) : (
-                 <button type="button" onClick={handleNext} className={`flex items-center px-6 py-3 text-sm font-semibold text-primary-content bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-lg ${step === 1 ? 'ml-auto' : ''}`}>
+                 <button type="button" onClick={handleNext} className={`flex items-center px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold text-primary-content bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-lg ${step === 1 ? 'ml-auto' : ''}`}>
                     Selanjutnya
                     <ArrowRight className="w-4 h-4 ml-2"/>
                 </button>

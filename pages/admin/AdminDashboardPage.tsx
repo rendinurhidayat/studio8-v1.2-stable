@@ -179,7 +179,7 @@ const AdminDashboardPage: React.FC = () => {
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-primary">Welcome back, {user?.name?.split(' ')[0]}!</h1>
+                <h1 className="text-2xl md:text-3xl font-bold text-primary">Welcome back, {user?.name?.split(' ')[0]}!</h1>
                 <p className="text-muted mt-1">Here's a real-time overview of Studio 8's performance.</p>
             </div>
             

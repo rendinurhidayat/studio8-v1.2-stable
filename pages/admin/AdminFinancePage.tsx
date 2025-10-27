@@ -370,7 +370,7 @@ const AdminFinancePage = () => {
 
     return (
         <div>
-            <h1 className="text-3xl font-bold">Dasbor Keuangan & Analitik</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Dasbor Keuangan & Analitik</h1>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-6">
                 <StatCard title="Pendapatan Minggu Ini" value={`Rp ${weeklyIncome.toLocaleString('id-ID')}`} icon={<div className="p-3 bg-success/10 text-success rounded-full"><DollarSign /></div>} />

@@ -86,7 +86,7 @@ const QuizResultPage = () => {
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center p-8 bg-white rounded-2xl border border-base-200 shadow-lg">
                     <h1 className="text-xl text-muted">{result.quizTitle}</h1>
                     <p className="text-sm text-muted">Hasil Kuis</p>
-                    <p className={`text-7xl font-bold my-4 ${scoreColor}`}>{result.score}<span className="text-4xl">%</span></p>
+                    <p className={`text-6xl md:text-7xl font-bold my-4 ${scoreColor}`}>{result.score}<span className="text-4xl">%</span></p>
                     <Link to="/intern/quiz" className="px-6 py-2 bg-primary text-primary-content font-bold rounded-lg hover:bg-primary/90">
                         Kembali ke Daftar Kuis
                     </Link>

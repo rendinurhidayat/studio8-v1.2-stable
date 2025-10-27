@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import BookingForm from '../components/client/BookingForm';
@@ -104,7 +103,7 @@ const BookingPage = () => {
                         exit={{ opacity: 0, y: 10 }}
                         transition={{ duration: 0.3 }}
                     >
-                        <h1 className="mt-4 text-4xl font-extrabold text-primary">
+                        <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold text-primary">
                            {formContent[formType].title}
                         </h1>
                         <p className="mt-2 text-md text-muted max-w-xl mx-auto">
