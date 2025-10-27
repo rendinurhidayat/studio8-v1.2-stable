@@ -1,4 +1,3 @@
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
@@ -23,16 +22,32 @@ function initializeFirebaseAdmin(): admin.app.App {
     try {
         const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
-        if (projectId && serviceAccount.project_id !== projectId) {
+        // Validate essential fields
+        if (!serviceAccount.client_email || !serviceAccount.private_key) {
+            console.error('Invalid service account JSON:', {
+                hasClientEmail: !!serviceAccount.client_email,
+                hasPrivateKey: !!serviceAccount.private_key,
+                projectIdField: serviceAccount.project_id,
+            });
+            throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT_JSON: missing client_email or private_key.');
+        }
+
+        // Fix common newline-escaping issue when storing JSON in env variables (\\n -> \n)
+        if (typeof serviceAccount.private_key === 'string' && serviceAccount.private_key.includes('\\n')) {
+            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+
+        if (projectId && serviceAccount.project_id && serviceAccount.project_id !== projectId) {
             console.warn(`Project ID mismatch. Vercel Project ID: ${projectId}, Service Account Project ID: ${serviceAccount.project_id}. This may cause issues.`);
         }
         
         return admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
+            projectId: serviceAccount.project_id || projectId,
         });
     } catch (e: any) {
-        console.error("Failed to initialize Firebase Admin:", e.message);
-        throw new Error("Server configuration error: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's a valid, single-line JSON string.");
+        console.error("Failed to initialize Firebase Admin:", e?.message ?? e);
+        throw new Error("Server configuration error: Could not parse/validate FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's the full service account JSON with client_email and private_key.");
     }
 }
 
