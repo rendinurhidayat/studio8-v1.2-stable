@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPackages, getAddOns, getSystemSettings, getClientDetailsForBooking, validateReferralCode, validatePromoCode } from '../../services/api';
 import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, Client, Promo } from '../../types';
@@ -738,6 +738,7 @@ const BookingForm = () => {
     const [packages, setPackages] = useState<Package[]>([]);
     const [addOns, setAddOns] = useState<AddOn[]>([]);
     const [settings, setSettings] = useState<SystemSettings | null>(null);
+    const [searchParams] = useSearchParams();
 
     useEffect(() => {
         const loadData = async () => {
@@ -752,6 +753,16 @@ const BookingForm = () => {
         };
         loadData();
     }, []);
+
+    useEffect(() => {
+        const packageIdFromUrl = searchParams.get('paketId');
+        if (packageIdFromUrl && packages.length > 0) {
+            const packageExists = packages.some(p => p.id === packageIdFromUrl);
+            if (packageExists) {
+                setFormData(prev => ({ ...prev, packageId: packageIdFromUrl }));
+            }
+        }
+    }, [packages, searchParams]);
 
     const handleEmailBlur = async () => {
         const client = await getClientDetailsForBooking(formData.email);

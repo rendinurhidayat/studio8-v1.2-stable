@@ -178,7 +178,7 @@ const PackageModal: React.FC<{ pkg: PackageWithDetails | null; addOns: AddOn[]; 
               )}
               
               <div className="mt-auto pt-6">
-                <Link to={`/pesan-sesi`} className="w-full text-center block bg-primary text-primary-content px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg">
+                <Link to={`/pesan-sesi?paketId=${pkg.id}`} className="w-full text-center block bg-primary text-primary-content px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg">
                   Booking Sekarang
                 </Link>
               </div>
