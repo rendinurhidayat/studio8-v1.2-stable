@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPackages, getAddOns, getSystemSettings, getClientDetailsForBooking, validateReferralCode, validatePromoCode } from '../../services/api';
+import { getPackages, getAddOns, getSystemSettings, getClientDetailsForBooking, validateReferralCode, validatePromoCode, calculateDpAmount as apiCalculateDpAmount } from '../../services/api';
 import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, Client, Promo } from '../../types';
-import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, ArrowRight, ArrowLeft, Send, Home, Search, FileText, Loader2, AlertTriangle, Tag, Award, X } from 'lucide-react';
+import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, ArrowRight, ArrowLeft, Send, Home, Search, FileText, Loader2, AlertTriangle, Tag, Award, X, ShoppingCart } from 'lucide-react';
 import { fileToBase64 as fileUtilToBase64 } from '../../utils/fileUtils';
+import { useCart } from '../../contexts/CartContext';
 
 
 // --- Type Definitions ---
@@ -49,18 +50,7 @@ type ReferralStatus = {
 
 const calculateDpAmount = (totalPrice: number, pkg: Package | undefined): number => {
     if (!pkg) return 35000;
-    
-    const packageType = pkg.type || 'Studio';
-
-    if (packageType === 'Outdoor') {
-        return totalPrice * 0.5;
-    }
-    // Studio type
-    if (totalPrice > 150000) {
-        return totalPrice * 0.5;
-    }
-     // Studio under or equal 150k
-    return 35000;
+    return apiCalculateDpAmount({ totalPrice, package: pkg });
 };
 
 // --- Helper Functions ---
@@ -176,7 +166,7 @@ const Step1Personal: React.FC<{formData: FormData, setFormData: Function, errors
     </div>
 );
 
-const Step2Details: React.FC<{formData: FormData, setFormData: Function, errors: Partial<Record<keyof FormData, string>>, packages: Package[], validateField: Function}> = ({ formData, setFormData, errors, packages, validateField }) => {
+const Step2Details: React.FC<{formData: FormData, setFormData: Function, errors: Partial<Record<keyof FormData, string>>, packages: Package[], validateField: Function, disabled: boolean}> = ({ formData, setFormData, errors, packages, validateField, disabled }) => {
     const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
     const selectedPackage = packages.find(p => p.id === formData.packageId);
 
@@ -186,7 +176,7 @@ const Step2Details: React.FC<{formData: FormData, setFormData: Function, errors:
     };
 
     return (
-        <div className="space-y-6">
+        <div className={`space-y-6 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <InputWithIcon 
                     Icon={Calendar} 
@@ -275,6 +265,7 @@ const Step3Addons: React.FC<{
     promoStatus: ReferralStatus;
     onValidatePromoCode: () => void;
     setPromoStatus: (status: ReferralStatus) => void;
+    disabled: boolean;
 }> = ({
     formData,
     setFormData,
@@ -284,7 +275,8 @@ const Step3Addons: React.FC<{
     setReferralStatus,
     promoStatus,
     onValidatePromoCode,
-    setPromoStatus
+    setPromoStatus,
+    disabled
 }) => {
     const handleToggleSubAddOn = (subId: string) => {
         const newSubAddOns = formData.subAddOnIds.includes(subId)
@@ -298,7 +290,7 @@ const Step3Addons: React.FC<{
     const isAnyCodeApplied = isReferralApplied || isPromoApplied;
 
     return (
-        <div className="space-y-4">
+        <div className={`space-y-4 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             <div className="space-y-4">
                 {addOns.map(addon => (
                     <div key={addon.id} className="p-4 border border-base-200 rounded-2xl bg-white">
@@ -723,6 +715,10 @@ const NavigationButtons: React.FC<{ step: number, handlePrev: () => void, handle
 // --- Main Component ---
 const BookingForm = () => {
     const [step, setStep] = useState(1);
+    const { cart, removeFromCart } = useCart();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+    
     const [formData, setFormData] = useState<FormData>({
         name: '', email: '', whatsapp: '', date: '', time: '', packageId: '', subPackageId: '',
         people: 1, subAddOnIds: [], notes: '', paymentMethod: '', paymentProof: null, referralCode: '', promoCode: '', usePoints: false
@@ -738,7 +734,8 @@ const BookingForm = () => {
     const [packages, setPackages] = useState<Package[]>([]);
     const [addOns, setAddOns] = useState<AddOn[]>([]);
     const [settings, setSettings] = useState<SystemSettings | null>(null);
-    const [searchParams] = useSearchParams();
+    
+    const isFromCart = searchParams.get('fromCart') === 'true' && cart.length > 0;
 
     useEffect(() => {
         const loadData = async () => {
@@ -763,6 +760,20 @@ const BookingForm = () => {
             }
         }
     }, [packages, searchParams]);
+
+    useEffect(() => {
+        if (isFromCart) {
+            const itemToBook = cart[0];
+            setFormData(prev => ({
+                ...prev,
+                packageId: itemToBook.pkg.id,
+                subPackageId: itemToBook.subPkg.id,
+                subAddOnIds: itemToBook.addOns.map(a => a.id),
+                notes: `Pemesanan dari keranjang. Total item di keranjang: ${cart.length}.`
+            }));
+        }
+    }, [isFromCart, cart]);
+
 
     const handleEmailBlur = async () => {
         const client = await getClientDetailsForBooking(formData.email);
@@ -925,8 +936,20 @@ const BookingForm = () => {
             const result = await response.json();
             
             if(result.bookingCode) {
-                setBookingCode(result.bookingCode);
-                setStep(CONFIRMATION_STEP);
+                if (isFromCart) {
+                    removeFromCart(cart[0].id);
+                    searchParams.delete('fromCart');
+                    setSearchParams(searchParams);
+                    // After booking, send user back to packages and open the cart to continue
+                    navigate('/paket');
+                    // Use a timeout to ensure navigation happens before the event fires
+                    setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('open-cart'));
+                    }, 500);
+                } else {
+                    setBookingCode(result.bookingCode);
+                    setStep(CONFIRMATION_STEP);
+                }
             } else {
                 throw new Error("Kode booking tidak diterima dari server.");
             }
@@ -957,6 +980,12 @@ const BookingForm = () => {
 
     return (
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mt-8 border border-base-200">
+            {isFromCart && (
+                <div className="mb-6 p-4 bg-accent/10 border-l-4 border-accent text-accent-focus rounded-r-lg">
+                    <p className="font-semibold text-sm">Memesan dari Keranjang</p>
+                    <p className="text-xs">Formulir telah diisi otomatis dengan item pertama dari keranjang Anda. Selesaikan pemesanan ini untuk melanjutkan ke item berikutnya.</p>
+                </div>
+            )}
             {errors.api && (
                 <div className="bg-error/10 text-error text-sm p-4 rounded-lg mb-4 border border-error/20">
                     <strong>Gagal membuat booking:</strong> {errors.api}
@@ -979,8 +1008,8 @@ const BookingForm = () => {
                         transition={{ duration: 0.3 }}
                     >
                         {step === 1 && <Step1Personal formData={formData} setFormData={setFormData} errors={errors} onWhatsappChange={handleWhatsappChange} validateField={validateField} onEmailBlur={handleEmailBlur} />}
-                        {step === 2 && <Step2Details formData={formData} setFormData={setFormData} errors={errors} packages={packages} validateField={validateField} />}
-                        {step === 3 && <Step3Addons formData={formData} setFormData={setFormData} addOns={addOns} referralStatus={referralStatus} onValidateReferral={handleValidateReferral} setReferralStatus={setReferralStatus} promoStatus={promoStatus} onValidatePromoCode={handleValidatePromoCode} setPromoStatus={setPromoStatus}/>}
+                        {step === 2 && <Step2Details formData={formData} setFormData={setFormData} errors={errors} packages={packages} validateField={validateField} disabled={isFromCart} />}
+                        {step === 3 && <Step3Addons formData={formData} setFormData={setFormData} addOns={addOns} referralStatus={referralStatus} onValidateReferral={handleValidateReferral} setReferralStatus={setReferralStatus} promoStatus={promoStatus} onValidatePromoCode={handleValidatePromoCode} setPromoStatus={setPromoStatus} disabled={isFromCart}/>}
                         {step === 4 && <Step4Summary formData={formData} packages={packages} addOns={addOns} clientData={clientData} settings={settings} setFormData={setFormData} validatedPromo={validatedPromo} />}
                         {step === 5 && <Step5Payment formData={formData} setFormData={setFormData} errors={errors} settings={settings} packages={packages}/>}
                         {step === 6 && <ConfirmationStep bookingCode={bookingCode} formData={formData} />}

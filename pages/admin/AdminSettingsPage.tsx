@@ -6,17 +6,18 @@ import {
     addAddOn, updateAddOn, deleteAddOn, addSubPackage, updateSubPackage, 
     deleteSubPackage, addSubAddOn, updateSubAddOn, deleteSubAddOn,
     getSystemSettings, updateSystemSettings, getPromos, addPromo, updatePromo, deletePromo,
-    getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem
+    getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem,
+    generatePackageDescription
 } from '../../services/api';
-import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, FeatureToggles, Promo, OperationalHours, PaymentMethods, InventoryItem, InventoryStatus, LoyaltyTier } from '../../types';
+import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, FeatureToggles, Promo, OperationalHours, PaymentMethods, InventoryItem, InventoryStatus, LoyaltyTier, Partner } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud, Loader2, CheckCircle, AlertCircle, Sparkles, Handshake } from 'lucide-react';
 import Card from '../../components/common/Card';
 import { fileToBase64 } from '../../utils/fileUtils';
 
 type ModalMode = 'add' | 'edit';
-type ItemType = 'package' | 'addon' | 'subpackage' | 'subaddon' | 'promo' | 'inventory' | 'loyaltyTier';
+type ItemType = 'package' | 'addon' | 'subpackage' | 'subaddon' | 'promo' | 'inventory' | 'loyaltyTier' | 'partner';
 
 interface ModalState {
     isOpen: boolean;
@@ -163,6 +164,7 @@ const ServicesSettingsTab = () => {
     const [addOns, setAddOns] = useState<AddOn[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
     const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'package' });
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     
@@ -228,6 +230,22 @@ const ServicesSettingsTab = () => {
 
     const handleRemoveNewImage = (idToRemove: string) => {
         setImageUploads(prev => prev.filter(upload => upload.id !== idToRemove));
+    };
+
+    const handleGenerateDescription = async () => {
+        if (!formData.name) {
+            alert("Silakan isi nama paket terlebih dahulu.");
+            return;
+        }
+        setIsGeneratingDesc(true);
+        try {
+            const desc = await generatePackageDescription(formData.name);
+            setFormData(prev => ({ ...prev, description: desc }));
+        } catch (error) {
+            alert("Gagal membuat deskripsi: " + (error as Error).message);
+        } finally {
+            setIsGeneratingDesc(false);
+        }
     };
 
     const handleFormSubmit = async (e: React.FormEvent) => {
@@ -409,7 +427,15 @@ const ServicesSettingsTab = () => {
                      )}
                     {(modalState.type === 'package' || modalState.type === 'subpackage') && (
                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Deskripsi (Opsional)</label>
+                            <div className="flex justify-between items-center">
+                                <label className="block text-sm font-medium text-gray-700">Deskripsi (Opsional)</label>
+                                {modalState.type === 'package' && (
+                                    <button type="button" onClick={handleGenerateDescription} disabled={isGeneratingDesc || !formData.name} className="text-xs flex items-center gap-1 text-accent font-semibold disabled:opacity-50">
+                                        {isGeneratingDesc ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                        Generate (AI)
+                                    </button>
+                                )}
+                            </div>
                             <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={3} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
                         </div>
                     )}
@@ -938,6 +964,128 @@ const LoyaltySettingsTab = () => {
     );
 };
 
+const PartnersSettingsTab = () => {
+    const { user: currentUser } = useAuth();
+    const [settings, setSettings] = useState<SystemSettings | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'partner' });
+    const [formData, setFormData] = useState({ id: '', name: '' });
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
+
+    useEffect(() => {
+        getSystemSettings().then(data => {
+            setSettings(data);
+            setLoading(false);
+        });
+    }, []);
+
+    const handleSave = async () => {
+        if (settings && currentUser) {
+            await updateSystemSettings(settings, currentUser.id);
+            alert('Perubahan partner berhasil disimpan!');
+        }
+    };
+
+    const openModal = (mode: ModalMode, partner?: Partner) => {
+        setModalState({ isOpen: true, mode, type: 'partner', itemData: partner });
+        setFormData(partner ? { id: partner.id, name: partner.name } : { id: '', name: '' });
+        setLogoPreview(partner ? partner.logoUrl : null);
+        setLogoFile(null);
+    };
+
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setLogoFile(file);
+            setLogoPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!settings) return;
+        setIsSaving(true);
+        try {
+            let logoUrl = modalState.itemData?.logoUrl || '';
+            if (logoFile) {
+                const base64 = await fileToBase64(logoFile);
+                const response = await fetch('/api/uploadImage', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imageBase64: base64, folder: 'partners_logos' })
+                });
+                if (!response.ok) throw new Error('Gagal mengunggah logo.');
+                const result = await response.json();
+                logoUrl = result.secure_url;
+            }
+            if (!logoUrl) throw new Error('Logo wajib diunggah.');
+
+            const currentPartners = settings.partners || [];
+            if (modalState.mode === 'add') {
+                const newPartner: Partner = { id: String(Date.now()), name: formData.name, logoUrl };
+                setSettings({ ...settings, partners: [...currentPartners, newPartner] });
+            } else {
+                const updatedPartners = currentPartners.map(p =>
+                    p.id === modalState.itemData.id ? { ...p, name: formData.name, logoUrl } : p
+                );
+                setSettings({ ...settings, partners: updatedPartners });
+            }
+            setModalState({ ...modalState, isOpen: false });
+        } catch (error) {
+            alert((error as Error).message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDelete = () => {
+        if (!settings || !partnerToDelete) return;
+        const updatedPartners = (settings.partners || []).filter(p => p.id !== partnerToDelete.id);
+        setSettings({ ...settings, partners: updatedPartners });
+        setPartnerToDelete(null);
+    };
+
+    if (loading) return <p>Loading...</p>;
+
+    return (
+        <SettingsCard title="Partner Kolaborasi" description="Kelola logo partner yang ditampilkan di halaman depan.">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {(settings?.partners || []).map(partner => (
+                    <div key={partner.id} className="relative group p-4 border rounded-lg flex flex-col items-center justify-center">
+                        <img src={partner.logoUrl} alt={partner.name} className="h-16 object-contain" />
+                        <p className="text-sm font-semibold mt-2">{partner.name}</p>
+                        <div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => openModal('edit', partner)} className="p-1.5 bg-base-200 rounded-md hover:bg-base-300"><Edit size={14}/></button>
+                            <button onClick={() => setPartnerToDelete(partner)} className="p-1.5 bg-base-200 rounded-md hover:bg-base-300"><Trash2 size={14}/></button>
+                        </div>
+                    </div>
+                ))}
+                <button onClick={() => openModal('add')} className="p-4 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted hover:bg-base-100 hover:text-primary">
+                    <PlusCircle size={24} />
+                    <span className="text-sm font-semibold mt-2">Tambah Baru</span>
+                </button>
+            </div>
+             <div className="flex justify-end mt-6 border-t pt-4">
+                <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 font-semibold">
+                    <Save size={16}/> Simpan Perubahan Partner
+                </button>
+            </div>
+            <Modal isOpen={modalState.isOpen && modalState.type === 'partner'} onClose={() => setModalState({ ...modalState, isOpen: false })} title={modalState.mode === 'add' ? 'Tambah Partner' : 'Edit Partner'}>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div><label>Nama Partner</label><input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="w-full p-2 border rounded" /></div>
+                    <div><label>Logo</label><input type="file" accept="image/*" onChange={handleLogoChange} className="w-full text-sm" /></div>
+                    {logoPreview && <img src={logoPreview} alt="Preview" className="h-20 object-contain border rounded p-2" />}
+                    <div className="flex justify-end gap-2 pt-4"><button type="submit" disabled={isSaving} className="px-4 py-2 bg-primary text-white rounded w-24">{isSaving ? <Loader2 className="animate-spin mx-auto"/> : 'Simpan'}</button></div>
+                </form>
+            </Modal>
+             <ConfirmationModal isOpen={!!partnerToDelete} onClose={() => setPartnerToDelete(null)} onConfirm={handleDelete} title="Hapus Partner" message={`Yakin ingin menghapus partner "${partnerToDelete?.name}"?`} />
+        </SettingsCard>
+    );
+};
+
 
 // --- MAIN COMPONENT ---
 const AdminSettingsPage = () => {
@@ -946,6 +1094,7 @@ const AdminSettingsPage = () => {
     const tabs = [
         { id: 'general', label: 'Umum', icon: SlidersHorizontal },
         { id: 'services', label: 'Layanan & Harga', icon: Box },
+        { id: 'partners', label: 'Partner Kolaborasi', icon: Handshake },
         { id: 'inventory', label: 'Inventaris', icon: Archive },
         { id: 'promos', label: 'Promosi', icon: Tag },
         { id: 'loyalty', label: 'Loyalitas & Referral', icon: Award },
@@ -962,6 +1111,7 @@ const AdminSettingsPage = () => {
             case 'payments': return <PaymentsSettingsTab />;
             case 'users': return <UsersSettingsTab />;
             case 'inventory': return <InventorySettingsTab />;
+            case 'partners': return <PartnersSettingsTab />;
             default: return null;
         }
     }

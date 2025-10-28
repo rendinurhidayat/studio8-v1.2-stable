@@ -7,6 +7,7 @@ import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { Award, PlusCircle, Download, QrCode, Loader2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
+import { fileToBase64 } from '../../utils/fileUtils';
 
 const AdminCertificatesPage = () => {
     const { user: currentUser } = useAuth();
@@ -22,6 +23,7 @@ const AdminCertificatesPage = () => {
         period: '',
         mentor: currentUser?.name || '',
     });
+    const [pdfFile, setPdfFile] = useState<File | null>(null);
 
     const fetchData = async () => {
         setLoading(p => ({ ...p, page: true }));
@@ -38,6 +40,7 @@ const AdminCertificatesPage = () => {
     const handleOpenModal = () => {
         setError('');
         setFormData({ studentId: '', period: '', mentor: currentUser?.name || '' });
+        setPdfFile(null);
         setIsModalOpen(true);
     };
 
@@ -46,6 +49,10 @@ const AdminCertificatesPage = () => {
         setError('');
         if (!formData.studentId || !formData.period || !formData.mentor) {
             setError('Semua field harus diisi.');
+            return;
+        }
+        if (!pdfFile) {
+            setError('File PDF sertifikat wajib diunggah.');
             return;
         }
 
@@ -58,6 +65,8 @@ const AdminCertificatesPage = () => {
         }
 
         try {
+            const pdfBase64 = await fileToBase64(pdfFile);
+
             const response = await fetch('/api/generateCertificate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -66,6 +75,7 @@ const AdminCertificatesPage = () => {
                     major: selectedIntern.jurusan || 'N/A',
                     period: formData.period,
                     mentor: formData.mentor,
+                    pdfBase64: pdfBase64,
                 }),
             });
 
@@ -153,11 +163,21 @@ const AdminCertificatesPage = () => {
                         <label className="block text-sm font-medium">Nama Mentor / Pimpinan</label>
                         <input type="text" value={formData.mentor} onChange={e => setFormData({...formData, mentor: e.target.value})} required className="mt-1 w-full p-2 border rounded-md" />
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium">File Sertifikat (PDF)</label>
+                        <input 
+                            type="file" 
+                            accept="application/pdf" 
+                            onChange={e => setPdfFile(e.target.files ? e.target.files[0] : null)} 
+                            required 
+                            className="mt-1 w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        />
+                    </div>
                     {error && <p className="text-sm text-red-500">{error}</p>}
                     <div className="flex justify-end gap-2 pt-4">
                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-100 rounded-md">Batal</button>
                         <button type="submit" disabled={loading.modal} className="px-4 py-2 bg-primary text-white rounded-md w-40 flex justify-center">
-                            {loading.modal ? <Loader2 className="animate-spin"/> : 'Generate & Simpan'}
+                            {loading.modal ? <Loader2 className="animate-spin"/> : 'Upload & Simpan'}
                         </button>
                     </div>
                 </form>

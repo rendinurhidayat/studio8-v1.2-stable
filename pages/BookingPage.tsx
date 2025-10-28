@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import BookingForm from '../components/client/BookingForm';
 import InstitutionalBookingForm from '../components/client/InstitutionalBookingForm';
 import SponsorshipForm from '../components/client/SponsorshipForm';
 import { Camera, HelpCircle, User, Briefcase, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Modal from '../components/common/Modal';
+import { useCart } from '../contexts/CartContext';
 
 type FormType = 'individual' | 'institutional' | 'sponsorship';
 
@@ -46,8 +47,8 @@ const FAQModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, 
 const BookingTypeSelector: React.FC<{ selected: FormType, onSelect: (type: FormType) => void }> = ({ selected, onSelect }) => {
     const types = [
         { id: 'individual', label: 'Sesi Individu', icon: <User size={20}/> },
-        { id: 'institutional', label: 'Instansi', icon: <Briefcase size={20}/> },
-        { id: 'sponsorship', label: 'Sponsorship', icon: <Award size={20}/> }
+        { id: 'institutional', label: 'Grup / Instansi', icon: <Briefcase size={20}/> },
+        { id: 'sponsorship', label: 'Sponsor / Partner', icon: <Award size={20}/> }
     ] as const;
 
     return (
@@ -68,12 +69,28 @@ const BookingTypeSelector: React.FC<{ selected: FormType, onSelect: (type: FormT
 
 const BookingPage = () => {
   const [isFaqOpen, setIsFaqOpen] = useState(false);
-  const [formType, setFormType] = useState<FormType>('individual');
+  const { cart } = useCart();
+  const [searchParams] = useSearchParams();
+  
+  const getInitialFormType = (): FormType => {
+    const fromCart = searchParams.get('fromCart') === 'true' && cart.length > 0;
+    if (fromCart) {
+      return 'individual';
+    }
+    const typeFromUrl = searchParams.get('type');
+    if (typeFromUrl === 'institutional' || typeFromUrl === 'sponsorship') {
+      return typeFromUrl;
+    }
+    return 'individual';
+  };
+
+  const [formType, setFormType] = useState<FormType>(getInitialFormType());
+  const isFromCart = searchParams.get('fromCart') === 'true' && cart.length > 0;
 
   const formContent = {
       individual: {
           title: "Booking Sesi di Studio 8",
-          description: "Selangkah lagi menuju momen tak terlupakan. Isi data di bawah ya!",
+          description: isFromCart ? "Selesaikan detail pemesanan untuk item di keranjangmu." : "Selangkah lagi menuju momen tak terlupakan. Isi data di bawah ya!",
           component: <BookingForm />
       },
       institutional: {
@@ -113,9 +130,11 @@ const BookingPage = () => {
                 </AnimatePresence>
             </div>
 
-            <div className="mt-8">
-                <BookingTypeSelector selected={formType} onSelect={setFormType} />
-            </div>
+            { !isFromCart &&
+                <div className="mt-8">
+                    <BookingTypeSelector selected={formType} onSelect={setFormType} />
+                </div>
+            }
 
             <AnimatePresence mode="wait">
                  <motion.div

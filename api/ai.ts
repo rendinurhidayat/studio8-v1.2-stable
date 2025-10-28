@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
+import { ActivityLog } from '../../types';
 
 // --- Firebase Admin Initialization (only for actions that need it) ---
 function initializeFirebaseAdmin(): admin.app.App {
@@ -85,6 +86,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return await handleGenerateClassDescription(ai, payload, res);
              case 'recommendPackage':
                 return await handleRecommendPackage(ai, payload, res);
+            case 'generateMouContent':
+                return await handleGenerateMouContent(ai, payload, res);
+            case 'generateInternReportContent':
+                return await handleGenerateInternReportContent(ai, payload, res);
+            case 'generatePackageDescription':
+                return await handleGeneratePackageDescription(ai, payload, res);
+            case 'generateSocialMediaCaption':
+                return await handleGenerateSocialMediaCaption(ai, payload, res);
             default:
                 return res.status(400).json({ message: `Unknown action: ${action}` });
         }
@@ -95,6 +104,152 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // --- Individual Action Handlers ---
+
+async function handleGeneratePackageDescription(ai: GoogleGenAI, payload: any, res: VercelResponse) {
+    const { packageName } = payload;
+    if (!packageName) {
+        return res.status(400).json({ message: 'packageName is required.' });
+    }
+
+    const prompt = `Anda adalah seorang copywriter marketing untuk "Studio 8", sebuah studio foto modern. Buat deskripsi yang menarik, singkat (2-3 kalimat), dan persuasif untuk paket foto bernama "${packageName}". Deskripsi harus menonjolkan manfaat utama dan target audiensnya (misalnya, untuk wisuda, keluarga, atau pasangan). Gunakan bahasa yang menjual dan ajakan untuk bertindak (call-to-action) yang halus. Berikan hanya teks deskripsinya saja, tanpa judul atau embel-embel lain.`;
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send(response.text);
+}
+
+async function handleGenerateSocialMediaCaption(ai: GoogleGenAI, payload: any, res: VercelResponse) {
+    const { asset } = payload;
+    if (!asset) {
+        return res.status(400).json({ message: 'asset object is required.' });
+    }
+
+    const prompt = `
+        Anda adalah seorang social media manager yang kreatif untuk "Studio 8", sebuah studio foto modern.
+        Tugas Anda adalah membuat 3 pilihan caption Instagram yang menarik berdasarkan detail aset berikut.
+
+        Detail Aset:
+        - Tipe File: ${asset.fileType}
+        - Kategori: ${asset.category}
+        - Tags: ${asset.tags.join(', ')}
+        - Nama File (mungkin berisi petunjuk): ${asset.fileName}
+
+        Buat 3 variasi caption:
+        1.  **Caption 1 (Informatif & Profesional):** Jelaskan layanan atau momen yang mungkin terkait dengan aset ini.
+        2.  **Caption 2 (Santai & Mengajak Interaksi):** Gunakan bahasa yang lebih kasual, ajukan pertanyaan kepada audiens.
+        3.  **Caption 3 (Singkat & Penuh Emoji):** Caption pendek yang eye-catching dengan banyak emoji relevan.
+
+        Sertakan juga beberapa hashtag yang relevan di akhir setiap caption, seperti #studiofoto #selfphotostudio #fotobanjar #studio8banjar.
+        
+        Format output HARUS berupa JSON dengan skema berikut:
+    `;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            captions: {
+                type: Type.ARRAY,
+                description: "Array berisi 3 string caption yang berbeda.",
+                items: { type: Type.STRING }
+            }
+        },
+        required: ["captions"]
+    };
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: schema,
+        }
+    });
+
+    const result = JSON.parse(response.text);
+    return res.status(200).json(result);
+}
+
+
+async function handleGenerateMouContent(ai: GoogleGenAI, payload: any, res: VercelResponse) {
+    const { sponsorshipData } = payload;
+    if (!sponsorshipData) {
+        return res.status(400).json({ message: 'sponsorshipData is required.' });
+    }
+
+    const prompt = `
+        Anda adalah asisten legal yang ahli dalam membuat draf dokumen kerjasama.
+        Buat draf Memorandum of Understanding (MoU) untuk kerjasama sponsorship antara "Studio 8" dan pihak kedua.
+
+        Gunakan format Markdown. Draf harus mencakup bagian-bagian berikut:
+        1. Judul: "MEMORANDUM OF UNDERSTANDING (MoU) KERJASAMA SPONSORSHIP"
+        2. Para Pihak:
+           - PIHAK PERTAMA: Studio 8.
+           - PIHAK KEDUA: ${sponsorshipData.institutionName}.
+        3. Latar Belakang: Jelaskan secara singkat tujuan kerjasama ini terkait acara "${sponsorshipData.eventName}".
+        4. Objek Kerjasama: Jelaskan bentuk kerjasama yang diajukan, yaitu "${sponsorshipData.partnershipType}".
+        5. Hak dan Kewajiban:
+           - Jabarkan kewajiban PIHAK PERTAMA (Studio 8) berdasarkan benefit yang ditawarkan.
+           - Jabarkan kewajiban PIHAK KEDUA (${sponsorshipData.institutionName}).
+        6. Benefit yang Ditawarkan PIHAK KEDUA untuk Studio 8:
+           - "${sponsorshipData.benefits}"
+        7. Jangka Waktu: Sebutkan bahwa jangka waktu kerjasama akan dibahas lebih lanjut.
+        8. Penutup: Kalimat penutup standar untuk MoU.
+        9. Tanda Tangan: Sediakan placeholder untuk tanda tangan kedua belah pihak, termasuk nama PIC dari PIHAK KEDUA (${sponsorshipData.picName}).
+
+        Buatlah draf ini dengan bahasa yang formal dan profesional.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send(response.text);
+}
+
+async function handleGenerateInternReportContent(ai: GoogleGenAI, payload: any, res: VercelResponse) {
+    const { internName, period, attendanceSummary, tasksSummary, reportsSummary } = payload;
+    if (!internName || !period || !attendanceSummary || !tasksSummary || !reportsSummary) {
+        return res.status(400).json({ message: 'Missing required data for report generation.' });
+    }
+
+    const prompt = `
+        Anda adalah seorang mentor di Studio 8. Buat draf Laporan Perkembangan Peserta Praktik Kerja Lapangan (PKL) berdasarkan data berikut.
+        Gunakan format Markdown dengan bahasa yang formal dan terstruktur.
+
+        **Data Peserta:**
+        - Nama Lengkap: ${internName}
+        - Periode PKL: ${period}
+
+        **Rangkuman Kinerja:**
+        - Kehadiran: ${attendanceSummary}
+        - Tugas yang diselesaikan: ${tasksSummary}
+        - Rangkuman Laporan Harian: ${reportsSummary}
+
+        **Struktur Laporan:**
+        1.  **PENDAHULUAN:** Paragraf singkat yang menyatakan tujuan laporan ini.
+        2.  **EVALUASI KINERJA:**
+            -   **A. Kehadiran (Disiplin):** Berikan ulasan singkat berdasarkan data kehadiran.
+            -   **B. Pelaksanaan Tugas (Kompetensi):** Berikan ulasan berdasarkan rangkuman tugas.
+            -   **C. Laporan Harian (Inisiatif & Komunikasi):** Berikan ulasan berdasarkan rangkuman laporan harian.
+        3.  **CATATAN DAN REKOMENDASI:** Berikan satu paragraf berisi catatan umum dan rekomendasi untuk peserta di masa mendatang.
+        4.  **PENUTUP:** Paragraf penutup formal.
+    `;
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+    
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send(response.text);
+}
+
 
 async function handleRecommendPackage(ai: GoogleGenAI, payload: any, res: VercelResponse) {
     const { userQuery, packages } = payload;
@@ -215,7 +370,7 @@ async function handleGenerateForecast(ai: GoogleGenAI, payload: any, res: Vercel
 }
 
 async function handleChat(ai: GoogleGenAI, payload: any, res: VercelResponse) {
-    const { history } = payload;
+    const { history, pageContext } = payload;
     if (!history) {
         return res.status(400).json({ message: 'History array is required.' });
     }
@@ -223,32 +378,36 @@ async function handleChat(ai: GoogleGenAI, payload: any, res: VercelResponse) {
     const whatsappNumber = "+6285724025425";
     const instagramUsername = "studiolapan_";
 
-    const systemInstruction = `
-            Anda adalah Otto, asisten AI dari Studio 8. Persona Anda ramah, ceria, dan sangat efisien.
+    let systemInstruction = `
+            Anda adalah Otto, asisten AI ceria dari Studio 8. Persona Anda ramah, proaktif, dan sangat membantu. Gunakan Bahasa Indonesia yang santai, modern, dan penuh emoji. ✨
+            Tujuan utama Anda adalah menjawab pertanyaan umum dan membantu pengguna merasa nyaman untuk melakukan booking.
 
-            --- INFORMASI PENTING TENTANG STUDIO 8 (Gunakan ini sebagai prioritas utama) ---
-
-            **Info Kontak:**
+            --- BASIS PENGETAHUAN ANDA (SUMBER KEBENARAN) ---
             - WhatsApp Admin: ${whatsappNumber}
             - Instagram: @${instagramUsername}
-
-            **Informasi Umum (FAQ):**
-            - Cara Booking: Pelanggan bisa klik tombol "Booking Sekarang" di halaman utama.
-            - Uang Muka (DP): Untuk beberapa paket, DP-nya Rp 35.000 untuk kunci jadwal. Sisanya dibayar di studio.
+            - Cara Booking: Pelanggan bisa klik tombol "Booking Sekarang" atau "Lihat Paket" di website.
+            - Uang Muka (DP): Untuk beberapa paket, ada DP Rp 35.000 untuk kunci jadwal. Sisanya dibayar di studio.
             - Metode Pembayaran: QRIS, Transfer Bank (BNI & BRI), Dana, dan Shopeepay.
             - Pindah Jadwal (Reschedule): Bisa, maksimal H-7 sebelum jadwal sesi melalui halaman 'Cek Status'.
             - Pembatalan: DP kembali 100% jika dibatalkan H-1 (lebih dari 24 jam). Kurang dari 24 jam, DP hangus.
             - Hasil Foto: Pelanggan dapat semua file digital (soft file). Beberapa paket dapat bonus editan.
             - Lokasi: Depan SMK 4 Banjar, Sukamukti, Pataruman, Kota Banjar.
 
-            --- ATURAN WAJIB ---
-
-            1.  **JAWABAN SUPER SINGKAT:** Ini aturan paling penting. Jawaban Anda HARUS singkat, padat, dan jelas. **MAKSIMAL 3 kalimat.** Gunakan poin jika perlu untuk menjaga keringkasan. Jangan pernah bertele-tele.
-            2.  **GUNAKAN INFO DI ATAS:** Selalu gunakan informasi dari bagian "INFORMASI PENTING" untuk menjawab.
-            3.  **JIKA TIDAK TAHU:** Jika info tidak ada atau pertanyaan sangat spesifik (detail harga, promo, jadwal real-time), JANGAN mengarang. Langsung alihkan ke admin via WhatsApp (${whatsappNumber}). Contoh: "Untuk info harga detail, langsung chat admin kami di WhatsApp ya! 😊"
-            4.  **GUNAKAN EMOJI:** Selalu pakai emoji agar terdengar ramah dan modern. ✨📸
-            5.  **SAPALAH DENGAN SANTAI:** Buka percakapan dengan santai.
+            --- ATURAN PERCAKAPAN WAJIB ---
+            1.  **SINGKAT & JELAS:** Jawaban Anda HARUS singkat (maksimal 3-4 kalimat). Gunakan poin jika perlu.
+            2.  **JANGAN MENGARANG:** Jika pertanyaan di luar "BASIS PENGETAHUAN ANDA" (misal: promo spesifik, ketersediaan jadwal real-time, harga detail yang tidak ada), JANGAN PERNAH menebak. Langsung alihkan pengguna ke admin dengan ramah. Contoh: "Wah, untuk info promo paling update, paling pas langsung tanya admin di WhatsApp ya! Biar infonya akurat. 😉" atau "Untuk cek jadwal yang kosong, kamu bisa langsung klik tombol 'Booking Sekarang' di website, lho!"
+            3.  **JADILAH PROAKTIF:** Jika pengguna bertanya tentang sesuatu, coba berikan langkah selanjutnya. Contoh: Jika bertanya lokasi, berikan alamat dan tambahkan "Kami tunggu kedatanganmu ya!". Jika bertanya cara booking, jelaskan singkat dan arahkan untuk klik tombol booking.
+            4.  **SELALU RAMAH:** Gunakan sapaan seperti "kak", "kamu", dan akhiri jawaban dengan positif.
         `;
+        
+    if (pageContext) {
+        systemInstruction += `
+            --- KONTEKS HALAMAN SAAT INI ---
+            ${pageContext}
+
+            **ATURAN TAMBAHAN:** Jika pertanyaan pengguna berkaitan dengan konteks di atas, prioritaskan informasi tersebut dalam jawabanmu untuk memberikan respons yang paling relevan.
+            `;
+    }
         
     const chat = ai.chats.create({
         model: 'gemini-2.5-flash',
@@ -393,14 +552,33 @@ async function handleAnalyzeQuizResult(ai: GoogleGenAI, payload: any, res: Verce
 }
 
 async function handleGenerateMarketingInsight(ai: GoogleGenAI, payload: any, res: VercelResponse) {
-    const { packagePopularity, dailyRevenue } = payload;
+    const { packagePopularity, dailyRevenue, recentActivity } = payload;
     if (!packagePopularity || !dailyRevenue) {
         return res.status(400).json({ message: 'packagePopularity and dailyRevenue are required.' });
     }
-    const dataSummary = `- Popularitas Paket: ${packagePopularity.map((p: any) => `${p.name} (${p.value} booking)`).join(', ')}.\n- Tren Pemasukan Harian (7 hari terakhir): ${dailyRevenue.map((d: any) => `${d.name}: Rp ${d.Pemasukan.toLocaleString('id-ID')}`).join(', ')}.`;
+    const activitySummary = recentActivity.map((log: ActivityLog) => `- ${log.userName} ${log.action.toLowerCase()}`).join('\n');
+    
+    const dataSummary = `
+- Popularitas Paket: ${packagePopularity.map((p: any) => `${p.name} (${p.value} booking)`).join(', ')}.
+- Tren Pemasukan Harian (7 hari terakhir): ${dailyRevenue.map((d: any) => `${d.name}: Rp ${d.Pemasukan.toLocaleString('id-ID')}`).join(', ')}.
+- Aktivitas Tim Terbaru:
+${activitySummary}
+    `;
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Anda adalah seorang konsultan marketing ahli untuk "Studio 8", sebuah studio foto modern. Berdasarkan ringkasan data performa berikut, berikan 2-3 insight atau saran marketing yang singkat, konkret, dan actionable dalam Bahasa Indonesia. Fokus pada cara meningkatkan booking atau mempromosikan paket yang populer. Gunakan format poin (bullet points).\n\nData Performa:\n${dataSummary}\n\nContoh output:\n- Paket "Wisuda Berdua" sedang sangat diminati! Buat konten khusus di Instagram Stories untuk menyorot paket ini.\n- Pendapatan cenderung menurun di akhir pekan. Pertimbangkan untuk membuat promo khusus "Weekend Ceria" dengan diskon kecil untuk menarik lebih banyak klien.`,
+        contents: `
+            Anda adalah seorang konsultan marketing ahli untuk "Studio 8", sebuah studio foto modern.
+            Berdasarkan ringkasan data performa dan aktivitas tim berikut, berikan 2-3 insight atau saran marketing yang singkat, konkret, dan actionable dalam Bahasa Indonesia.
+            Fokus pada cara meningkatkan booking atau mempromosikan paket yang populer. Hubungkan saran Anda dengan aktivitas tim jika memungkinkan. Gunakan format poin (bullet points).
+
+            Data Performa & Aktivitas:
+            ${dataSummary}
+
+            Contoh output:
+            - Tim baru saja mengonfirmasi banyak booking. Ini saat yang tepat untuk membuat konten "behind the scenes" di Instagram untuk menunjukkan kesibukan studio!
+            - Paket "Wisuda Berdua" sangat populer! Buat promo kilat "Ajak Teman Wisuda" untuk meningkatkan momentum.
+            - Pendapatan cenderung menurun. Mungkin tim bisa fokus menghubungi klien lama untuk menawarkan sesi foto selanjutnya dengan diskon khusus.
+        `,
     });
     const insightText = response.text;
     return res.status(200).json({ insight: insightText });

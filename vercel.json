@@ -22,9 +22,6 @@
         "api/publicCreateSponsorship.ts": {
             "maxDuration": 30
         },
-        "api/generateMou.ts": {
-            "maxDuration": 60
-        },
         "api/uploadImage.ts": {
             "maxDuration": 30
         },

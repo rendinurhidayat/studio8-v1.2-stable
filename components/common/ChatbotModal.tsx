@@ -23,18 +23,16 @@ const faqQuestions = [
     "Di mana lokasi studionya?"
 ];
 
-const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void; pageContext?: string; }> = ({ isOpen, onClose, pageContext }) => {
     const [messages, setMessages] = useState<UIMessage[]>([]);
     const [history, setHistory] = useState<GeminiMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isInitializing, setIsInitializing] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isOpen) {
-            setIsInitializing(false);
             if(messages.length === 0) {
                  setMessages([
                     { id: crypto.randomUUID(), sender: 'bot', text: "Halo! 👋 Saya Otto, asisten virtual Studio 8. Ada yang bisa saya bantu terkait info umum, jadwal, atau cara booking?" }
@@ -66,6 +64,7 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
                 body: JSON.stringify({
                     action: 'chat',
                     history: [...history, userHistoryMessage],
+                    pageContext: pageContext, // Pass context to API
                 }),
             });
 
@@ -127,18 +126,10 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
         await sendMessage(question);
     };
 
-    const renderChatContent = () => {
-        if (isInitializing) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full text-center text-slate-500">
-                    <Loader2 className="animate-spin mb-2" size={24} />
-                    <p>Mempersiapkan asisten AI...</p>
-                </div>
-            );
-        }
-        return (
-            <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 rounded-lg">
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Studio 8 Support AI">
+            <div className="flex flex-col h-[60vh]">
+                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 rounded-lg">
                     <AnimatePresence>
                         {messages.map((msg) => (
                             <motion.div
@@ -151,7 +142,7 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
                                 className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                                 {msg.sender === 'bot' && <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0"><Bot size={20} className="text-slate-600"/></div>}
-                                <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-sm ${msg.sender === 'user' ? 'bg-primary text-primary-content rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border'}`}>
+                                <div className={`max-w-xs md:max-w-md p-3 rounded-2xl shadow-sm ${msg.sender === 'user' ? 'bg-primary text-primary-content rounded-br-lg' : 'bg-white text-gray-800 rounded-bl-lg border'}`}>
                                     <div className="text-sm prose prose-sm max-w-none">{msg.text}</div>
                                 </div>
                                 {msg.sender === 'user' && <div className="w-8 h-8 rounded-full bg-slate-600 text-white flex items-center justify-center flex-shrink-0"><User size={20} /></div>}
@@ -161,9 +152,7 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
                     <div ref={chatEndRef} />
                 </div>
                 
-                <div
-                    className="pt-3 mt-3 border-t border-slate-200"
-                >
+                <div className="pt-3 mt-3 border-t border-slate-200">
                     <div className="flex items-center gap-2 text-sm text-slate-600 mb-2 px-1">
                         <Zap size={16} />
                         <h4 className="font-semibold">Saran Pertanyaan</h4>
@@ -188,21 +177,13 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
                         onChange={(e) => setInput(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSend()}
                         placeholder="Tanya apa saja..."
-                        disabled={isLoading || isInitializing}
+                        disabled={isLoading}
                         className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                     />
-                    <button onClick={handleSend} disabled={isLoading || !input.trim() || isInitializing} className="p-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60">
+                    <button onClick={handleSend} disabled={isLoading || !input.trim()} className="p-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60">
                         <Send size={20} />
                     </button>
                 </div>
-            </>
-        );
-    }
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Studio 8 Support AI">
-            <div className="flex flex-col h-[60vh]">
-                {renderChatContent()}
             </div>
         </Modal>
     );

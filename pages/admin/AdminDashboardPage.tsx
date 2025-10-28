@@ -113,6 +113,8 @@ const AdminDashboardPage: React.FC = () => {
         return { todaysRevenue, newBookingsToday, completedToday, monthlyProfit: monthlyIncome - monthlyExpense };
     }, [transactions, bookings, expenses]);
     
+    const recentActivity = useMemo(() => logs.slice(0, 5), [logs]);
+
     const chartData = useMemo(() => {
         const last30Days = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
         const dailyData = last30Days.map(date => {
@@ -140,6 +142,7 @@ const AdminDashboardPage: React.FC = () => {
             const payload = {
                 packagePopularity: chartData.packagePopularity,
                 dailyRevenue: chartData.dailyData.slice(-7),
+                recentActivity: recentActivity,
             };
             const response = await fetch('/api/ai', {
                 method: 'POST',
@@ -169,7 +172,6 @@ const AdminDashboardPage: React.FC = () => {
         .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
         .slice(0, 5), [bookings]);
     
-    const recentActivity = useMemo(() => logs.slice(0, 5), [logs]);
     
     if (loading) return (
         <div className="flex items-center justify-center h-full">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HighlightWork } from '../../types';
-import { X, User, Briefcase, Award, Calendar } from 'lucide-react';
+import { X, User, Briefcase, Award, Calendar, Instagram } from 'lucide-react';
 import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 
@@ -81,6 +81,19 @@ const MediaModal: React.FC<MediaModalProps> = ({ work, isOpen, onClose }) => {
             <div className="w-full lg:w-1/3 p-6 space-y-4 overflow-y-auto">
               <h2 className="text-2xl font-bold text-primary">{work.title}</h2>
               <p className="text-muted leading-relaxed text-sm">{work.description}</p>
+              
+              {work.instagramUrl && (
+                <a 
+                    href={work.instagramUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-2 w-full justify-center px-4 py-3 bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white font-bold rounded-lg hover:opacity-90 transition-opacity"
+                >
+                    <Instagram size={20} />
+                    Lihat di Instagram
+                </a>
+              )}
+
               <div className="pt-4 border-t border-base-200 space-y-4">
                   <InfoItem icon={<User size={18} />} label="Kreator" value={work.author} />
                   <InfoItem icon={<Briefcase size={18} />} label="Jurusan" value={work.major} />

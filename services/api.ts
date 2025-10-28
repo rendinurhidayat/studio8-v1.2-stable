@@ -1,3 +1,4 @@
+
 import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
 import { notificationService } from './notificationService';
 import { auth, db, storage, firebaseConfig } from '../firebase';
@@ -669,26 +670,61 @@ export const checkAndSendReportReminders = async () => {
     }
 };
 
-export const saveInternReport = async (internId: string, pdfBlob: Blob, mentorName: string): Promise<InternReport> => {
-    const fileName = `Laporan_Progres_${internId}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.pdf`;
-    const storageRef = storage.ref(`intern_reports/${internId}/${fileName}`);
-    
-    // Upload the file
-    const uploadTask = await storageRef.put(pdfBlob);
-    const downloadUrl = await uploadTask.ref.getDownloadURL();
-
-    // Save metadata to Firestore
-    const reportData = {
-        fileName,
-        downloadUrl,
-        generatedAt: new Date(),
-        generatedBy: mentorName,
-    };
-
-    const docRef = await db.collection('users').doc(internId).collection('reports').add(reportData);
-
-    return { id: docRef.id, ...reportData, generatedAt: reportData.generatedAt };
+export const generateInternReportContent = async (reportPayload: any): Promise<string> => {
+    const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generateInternReportContent', ...reportPayload }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Gagal membuat konten laporan.');
+    }
+    const data = await response.text();
+    return data;
 };
+
+export const generateMouContent = async (sponsorshipData: Sponsorship): Promise<string> => {
+    const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generateMouContent', sponsorshipData }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Gagal membuat konten MoU.');
+    }
+    const data = await response.text();
+    return data;
+};
+
+export const generatePackageDescription = async (packageName: string): Promise<string> => {
+    const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generatePackageDescription', packageName }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message ||'Gagal membuat deskripsi paket.');
+    }
+    return await response.text();
+};
+
+export const generateSocialMediaCaption = async (asset: Asset): Promise<string[]> => {
+    const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generateSocialMediaCaption', asset }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Gagal membuat caption.');
+    }
+    const data = await response.json();
+    return data.captions;
+};
+
 
 export const getInternReports = async (internId: string): Promise<InternReport[]> => {
   const snapshot = await db.collection('users').doc(internId).collection('reports').orderBy('generatedAt', 'desc').get();

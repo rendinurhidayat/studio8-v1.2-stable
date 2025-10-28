@@ -15,6 +15,8 @@ declare global {
         appConfig?: {
             googleMapsReviewUrl: string;
         };
+        jspdf: any;
+        html2canvas: any;
     }
 }
 
@@ -124,6 +126,13 @@ export interface AddOn {
     id: string;
     name: string;
     subAddOns: SubAddOn[];
+}
+
+export interface CartItem {
+  id: string; // Unique ID for the cart item, e.g., `${subPackage.id}-${timestamp}`
+  pkg: Package;
+  subPkg: SubPackage;
+  addOns: SubAddOn[];
 }
 
 export interface Booking {
@@ -341,6 +350,11 @@ export interface LoyaltySettings {
     loyaltyTiers: LoyaltyTier[];
 }
 
+export interface Partner {
+    id: string;
+    name: string;
+    logoUrl: string;
+}
 
 export interface SystemSettings {
     operationalHours: OperationalHours;
@@ -351,6 +365,7 @@ export interface SystemSettings {
         instagram: string;
     };
     loyaltySettings: LoyaltySettings;
+    partners?: Partner[];
 }
 
 export interface ActivityLog {
@@ -451,6 +466,7 @@ export interface HighlightWork {
   type: 'Video' | 'Image' | 'Design';
   highlightDate: Date;
   category: 'Client' | 'PKL' | 'Event' | 'BTS';
+  instagramUrl?: string;
 }
 
 export interface Certificate {

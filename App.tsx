@@ -2,12 +2,14 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { CartProvider } from './contexts/CartContext';
 import AdminLayout from './components/layout/AdminLayout';
 import { UserRole, SystemSettings, FeatureToggles } from './types';
 import { getSystemSettings } from './services/api';
 import { Loader2 } from 'lucide-react';
 import OfflineBanner from './components/common/OfflineBanner';
 import { AnimatePresence } from 'framer-motion';
+import CartModal from './components/common/CartModal';
 
 // Fallback component for lazy loading
 const SuspenseFallback = () => (
@@ -265,6 +267,7 @@ const AppRoutes = () => {
 
 function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   useEffect(() => {
     // Register Service Worker for PWA
@@ -281,13 +284,16 @@ function App() {
     // Online/Offline detection
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
+    const handleOpenCart = () => setIsCartOpen(true);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('open-cart', handleOpenCart);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('open-cart', handleOpenCart);
     };
   }, []);
 
@@ -296,10 +302,13 @@ function App() {
     <HashRouter>
       <AuthProvider>
         <NotificationProvider>
-          <AppRoutes />
-          <AnimatePresence>
-            {!isOnline && <OfflineBanner />}
-          </AnimatePresence>
+          <CartProvider>
+            <AppRoutes />
+            <AnimatePresence>
+              {!isOnline && <OfflineBanner />}
+            </AnimatePresence>
+            <CartModal isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+          </CartProvider>
         </NotificationProvider>
       </AuthProvider>
     </HashRouter>

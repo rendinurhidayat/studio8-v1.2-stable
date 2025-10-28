@@ -12,7 +12,9 @@ import {
     UserCheck,
     ArrowRight,
     Camera,
-    CheckCircle
+    CheckCircle,
+    Briefcase,
+    Award
 } from 'lucide-react';
 import ChatbotModal from '../components/common/ChatbotModal';
 import { getSystemSettings, getPublicFeedbacks } from '../services/api';
@@ -64,8 +66,9 @@ const Header = () => {
       { id: 'about', label: 'Tentang Kami', type: 'scroll' as const },
       { id: 'showcase', label: 'Showcase', type: 'link' as const, href: '/highlight' },
       { id: 'how-it-works', label: 'Cara Kerja', type: 'scroll' as const },
-      { id: 'location', label: 'Lokasi', type: 'scroll' as const },
-      { id: 'testimonials', label: 'Testimoni', type: 'scroll' as const }
+      { id: 'collaboration', label: 'Kolaborasi', type: 'scroll' as const },
+      { id: 'testimonials', label: 'Testimoni', type: 'scroll' as const },
+      { id: 'location', label: 'Lokasi', type: 'scroll' as const }
   ];
 
   return (
@@ -107,23 +110,37 @@ const Header = () => {
 }
 
 const HeroSection = () => {
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-    // Array of 5 placeholder images for the carousel
-    const images = [
+    const desktopImages = [
         '/images/hero-1.jpg',
         '/images/hero-2.jpg',
         '/images/hero-3.jpg',
         '/images/hero-4.jpg',
         '/images/hero-5.jpg',
     ];
+    const mobileImages = [
+        '/images/mobile-hero-1.jpg',
+        '/images/mobile-hero-2.jpg',
+        '/images/mobile-hero-3.jpg',
+    ];
+
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
-        // Automatically cycle through images every 4 seconds
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const images = isMobile ? mobileImages : desktopImages;
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+    useEffect(() => {
         const timer = setInterval(() => {
             setCurrentImageIndex(prevIndex => (prevIndex + 1) % images.length);
         }, 4000);
-        return () => clearInterval(timer); // Cleanup on component unmount
+        return () => clearInterval(timer);
     }, [images.length]);
 
     const container = {
@@ -143,68 +160,78 @@ const HeroSection = () => {
     };
 
     return (
-        <section className="bg-[#0a0a0a] text-white flex flex-col md:flex-row items-center justify-between px-6 md:px-12 py-20 min-h-screen">
-          {/* Left Section */}
-          <motion.div 
-            className="flex-1 space-y-6 text-center md:text-left mb-10 md:mb-0 md:pr-12"
-            variants={container}
-            initial="hidden"
-            animate="visible"
-          >
-            <motion.p variants={item} className="uppercase tracking-[0.2em] text-gray-400 text-sm">STUDIO 8</motion.p>
-            <motion.h1 variants={item} className="text-4xl md:text-5xl font-bold leading-tight tracking-tight">
-              Express Your Time with Happiness.
-            </motion.h1>
-            <motion.p variants={item} className="text-base md:text-lg text-gray-400 leading-relaxed max-w-lg mx-auto md:mx-0">
-              Self Photo, Couple Session, atau Pemotretan Profesional — semua bisa diatur lewat sistem booking yang nyaman.
-            </motion.p>
-            <motion.div 
-                variants={item} 
-                className="flex flex-col items-center md:items-start pt-4 gap-6"
-            >
-                {/* Primary CTA Buttons */}
-                <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
-                    <Link to="/pesan-sesi" className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:scale-105 transition-transform duration-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] w-full sm:w-auto text-center">
-                        Booking Sekarang
-                    </Link>
-                    <Link to="/paket" className="border border-white/50 text-white/80 px-8 py-3 rounded-full font-semibold hover:bg-white/10 hover:border-white hover:text-white transition-colors duration-300 w-full sm:w-auto text-center">
-                        Lihat Paket & Harga
-                    </Link>
-                </div>
+        <section className="relative bg-[#0a0a0a] text-white overflow-hidden">
+            <div className="container mx-auto px-6 md:px-12 min-h-screen flex items-center justify-center">
+                <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-20">
+                    {/* Left Section (Text) */}
+                    <motion.div 
+                        className="space-y-6 text-center lg:text-left"
+                        variants={container}
+                        initial="hidden"
+                        animate="visible"
+                    >
+                        <motion.p variants={item} className="uppercase tracking-[0.2em] text-gray-400 text-sm">STUDIO 8</motion.p>
+                        <motion.h1 variants={item} className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
+                        Express Your Time with Happiness.
+                        </motion.h1>
+                        <motion.p variants={item} className="text-base md:text-lg text-gray-400 leading-relaxed max-w-lg mx-auto lg:mx-0">
+                        Self Photo, Couple Session, atau Pemotretan Profesional — semua bisa diatur lewat sistem booking yang nyaman.
+                        </motion.p>
+                        <motion.div 
+                            variants={item} 
+                            className="flex flex-col items-center lg:items-start pt-4 gap-6"
+                        >
+                            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 w-full sm:w-auto">
+                                <Link to="/pesan-sesi" className="bg-white text-black px-8 py-3 rounded-full font-semibold hover:scale-105 transition-transform duration-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] w-full sm:w-auto text-center">
+                                    Booking Sekarang
+                                </Link>
+                                <Link to="/paket" className="border border-white/50 text-white/80 px-8 py-3 rounded-full font-semibold hover:bg-white/10 hover:border-white hover:text-white transition-colors duration-300 w-full sm:w-auto text-center">
+                                    Lihat Paket & Harga
+                                </Link>
+                            </div>
 
-                {/* Secondary CTA */}
-                <div className="text-center md:text-left">
-                    <p className="text-sm text-gray-400 mb-2">Udah booking? Cek status booking mu.</p>
-                    <Link to="/cek-status" className="inline-block border border-accent text-accent px-6 py-2 rounded-full font-semibold hover:bg-accent/10 transition-colors duration-300 text-sm">
-                        Booking Status
-                    </Link>
-                </div>
-            </motion.div>
-          </motion.div>
+                            <div className="text-center lg:text-left">
+                                <p className="text-sm text-gray-400 mb-2">Udah booking? Cek status booking mu.</p>
+                                <Link to="/cek-status" className="inline-block border border-accent text-accent px-6 py-2 rounded-full font-semibold hover:bg-accent/10 transition-colors duration-300 text-sm">
+                                    Booking Status
+                                </Link>
+                            </div>
+                        </motion.div>
+                    </motion.div>
 
-          {/* Right Section */}
-          <motion.div 
-            className="flex-1 relative w-full h-[300px] md:h-[500px] rounded-2xl overflow-hidden shadow-lg"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-          >
-            <AnimatePresence>
-                <motion.img
-                    key={currentImageIndex}
-                    src={images[currentImageIndex]}
-                    alt="Studio 8 Showcase"
-                    loading="lazy"
-                    decoding="async"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 1.5, ease: 'easeInOut' }}
-                    className="absolute inset-0 w-full h-full object-cover"
-                />
-            </AnimatePresence>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-          </motion.div>
+                    {/* Right Section (Image) */}
+                    <motion.div 
+                        className="relative w-full aspect-[3/4] max-w-md mx-auto lg:max-w-none lg:mx-0 lg:aspect-auto lg:h-[600px]"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                    >
+                         {/* Decorative shapes */}
+                        <div className="absolute -top-8 -left-8 w-32 h-32 bg-accent/10 rounded-full blur-2xl animate-pulse"></div>
+                        <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-white/5 rounded-full blur-3xl animate-pulse delay-500"></div>
+
+                        <div className="absolute inset-8 sm:inset-12 z-10">
+                            <AnimatePresence>
+                                <motion.img
+                                    key={currentImageIndex}
+                                    src={images[currentImageIndex]}
+                                    alt="Studio 8 Showcase"
+                                    loading="lazy"
+                                    decoding="async"
+                                    initial={{ opacity: 0, scale: 1.1 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 1.1 }}
+                                    transition={{ duration: 1.5, ease: 'easeInOut' }}
+                                    className="absolute inset-0 w-full h-full object-cover rounded-3xl shadow-2xl"
+                                />
+                            </AnimatePresence>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-3xl" />
+                             {/* Border effect */}
+                            <div className="absolute inset-0 rounded-3xl border-2 border-white/10"></div>
+                        </div>
+                    </motion.div>
+                </div>
+            </div>
         </section>
     );
 };
@@ -220,20 +247,20 @@ const AboutSection = () => (
       variants={sectionVariants}
     >
       <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-        <div className="relative h-96 md:h-[500px]">
+        <div className="relative aspect-[2/3] md:aspect-[3/2]">
             <motion.img 
                 whileHover={{ scale: 1.05, rotate: -3 }}
                 transition={{ type: 'spring', stiffness: 300 }}
                 src="/images/about-1.jpg" 
                 alt="Interior Studio 8" 
-                className="absolute top-0 left-0 w-3/4 h-3/4 rounded-2xl shadow-xl border-8 border-white object-cover" 
+                className="absolute top-0 left-0 w-3/4 portrait:aspect-[4/5] landscape:aspect-[2/3] rounded-2xl shadow-xl border-8 border-white object-cover" 
             />
             <motion.img 
                 whileHover={{ scale: 1.05, rotate: 3 }}
                 transition={{ type: 'spring', stiffness: 300 }}
                 src="/images/about-2.jpg" 
                 alt="Peralatan Studio 8" 
-                className="absolute bottom-0 right-0 w-2/3 h-2/3 rounded-2xl shadow-2xl border-8 border-white object-cover" 
+                className="absolute bottom-0 right-0 w-2/3 portrait:aspect-[4/5] landscape:aspect-[2/3] rounded-2xl shadow-2xl border-8 border-white object-cover" 
             />
         </div>
 
@@ -308,6 +335,67 @@ const HowItWorksSection = () => (
   </motion.section>
 );
 
+const CollaborationSection: React.FC<{ settings: SystemSettings | null }> = ({ settings }) => (
+    <motion.section 
+      id="collaboration" 
+      className="w-full py-16 md:py-24 bg-base-100"
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.3 }}
+      variants={sectionVariants}
+    >
+      <div className="container mx-auto px-4 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold text-primary">Untuk Grup, Instansi & Event</h2>
+        <p className="text-muted mt-2 mb-12 max-w-2xl mx-auto">Kami terbuka untuk kolaborasi, booking grup, dan sponsorship untuk berbagai acara.</p>
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <motion.div
+              variants={cardVariants}
+              custom={0}
+              whileHover={{ y: -10 }}
+              className="bg-white p-8 rounded-xl shadow-lg border border-base-200 text-left flex flex-col"
+          >
+              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mb-4"><Briefcase size={32} className="text-accent"/></div>
+              <h3 className="text-2xl font-bold text-primary">Booking Instansi</h3>
+              <p className="text-muted mt-2 flex-grow">Sempurna untuk foto kelas, acara perusahaan, atau kegiatan komunitas. Dapatkan penawaran khusus untuk booking grup.</p>
+              <Link to="/pesan-sesi?type=institutional" className="mt-6 inline-flex items-center gap-2 font-semibold text-accent hover:underline">
+                  Ajukan Booking Grup <ArrowRight size={18} />
+              </Link>
+          </motion.div>
+          <motion.div
+              variants={cardVariants}
+              custom={1}
+              whileHover={{ y: -10 }}
+              className="bg-white p-8 rounded-xl shadow-lg border border-base-200 text-left flex flex-col"
+          >
+              <div className="w-16 h-16 bg-gold/10 rounded-full flex items-center justify-center mb-4"><Award size={32} className="text-gold"/></div>
+              <h3 className="text-2xl font-bold text-primary">Sponsorship & Kerjasama</h3>
+              <p className="text-muted mt-2 flex-grow">Punya event keren? Mari berkolaborasi! Kami menawarkan berbagai bentuk kerjasama media partner dan sponsorship.</p>
+              <Link to="/pesan-sesi?type=sponsorship" className="mt-6 inline-flex items-center gap-2 font-semibold text-accent hover:underline">
+                  Ajukan Kerjasama <ArrowRight size={18} />
+              </Link>
+          </motion.div>
+        </div>
+        
+        {settings?.partners && settings.partners.length > 0 && (
+            <div className="mt-20">
+                <h3 className="text-lg font-semibold text-muted tracking-wider uppercase">Kolaborasi Bersama Brand & Instansi</h3>
+                <div className="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-8 gap-y-6 items-center">
+                    {settings.partners.map((partner) => (
+                        <div key={partner.id} className="flex justify-center">
+                            <img 
+                                src={partner.logoUrl} 
+                                alt={partner.name}
+                                className="h-12 object-contain filter grayscale hover:grayscale-0 opacity-60 hover:opacity-100 transition-all duration-300"
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+      </div>
+    </motion.section>
+);
+
 
 const TestimonialsSection: React.FC<{ feedbacks: Feedback[] }> = ({ feedbacks }) => {
   if (feedbacks.length === 0) {
@@ -317,7 +405,7 @@ const TestimonialsSection: React.FC<{ feedbacks: Feedback[] }> = ({ feedbacks })
   return (
     <motion.section 
       id="testimonials" 
-      className="w-full py-16 md:py-24 bg-base-100"
+      className="w-full py-16 md:py-24 bg-base-200"
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, amount: 0.2 }}
@@ -433,6 +521,8 @@ const Footer = () => {
               <li><button onClick={() => scrollToSection('location')} className="text-primary-content/70 hover:text-primary-content transition-colors text-sm">Lokasi</button></li>
               <li><button onClick={() => scrollToSection('testimonials')} className="text-primary-content/70 hover:text-primary-content transition-colors text-sm">Testimoni</button></li>
               <li><Link to="/pesan-sesi" className="text-primary-content/70 hover:text-primary-content transition-colors text-sm">Booking Sesi</Link></li>
+              <li><Link to="/pesan-sesi?type=institutional" className="text-primary-content/70 hover:text-primary-content transition-colors text-sm font-semibold">Booking Grup & Instansi</Link></li>
+              <li><Link to="/pesan-sesi?type=sponsorship" className="text-primary-content/70 hover:text-primary-content transition-colors text-sm font-semibold">Sponsorship</Link></li>
             </ul>
           </div>
 
@@ -504,6 +594,7 @@ const LandingPage: React.FC = () => {
         <HeroSection />
         <AboutSection />
         <HowItWorksSection />
+        <CollaborationSection settings={settings} />
         <TestimonialsSection feedbacks={publicFeedbacks} />
         <LocationSection />
         <Footer />

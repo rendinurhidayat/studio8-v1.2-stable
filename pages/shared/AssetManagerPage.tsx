@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { getAssets } from '../../services/api';
 import { Asset } from '../../types';
@@ -5,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Loader2, PlusCircle, Image as ImageIcon } from 'lucide-react';
 import AssetCard from '../../components/assets/AssetCard';
 import UploadModal from '../../components/assets/UploadModal';
+import AssetDetailModal from '../../components/assets/AssetDetailModal';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -15,6 +17,7 @@ const AssetManagerPage = () => {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [loading, setLoading] = useState(true);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
     const fetchData = async () => {
         setLoading(true);
@@ -30,6 +33,14 @@ const AssetManagerPage = () => {
     const handleUploadComplete = () => {
         setIsUploadModalOpen(false);
         fetchData(); // Refresh the list
+    };
+    
+    const handleAssetClick = (asset: Asset) => {
+        setSelectedAsset(asset);
+    };
+
+    const handleCloseDetailModal = () => {
+        setSelectedAsset(null);
     };
 
     return (
@@ -63,7 +74,7 @@ const AssetManagerPage = () => {
                     className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
                 >
                     {assets.map(asset => (
-                        <AssetCard key={asset.id} asset={asset} />
+                        <AssetCard key={asset.id} asset={asset} onClick={() => handleAssetClick(asset)} />
                     ))}
                 </motion.div>
             )}
@@ -72,6 +83,12 @@ const AssetManagerPage = () => {
                 isOpen={isUploadModalOpen} 
                 onClose={() => setIsUploadModalOpen(false)}
                 onUploadComplete={handleUploadComplete}
+            />
+            
+            <AssetDetailModal
+                isOpen={!!selectedAsset}
+                onClose={handleCloseDetailModal}
+                asset={selectedAsset}
             />
         </div>
     );

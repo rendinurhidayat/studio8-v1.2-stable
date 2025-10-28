@@ -57,7 +57,7 @@ const AdminHighlightManagerPage = () => {
     const resetForm = () => {
         setFormData({
             title: '', author: '', mentor: '', major: '', description: '',
-            type: 'Image', category: 'PKL', highlightDate: new Date()
+            type: 'Image', category: 'PKL', highlightDate: new Date(), instagramUrl: ''
         });
         setMediaFile(null); setThumbnailFile(null);
         setMediaPreview(null); setThumbnailPreview(null);
@@ -115,9 +115,17 @@ const AdminHighlightManagerPage = () => {
 
             if (mediaFile) {
                 mediaUrl = await uploadFile(mediaFile, 'highlight_media');
+                // Auto-generate thumbnail URL from video URL
+                if (formData.type === 'Video' && mediaUrl) {
+                    thumbnailUrl = mediaUrl.replace(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i, '.jpg');
+                }
             }
-            if (thumbnailFile) {
+            if (thumbnailFile && formData.type !== 'Video') { // Only upload manual thumbnail if not a video
                 thumbnailUrl = await uploadFile(thumbnailFile, 'highlight_thumbnails');
+            }
+
+            if (!thumbnailUrl && formData.type !== 'Video') {
+                throw new Error("Thumbnail is required for image or design types.");
             }
 
             const payload: Omit<HighlightWork, 'id'> = {
@@ -126,6 +134,7 @@ const AdminHighlightManagerPage = () => {
                 description: formData.description!, mediaUrl, thumbnailUrl,
                 type: formData.type!, highlightDate: new Date(formData.highlightDate!),
                 category: formData.category!,
+                instagramUrl: formData.instagramUrl,
             };
 
             if (isEditing && selectedWork) {
@@ -137,7 +146,7 @@ const AdminHighlightManagerPage = () => {
             fetchData();
         } catch (error) {
             console.error(error);
-            alert("Gagal menyimpan data.");
+            alert("Gagal menyimpan data: " + (error as Error).message);
         } finally {
             setLoading(p => ({ ...p, modal: false }));
         }
@@ -203,20 +212,23 @@ const AdminHighlightManagerPage = () => {
                         <div><label className="font-semibold text-sm">Tipe</label><select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as any})} className="w-full p-2 border rounded mt-1"><option>Image</option><option>Video</option><option>Design</option></select></div>
                         <div><label className="font-semibold text-sm">Kategori</label><select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as any})} className="w-full p-2 border rounded mt-1"><option>Client</option><option>PKL</option><option>Event</option><option>BTS</option></select></div>
                     </div>
+                     <div><label className="font-semibold text-sm">Link Instagram (Opsional)</label><input type="url" value={formData.instagramUrl || ''} onChange={e => setFormData({...formData, instagramUrl: e.target.value})} placeholder="https://www.instagram.com/p/..." className="w-full p-2 border rounded mt-1"/></div>
                      <div><label className="font-semibold text-sm">Deskripsi</label><textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required rows={3} className="w-full p-2 border rounded mt-1"/></div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="font-semibold text-sm block mb-1">File Media (Gambar/Video)</label>
                             <label htmlFor="media-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">Pilih File</label>
                             <input id="media-upload" type="file" onChange={e => handleFileChange(e, 'media')} className="hidden"/>
-                            {mediaPreview && <img src={mediaPreview} className="w-32 h-20 object-cover rounded-md mt-2" />}
+                            {mediaPreview && (formData.type === 'Video' ? <video src={mediaPreview} className="w-32 h-20 object-cover rounded-md mt-2" /> : <img src={mediaPreview} className="w-32 h-20 object-cover rounded-md mt-2" />)}
                         </div>
-                        <div>
-                            <label className="font-semibold text-sm block mb-1">File Thumbnail</label>
-                            <label htmlFor="thumbnail-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">Pilih File</label>
-                            <input id="thumbnail-upload" type="file" onChange={e => handleFileChange(e, 'thumbnail')} className="hidden"/>
-                             {thumbnailPreview && <img src={thumbnailPreview} className="w-32 h-20 object-cover rounded-md mt-2" />}
-                        </div>
+                        {formData.type !== 'Video' && (
+                            <div>
+                                <label className="font-semibold text-sm block mb-1">File Thumbnail</label>
+                                <label htmlFor="thumbnail-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">Pilih File</label>
+                                <input id="thumbnail-upload" type="file" onChange={e => handleFileChange(e, 'thumbnail')} className="hidden"/>
+                                 {thumbnailPreview && <img src={thumbnailPreview} className="w-32 h-20 object-cover rounded-md mt-2" />}
+                            </div>
+                        )}
                      </div>
                     <div className="flex justify-end pt-4"><button type="submit" disabled={loading.modal} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 w-28 flex justify-center">{loading.modal ? <Loader2 className="animate-spin"/> : 'Simpan'}</button></div>
                 </form>

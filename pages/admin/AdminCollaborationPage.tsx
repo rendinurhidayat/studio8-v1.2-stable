@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getSponsorships, getInstitutionalBookings, getPackages, updateSponsorship, deleteSponsorship, updateBooking, logCollaborationActivity, getCollaborationActivity } from '../../services/api';
+import { getSponsorships, getInstitutionalBookings, getPackages, updateSponsorship, deleteSponsorship, updateBooking, logCollaborationActivity, getCollaborationActivity, generateMouContent } from '../../services/api';
 import { Sponsorship, SponsorshipStatus, Booking, Package, BookingStatus, CollaborationActivity } from '../../types';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import InvoiceModal from '../../components/admin/InvoiceModal';
 import Modal from '../../components/common/Modal';
-import { Loader2, FileText, Download, Trash2, MessageCircle, Edit, Award, Briefcase, History, Clock } from 'lucide-react';
+import { Loader2, FileText, Download, Trash2, MessageCircle, Edit, Award, Briefcase, History, Clock, Sparkles, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -47,6 +48,34 @@ const ActivityLogModal: React.FC<{
     </Modal>
 );
 
+const GeneratedContentModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    title: string;
+    content: string;
+}> = ({ isOpen, onClose, title, content }) => {
+    const [isCopied, setIsCopied] = useState(false);
+    const handleCopy = () => {
+        navigator.clipboard.writeText(content);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={title}>
+            <div className="max-h-[60vh] overflow-y-auto pr-2 bg-gray-50 p-4 rounded-lg border">
+                <pre className="whitespace-pre-wrap text-sm font-sans">{content}</pre>
+            </div>
+            <div className="mt-4 flex justify-end">
+                <button onClick={handleCopy} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                    <Copy size={16} /> {isCopied ? 'Tersalin!' : 'Salin Teks'}
+                </button>
+            </div>
+        </Modal>
+    );
+};
+
+
 // --- Main Page Component ---
 
 const AdminCollaborationPage = () => {
@@ -58,6 +87,7 @@ const AdminCollaborationPage = () => {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [packages, setPackages] = useState<Package[]>([]);
     const [activities, setActivities] = useState<CollaborationActivity[]>([]);
+    const [generatedMouContent, setGeneratedMouContent] = useState('');
     
     // Loading states
     const [loading, setLoading] = useState({ page: true, mou: '', activity: false });
@@ -68,11 +98,13 @@ const AdminCollaborationPage = () => {
         manageBooking: { isOpen: boolean, item: Booking | null };
         invoice: { isOpen: boolean, item: Booking | null };
         activityLog: { isOpen: boolean, item: Sponsorship | Booking | null, type: 'sponsorship' | 'booking' };
+        generatedContent: { isOpen: boolean };
     }>({
         confirmDelete: { isOpen: false, item: null, type: 'sponsorship' },
         manageBooking: { isOpen: false, item: null },
         invoice: { isOpen: false, item: null },
         activityLog: { isOpen: false, item: null, type: 'sponsorship' },
+        generatedContent: { isOpen: false },
     });
 
     const fetchData = async () => {
@@ -101,19 +133,14 @@ const AdminCollaborationPage = () => {
     };
 
     const handleGenerateMoU = async (sponsorship: Sponsorship) => {
-        if (!currentUser) return;
         setLoading(p => ({ ...p, mou: sponsorship.id }));
         try {
-            const response = await fetch('/api/generateMou', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sponsorshipData: sponsorship, mentorName: currentUser.name })
-            });
-            if (!response.ok) throw new Error("Gagal membuat MoU");
-            await logCollaborationActivity('sponsorships', sponsorship.id, 'Dokumen Dibuat', 'MoU berhasil digenerate.', currentUser.id);
-            await fetchData();
+            const content = await generateMouContent(sponsorship);
+            setGeneratedMouContent(content);
+            setModal(m => ({...m, generatedContent: { isOpen: true }}));
         } catch (error) {
-            alert("Terjadi kesalahan saat membuat MoU.");
+            console.error("Failed to generate MoU:", error);
+            alert("Gagal membuat konten MoU.");
         } finally {
             setLoading(p => ({ ...p, mou: '' }));
         }
@@ -199,7 +226,11 @@ const AdminCollaborationPage = () => {
                                             {sp.agreementUrl && <a href={sp.agreementUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-semibold text-success/80 hover:underline"><Download size={14}/> MoU</a>}
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            {(sp.status === SponsorshipStatus.Approved || sp.status === SponsorshipStatus.Negotiation) && <button onClick={() => handleGenerateMoU(sp)} disabled={loading.mou === sp.id} className="text-xs font-semibold text-primary bg-primary/10 px-3 py-1.5 rounded-md w-28 flex justify-center hover:bg-primary/20">{loading.mou === sp.id ? <Loader2 className="animate-spin" size={14} /> : 'Generate MoU'}</button>}
+                                            {(sp.status === SponsorshipStatus.Approved || sp.status === SponsorshipStatus.Negotiation) && (
+                                                <button onClick={() => handleGenerateMoU(sp)} disabled={loading.mou === sp.id} className="text-xs font-semibold text-primary bg-primary/10 px-3 py-1.5 rounded-md w-32 flex justify-center hover:bg-primary/20">
+                                                    {loading.mou === sp.id ? <Loader2 className="animate-spin" size={14} /> : <><Sparkles size={14} className="mr-1"/> Generate MoU (AI)</>}
+                                                </button>
+                                            )}
                                             <button onClick={() => handleOpenActivityLog(sp, 'sponsorships')} className="p-2 text-muted hover:text-primary rounded-full" title="Riwayat"><History size={16} /></button>
                                             <a href={getWaLink(sp.picContact)} target="_blank" rel="noreferrer" title="Hubungi PIC" className="p-2 text-muted hover:text-success rounded-full"><MessageCircle size={16} /></a>
                                             <button onClick={() => setModal(m => ({ ...m, confirmDelete: { isOpen: true, item: sp, type: 'sponsorship' } }))} className="p-2 text-muted hover:text-error rounded-full" title="Hapus"><Trash2 size={16} /></button>
@@ -249,6 +280,7 @@ const AdminCollaborationPage = () => {
             <ActivityLogModal isOpen={modal.activityLog.isOpen} onClose={() => setModal(m => ({ ...m, activityLog: { isOpen: false, item: null, type: 'sponsorship' } }))} activities={activities} loading={loading.activity} />
             <InvoiceModal isOpen={modal.invoice.isOpen} onClose={() => setModal(m => ({ ...m, invoice: { isOpen: false, item: null } }))} booking={modal.invoice.item} />
             {modal.manageBooking.item && <ManageBookingModal isOpen={modal.manageBooking.isOpen} onClose={() => setModal(m => ({ ...m, manageBooking: { isOpen: false, item: null } }))} booking={modal.manageBooking.item} packages={packages} onSave={handleManageBookingSave} />}
+            <GeneratedContentModal isOpen={modal.generatedContent.isOpen} onClose={() => setModal(m => ({...m, generatedContent: {isOpen: false}}))} title="Draf Konten MoU (AI)" content={generatedMouContent} />
         </div>
     );
 };

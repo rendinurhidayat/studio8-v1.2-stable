@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Asset } from '../../types';
@@ -8,11 +9,17 @@ const itemVariants = {
   visible: { y: 0, opacity: 1 },
 };
 
-const AssetCard: React.FC<{ asset: Asset }> = ({ asset }) => {
+interface AssetCardProps {
+    asset: Asset;
+    onClick: () => void;
+}
+
+const AssetCard: React.FC<AssetCardProps> = ({ asset, onClick }) => {
     return (
         <motion.div
             variants={itemVariants}
             whileHover={{ y: -5, scale: 1.05 }}
+            onClick={onClick}
             className="group relative aspect-square bg-base-200 rounded-lg overflow-hidden shadow-md cursor-pointer"
         >
             <img 
