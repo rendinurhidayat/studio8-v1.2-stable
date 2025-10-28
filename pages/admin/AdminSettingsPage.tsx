@@ -213,7 +213,6 @@ const ServicesSettingsTab = () => {
     
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            // FIX: Explicitly type 'file' as File to resolve type inference errors when iterating over a FileList.
             const newFiles: ImageUpload[] = Array.from(e.target.files).map((file: File) => ({
                 id: `${file.name}-${file.lastModified}-${Math.random()}`,
                 file,
@@ -251,20 +250,19 @@ const ServicesSettingsTab = () => {
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentUser) return;
-    
+
         setIsSubmitting(true);
+        let hadError = false;
+        
         try {
             const { mode, type, itemData, parentId } = modalState;
             
-            // --- Image Upload Logic ---
             let finalImageUrls = [...formData.imageUrls];
             const filesToUpload = imageUploads.filter(f => f.status === 'pending' || f.status === 'error');
-            let hadError = false;
 
             if (filesToUpload.length > 0) {
-                const newUrls: string[] = [];
-                for (const fileWrapper of filesToUpload) {
-                    setImageUploads(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, status: 'uploading' } : f));
+                const uploadPromises = filesToUpload.map(async (fileWrapper) => {
+                    updateFileState(fileWrapper.id, { status: 'uploading', error: undefined });
                     try {
                         const base64 = await fileToBase64(fileWrapper.file);
                         const response = await fetch('/api/uploadImage', {
@@ -272,19 +270,36 @@ const ServicesSettingsTab = () => {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ imageBase64: base64, folder: 'package_images' })
                         });
+
+                        if (!response.ok) {
+                             let errorMessage = `Upload Gagal: Status ${response.status}`;
+                            try {
+                                const errorData = await response.json();
+                                errorMessage = errorData.message || errorMessage;
+                            } catch {
+                                 errorMessage += ` (${response.statusText})`;
+                            }
+                            throw new Error(errorMessage);
+                        }
                         const result = await response.json();
-                        if (!response.ok) throw new Error(result.message || 'Upload gagal');
-                        newUrls.push(result.secure_url);
-                        setImageUploads(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, status: 'success' } : f));
+                        updateFileState(fileWrapper.id, { status: 'success' });
+                        return result.secure_url;
                     } catch (error) {
                         hadError = true;
-                        setImageUploads(prev => prev.map(f => f.id === fileWrapper.id ? { ...f, status: 'error', error: (error as Error).message } : f));
+                        updateFileState(fileWrapper.id, { status: 'error', error: (error as Error).message });
+                        return null;
                     }
-                }
-                if (hadError) {
-                    throw new Error('Beberapa gambar gagal diunggah. Silakan hapus dan coba lagi.');
-                }
-                finalImageUrls.push(...newUrls);
+                });
+
+                const uploadedUrls = await Promise.all(uploadPromises);
+                const successfulUrls = uploadedUrls.filter((url): url is string => url !== null);
+                finalImageUrls.push(...successfulUrls);
+            }
+
+            if (hadError) {
+                // Stop submission if any upload failed. The UI will show individual errors.
+                setIsSubmitting(false);
+                return;
             }
         
             if (type === 'package') {
@@ -327,6 +342,11 @@ const ServicesSettingsTab = () => {
         } finally {
             setIsSubmitting(false);
         }
+    };
+    
+    // Helper to update individual file status in the UI
+    const updateFileState = (id: string, updates: Partial<ImageUpload>) => {
+        setImageUploads(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
     };
 
     const handleDelete = async () => {
@@ -461,7 +481,7 @@ const ServicesSettingsTab = () => {
                                             <div className="absolute bottom-1 right-1 bg-black/50 text-white rounded-full p-0.5">
                                                 {upload.status === 'uploading' && <Loader2 size={12} className="animate-spin" />}
                                                 {upload.status === 'success' && <CheckCircle size={12} className="text-green-400" />}
-                                                {upload.status === 'error' && <AlertCircle size={12} className="text-red-400" />}
+                                                {upload.status === 'error' && <AlertCircle size={12} className="text-red-400" title={upload.error}/>}
                                             </div>
                                         </div>
                                     ))}
@@ -755,7 +775,6 @@ const InventorySettingsTab = () => {
         if (!currentUser) return;
         const { mode, itemData } = modalState;
         if (mode === 'add') {
-            // FIX: Add missing 'lastChecked' property when creating a new inventory item.
             await addInventoryItem({ ...formData, lastChecked: null }, currentUser.id);
         } else if (itemData) {
             await updateInventoryItem(itemData.id, formData, currentUser.id);

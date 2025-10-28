@@ -5,7 +5,7 @@ import { v2 as cloudinary } from 'cloudinary';
 export const config = {
     api: {
         bodyParser: {
-            sizeLimit: "100mb", // Allow larger files for images
+            sizeLimit: "10mb", // Allow larger files for images
         },
     },
 };
