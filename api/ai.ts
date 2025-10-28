@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
-import { ActivityLog } from '../../types';
+import { ActivityLog } from '../types';
 
 // --- Firebase Admin Initialization (only for actions that need it) ---
 function initializeFirebaseAdmin(): admin.app.App {
