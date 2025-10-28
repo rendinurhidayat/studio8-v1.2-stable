@@ -110,39 +110,6 @@ const Header = () => {
 }
 
 const HeroSection = () => {
-    const desktopImages = [
-        '/images/hero-1.jpg',
-        '/images/hero-2.jpg',
-        '/images/hero-3.jpg',
-        '/images/hero-4.jpg',
-        '/images/hero-5.jpg',
-    ];
-    const mobileImages = [
-        '/images/mobile-hero-1.jpg',
-        '/images/mobile-hero-2.jpg',
-        '/images/mobile-hero-3.jpg',
-    ];
-
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-    useEffect(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    const images = isMobile ? mobileImages : desktopImages;
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentImageIndex(prevIndex => (prevIndex + 1) % images.length);
-        }, 4000);
-        return () => clearInterval(timer);
-    }, [images.length]);
-
     const container = {
         hidden: { opacity: 0 },
         visible: {
@@ -165,14 +132,14 @@ const HeroSection = () => {
                 <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-20">
                     {/* Left Section (Text) */}
                     <motion.div 
-                        className="space-y-6 text-center lg:text-left"
+                        className="space-y-6 text-center lg:text-left z-10"
                         variants={container}
                         initial="hidden"
                         animate="visible"
                     >
                         <motion.p variants={item} className="uppercase tracking-[0.2em] text-gray-400 text-sm">STUDIO 8</motion.p>
                         <motion.h1 variants={item} className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
-                        Express Your Time with Happiness.
+                        Abadikan Momen,<br/>Ciptakan Kenangan.
                         </motion.h1>
                         <motion.p variants={item} className="text-base md:text-lg text-gray-400 leading-relaxed max-w-lg mx-auto lg:mx-0">
                         Self Photo, Couple Session, atau Pemotretan Profesional — semua bisa diatur lewat sistem booking yang nyaman.
@@ -199,36 +166,36 @@ const HeroSection = () => {
                         </motion.div>
                     </motion.div>
 
-                    {/* Right Section (Image) */}
-                    <motion.div 
-                        className="relative w-full aspect-[3/4] max-w-md mx-auto lg:max-w-none lg:mx-0 lg:aspect-auto lg:h-[600px]"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                    {/* Right Section (Image Collage) */}
+                     <motion.div 
+                        className="relative w-full h-[500px] lg:h-[600px] flex items-center justify-center"
+                        initial="hidden"
+                        animate="visible"
+                        variants={container}
                     >
-                         {/* Decorative shapes */}
-                        <div className="absolute -top-8 -left-8 w-32 h-32 bg-accent/10 rounded-full blur-2xl animate-pulse"></div>
-                        <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-white/5 rounded-full blur-3xl animate-pulse delay-500"></div>
+                        {/* Image 1 - Background */}
+                        <motion.div 
+                            variants={item}
+                            className="absolute w-48 h-64 sm:w-64 sm:h-80 lg:w-80 lg:h-96 rounded-2xl overflow-hidden shadow-2xl transform rotate-[-8deg] left-0 top-1/2 -translate-y-1/2"
+                        >
+                            <img src="/images/hero-3.jpg" alt="Couple Session" className="w-full h-full object-cover"/>
+                        </motion.div>
 
-                        <div className="absolute inset-8 sm:inset-12 z-10">
-                            <AnimatePresence>
-                                <motion.img
-                                    key={currentImageIndex}
-                                    src={images[currentImageIndex]}
-                                    alt="Studio 8 Showcase"
-                                    loading="lazy"
-                                    decoding="async"
-                                    initial={{ opacity: 0, scale: 1.1 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 1.1 }}
-                                    transition={{ duration: 1.5, ease: 'easeInOut' }}
-                                    className="absolute inset-0 w-full h-full object-cover rounded-3xl shadow-2xl"
-                                />
-                            </AnimatePresence>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-3xl" />
-                             {/* Border effect */}
-                            <div className="absolute inset-0 rounded-3xl border-2 border-white/10"></div>
-                        </div>
+                        {/* Image 2 - Middle */}
+                        <motion.div 
+                             variants={item}
+                            className="relative z-10 w-64 h-80 sm:w-72 sm:h-96 lg:w-96 lg:h-[480px] rounded-2xl overflow-hidden shadow-2xl"
+                        >
+                            <img src="/images/hero-1.jpg" alt="Main Showcase" className="w-full h-full object-cover"/>
+                        </motion.div>
+
+                        {/* Image 3 - Foreground */}
+                        <motion.div 
+                             variants={item}
+                            className="absolute w-40 h-56 sm:w-48 sm:h-64 lg:w-64 lg:h-80 rounded-2xl overflow-hidden shadow-2xl transform rotate-[10deg] right-0 bottom-0 lg:bottom-1/4"
+                        >
+                            <img src="/images/hero-5.jpg" alt="Portrait" className="w-full h-full object-cover"/>
+                        </motion.div>
                     </motion.div>
                 </div>
             </div>
@@ -247,21 +214,18 @@ const AboutSection = () => (
       variants={sectionVariants}
     >
       <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
-        <div className="relative aspect-[2/3] md:aspect-[3/2]">
-            <motion.img 
-                whileHover={{ scale: 1.05, rotate: -3 }}
-                transition={{ type: 'spring', stiffness: 300 }}
-                src="/images/about-1.jpg" 
-                alt="Interior Studio 8" 
-                className="absolute top-0 left-0 w-3/4 portrait:aspect-[4/5] landscape:aspect-[2/3] rounded-2xl shadow-xl border-8 border-white object-cover" 
-            />
-            <motion.img 
-                whileHover={{ scale: 1.05, rotate: 3 }}
-                transition={{ type: 'spring', stiffness: 300 }}
-                src="/images/about-2.jpg" 
-                alt="Peralatan Studio 8" 
-                className="absolute bottom-0 right-0 w-2/3 portrait:aspect-[4/5] landscape:aspect-[2/3] rounded-2xl shadow-2xl border-8 border-white object-cover" 
-            />
+        <div className="relative">
+            <div className="aspect-[4/5] w-full max-w-md mx-auto lg:max-w-none lg:w-full bg-base-200 rounded-2xl">
+                <motion.img
+                    initial={{ scale: 1 }}
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ type: 'spring', stiffness: 300 }}
+                    src="/images/about-1.jpg"
+                    alt="Interior Studio 8"
+                    className="w-full h-full object-cover rounded-2xl shadow-xl border-8 border-white"
+                />
+            </div>
+            <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-accent/10 rounded-full blur-2xl -z-10"></div>
         </div>
 
         <div className="space-y-6">
@@ -293,6 +257,11 @@ const AboutSection = () => (
                   </div>
               </li>
           </ul>
+           <div className="mt-8">
+                <Link to="/highlight" className="inline-flex items-center gap-2 px-6 py-3 font-semibold text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors">
+                    Lihat Karya Kami <ArrowRight size={18} />
+                </Link>
+            </div>
         </div>
       </div>
     </motion.section>
@@ -378,7 +347,7 @@ const CollaborationSection: React.FC<{ settings: SystemSettings | null }> = ({ s
         
         {settings?.partners && settings.partners.length > 0 && (
             <div className="mt-20">
-                <h3 className="text-lg font-semibold text-muted tracking-wider uppercase">Kolaborasi Bersama Brand & Instansi</h3>
+                <h3 className="text-lg font-semibold text-muted tracking-wider uppercase">Kolaborasi Bersama Brand & Instansi Ternama</h3>
                 <div className="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-8 gap-y-6 items-center">
                     {settings.partners.map((partner) => (
                         <div key={partner.id} className="flex justify-center">
