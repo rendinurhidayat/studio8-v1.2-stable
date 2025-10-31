@@ -1,34 +1,39 @@
 
 
 
-import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
+import {
+  User, Booking, BookingStatus, Package, AddOn, PaymentStatus,
+  Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn,
+  Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus,
+  Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance,
+  DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback,
+  InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate,
+  DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship,
+  CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent,
+  PracticalClass
+} from '../types';
+
 import { notificationService } from './notificationService';
 import { db, auth } from '../firebase';
-import { 
-    collection, 
-    doc, 
-    getDoc, 
-    getDocs, 
-    addDoc, 
-    updateDoc, 
-    deleteDoc, 
-    query, 
-    where, 
-    orderBy, 
-    limit, 
-    serverTimestamp, 
-    writeBatch, 
-    runTransaction, 
-    Timestamp, 
-    increment, 
-    arrayUnion, 
-    arrayRemove, 
-    onSnapshot,
-    DocumentSnapshot,
-    setDoc
+
+import {
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  query, where, orderBy, limit, serverTimestamp, writeBatch,
+  runTransaction, Timestamp, DocumentSnapshot, increment, arrayUnion, arrayRemove,
+  onSnapshot, setDoc
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  updatePassword,
+} from 'firebase/auth';
+
 import format from 'date-fns/format';
+
 
 // --- Helper Functions ---
 
