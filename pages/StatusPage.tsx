@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Booking, BookingStatus, Client, SystemSettings } from '../types';
 import { findBookingByCode, requestReschedule, isSlotAvailable, getClientDetails } from '../services/api';
-// FIX: Add missing 'User' icon import from 'lucide-react' to resolve reference error in BookingSummaryCard.
 import { Home, Calendar, Clock, CheckCircle, AlertCircle, Loader2, Download, Star, Award, Copy, Search, X, ClipboardList, CalendarCheck, Sparkles, MessageSquare, Check, MapPin, Lightbulb, Repeat, BookOpen, User } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ChatbotModal from '../components/common/ChatbotModal';

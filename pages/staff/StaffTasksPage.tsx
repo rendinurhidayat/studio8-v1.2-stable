@@ -4,7 +4,6 @@ import { Task } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import format from 'date-fns/format';
-// FIX: Switched to default import for locale from date-fns/locale/id.
 import id from 'date-fns/locale/id';
 
 interface DailyTaskItem {

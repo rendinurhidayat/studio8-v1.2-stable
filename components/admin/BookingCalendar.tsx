@@ -1,9 +1,7 @@
 
 
-
 import React, { useMemo } from 'react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-// FIX: Switched to default imports from date-fns subpaths to resolve module export errors.
 import format from 'date-fns/format';
 import getDay from 'date-fns/getDay';
 import parse from 'date-fns/parse';

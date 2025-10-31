@@ -82,8 +82,6 @@ const BookingForm: React.FC<{ pkg: Package; addOns: AddOn[] }> = ({ pkg, addOns 
                 return '';
             case 'date':
                 if (!value) return 'Tanggal booking wajib dipilih.';
-                // FIX: Corrected operator precedence to prevent comparing a boolean with a string.
-                // The original code was parsed as `( !string ) === string`, which is always `false === string`.
                 if (isPast(new Date(value)) && !(new Date(value).toDateString() === new Date().toDateString())) return 'Tanggal tidak boleh di masa lalu.';
                 return '';
              case 'time':

@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-// FIX: Split imports to fetch functions from 'api' and types from 'types', resolving an export error and aligning with project convention.
 import { getPackages, getAddOns } from '../services/api';
-import { Package, AddOn } from '../types';
+import type { Package, AddOn } from '../types';
 import BookingForm from '../components/client/BookingForm';
 import InstitutionalBookingForm from '../components/client/InstitutionalBookingForm';
 import SponsorshipForm from '../components/client/SponsorshipForm';

@@ -1,6 +1,5 @@
 
 
-
 import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
 import { notificationService } from './notificationService';
 import { db, auth } from '../firebase';

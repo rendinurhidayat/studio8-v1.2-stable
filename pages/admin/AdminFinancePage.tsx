@@ -8,12 +8,11 @@ import InvoiceModal from '../../components/admin/InvoiceModal';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { exportToCSV } from '../../utils/export';
-// FIX: Consolidated date-fns imports to use default imports from specific paths.
 import format from 'date-fns/format';
 import endOfMonth from 'date-fns/endOfMonth';
 import endOfWeek from 'date-fns/endOfWeek';
 import isWithinInterval from 'date-fns/isWithinInterval';
-import parseDate from 'date-fns/parse';
+import parse from 'date-fns/parse';
 import startOfMonth from 'date-fns/startOfMonth';
 import startOfWeek from 'date-fns/startOfWeek';
 import subDays from 'date-fns/subDays';
@@ -111,7 +110,7 @@ const FinancialForecastingSection: React.FC<{ bookings: Booking[] }> = ({ bookin
         return Object.entries(history)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([month, revenue]) => ({
-                month: format(parseDate(month, 'yyyy-MM', new Date()), 'MMM yyyy', { locale: id }),
+                month: format(parse(month, 'yyyy-MM', new Date()), 'MMM yyyy', { locale: id }),
                 revenue,
             }));
     }, [bookings]);

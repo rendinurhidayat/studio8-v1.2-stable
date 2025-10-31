@@ -3,12 +3,10 @@ import { Link } from 'react-router-dom';
 import { getBookings } from '../../services/api';
 import { Booking, BookingStatus } from '../../types';
 import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
-// FIX: Switched to default imports from date-fns subpaths to resolve module export errors.
 import format from 'date-fns/format';
 import getDay from 'date-fns/getDay';
 import parse from 'date-fns/parse';
 import startOfWeek from 'date-fns/startOfWeek';
-// FIX: Switched to default import for locale from date-fns/locale/id.
 import id from 'date-fns/locale/id';
 import { Home, ArrowRight, Camera } from 'lucide-react';
 
