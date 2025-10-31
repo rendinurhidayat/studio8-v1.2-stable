@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getPackages, getAddOns } from '../services/api';
@@ -130,18 +128,23 @@ const PackageModal: React.FC<{ pkg: PackageWithDetails | null; addOns: AddOn[]; 
   const prevSlide = () => setCurrentIndex((prevIndex) => (prevIndex - 1 + pkg.imageUrls.length) % pkg.imageUrls.length);
 
   const handleAddToCart = () => {
-    if (!selectedSubPackageId) {
-      alert("Pilih varian paket terlebih dahulu!");
-      return;
-    }
+    if (!selectedSubPackageId) return;
     const subPkg = pkg.subPackages.find(sp => sp.id === selectedSubPackageId);
     if (!subPkg) return;
 
-    const allSubAddOns = addOns.flatMap(a => a.subAddOns);
-    const selectedAddOns = allSubAddOns.filter(sa => selectedAddOnIds.includes(sa.id));
+    const selectedAddOns = addOns
+      .flatMap(addon => addon.subAddOns)
+      .filter(subAddon => selectedAddOnIds.includes(subAddon.id));
 
-    const cartItem: CartItem = { id: `${subPkg.id}-${Date.now()}`, pkg, subPkg, addOns: selectedAddOns };
-    addToCart(cartItem);
+    addToCart({
+        id: `${Date.now()}`,
+        pkg,
+        subPkg,
+        addOns: selectedAddOns,
+        packageId: pkg.id,
+        subPackageId: selectedSubPackageId,
+        subAddOnIds: selectedAddOnIds
+    });
     setShowAdded(true);
     setTimeout(() => {
       setShowAdded(false);

@@ -24,8 +24,7 @@ import {
     DocumentSnapshot,
     setDoc
 } from 'firebase/firestore';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { Auth } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, Auth } from 'firebase/auth';
 import format from 'date-fns/format';
 import { ref as storageRef } from 'firebase/storage';
 
