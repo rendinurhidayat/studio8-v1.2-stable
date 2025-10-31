@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getBookings } from '../services/api';
+import { getBookings } from '../../services/api';
 import { Booking, BookingStatus } from '../../types';
 import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
 // FIX: Switched to default imports from date-fns subpaths to resolve module export errors.
