@@ -13,7 +13,7 @@ declare global {
 
 // This configuration is for local development ONLY.
 // In a deployed environment, the configuration is injected via index.html
-const FirebaseConfig = {
+const localDevFirebaseConfig = {
   apiKey: "AIzaSyBq6T-Zwo39mOTIqHLaa6d1zYPIIQH0g34",
   authDomain: "studio-8-manager-ec159.firebaseapp.com",
   projectId: "studio-8-manager-ec159",
@@ -25,10 +25,10 @@ const FirebaseConfig = {
 
 // Use the injected config from index.html if it's available and not a placeholder.
 // Otherwise, fall back to the local development config.
-export const firebaseConfig = 
+const firebaseConfig = 
   window.firebaseConfig && window.firebaseConfig.apiKey && !window.firebaseConfig.apiKey.startsWith('__FIREBASE') 
   ? window.firebaseConfig 
-  : FirebaseConfig;
+  : localDevFirebaseConfig;
 
 // Inisialisasi Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();

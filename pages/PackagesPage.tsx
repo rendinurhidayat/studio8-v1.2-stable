@@ -140,7 +140,16 @@ const PackageModal: React.FC<{ pkg: PackageWithDetails | null; addOns: AddOn[]; 
     const allSubAddOns = addOns.flatMap(a => a.subAddOns);
     const selectedAddOns = allSubAddOns.filter(sa => selectedAddOnIds.includes(sa.id));
 
-    const cartItem: CartItem = { id: `${subPkg.id}-${Date.now()}`, pkg, subPkg, addOns: selectedAddOns };
+    // FIX: Add missing properties to CartItem object
+    const cartItem: CartItem = {
+      id: `${subPkg.id}-${Date.now()}`,
+      pkg,
+      subPkg,
+      addOns: selectedAddOns,
+      packageId: pkg.id,
+      subPackageId: subPkg.id,
+      subAddOnIds: selectedAddOnIds,
+    };
     addToCart(cartItem);
     setShowAdded(true);
     setTimeout(() => {

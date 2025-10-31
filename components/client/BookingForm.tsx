@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Package, AddOn, SystemSettings, Client, Promo } from '../../types';
+import { Package, AddOn, SystemSettings, Client, Promo, CartItem } from '../../types';
 import { validateReferralCode, validatePromoCode, calculateDpAmount as apiCalculateDpAmount } from '../../services/api';
 import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, Send, Loader2, AlertTriangle, Tag, Award, X, ShoppingCart, Copy, Check, Download } from 'lucide-react';
 import { fileToBase64 as fileUtilToBase64 } from '../../utils/fileUtils';
@@ -193,10 +193,22 @@ const BookingForm: React.FC<{ pkg: Package; addOns: AddOn[] }> = ({ pkg, addOns 
                 paymentProofBase64 = result;
             }
 
+            const item: CartItem = {
+                id: 'some-id',
+                pkg: pkg,
+                subPkg: pkg.subPackages.find(sp => sp.id === formData.subPackageId)!,
+                addOns: addOns.flatMap(a => a.subAddOns).filter(sa => formData.subAddOnIds.includes(sa.id)),
+                packageId: pkg.id,
+                subPackageId: formData.subPackageId,
+                subAddOnIds: formData.subAddOnIds,
+            };
+
             const payload = {
                 action: 'createPublic',
                 ...formData,
-                packageId: pkg.id,
+                packageId: item.pkg.id,
+                subPackageId: item.subPkg.id,
+                subAddOnIds: item.addOns.map(sa => sa.id),
                 paymentProof: undefined,
                 paymentProofBase64: paymentProofBase64 ? { base64: paymentProofBase64.base64, fileName: formData.paymentProof.name, mimeType: formData.paymentProof.type } : null
             };
