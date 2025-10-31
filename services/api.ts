@@ -1,6 +1,3 @@
-
-
-
 import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
 import { notificationService } from './notificationService';
 import { db, auth } from '../firebase';
@@ -27,8 +24,10 @@ import {
     DocumentSnapshot,
     setDoc
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { Auth } from 'firebase/auth';
 import format from 'date-fns/format';
+import { ref as storageRef } from 'firebase/storage';
 
 // --- Helper Functions ---
 

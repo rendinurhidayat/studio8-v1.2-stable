@@ -25,7 +25,7 @@ const localDevFirebaseConfig = {
 
 // Use the injected config from index.html if it's available and not a placeholder.
 // Otherwise, fall back to the local development config.
-const firebaseConfig = 
+export const firebaseConfig = 
   window.firebaseConfig && window.firebaseConfig.apiKey && !window.firebaseConfig.apiKey.startsWith('__FIREBASE') 
   ? window.firebaseConfig 
   : localDevFirebaseConfig;
