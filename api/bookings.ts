@@ -1,5 +1,6 @@
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { initializeFirebaseAdmin, initializeCloudinary, sendPushNotification } from './_lib/services';
@@ -13,8 +14,8 @@ export const config = {
 };
 
 // --- Type Duplication (necessary for serverless environment) ---
-enum BookingStatus { Pending = 'Pending' }
-enum PaymentStatus { Pending = 'Pending' }
+enum BookingStatus { Pending = 'Pending', Completed = 'Completed', Confirmed = 'Confirmed' }
+enum PaymentStatus { Pending = 'Pending', Paid = 'Paid' }
 enum UserRole { Admin = 'Admin', Staff = 'Staff' }
 interface Package { id: string; name: string; description: string; subPackages: SubPackage[]; type?: 'Studio' | 'Outdoor'; imageUrl?: string; isGroupPackage?: boolean; }
 interface SubPackage { id:string; name: string; price: number; description?: string; }
@@ -24,15 +25,140 @@ interface Client { id: string; name: string; email: string; phone: string; first
 interface LoyaltyTier { id: string; name: string; bookingThreshold: number; discountPercentage: number; }
 interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: LoyaltyTier[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
 interface Promo { id: string; code: string; description: string; discountPercentage: number; isActive: boolean; }
+interface Booking { id: string; bookingCode: string; clientName: string; clientEmail: string; clientPhone: string; bookingDate: admin.firestore.Timestamp; package: Package; selectedSubPackage: SubPackage; addOns: AddOn[]; selectedSubAddOns: SubAddOn[]; numberOfPeople: number; paymentMethod: string; paymentStatus: PaymentStatus; bookingStatus: BookingStatus; totalPrice: number; remainingBalance: number; createdAt: admin.firestore.Timestamp; paymentProofUrl?: string; rescheduleRequestDate?: admin.firestore.Timestamp; notes?: string; googleDriveLink?: string; discountAmount?: number; discountReason?: string; pointsEarned?: number; pointsRedeemed?: number; pointsValue?: number; // Rupiah value of redeemed points
+  referralCodeUsed?: string; promoCodeUsed?: string; extraPersonCharge?: number; }
 // --- End Type Duplication ---
 
 // --- Server-side API Helpers ---
-const fromFirestore = <T extends { id: string }>(doc: admin.firestore.DocumentSnapshot): T => {
-    return { id: doc.id, ...doc.data() } as T;
+const fromFirestore = <T extends object>(doc: admin.firestore.DocumentSnapshot): T & { id: string } => {
+    const data = { id: doc.id, ...doc.data() } as any;
+    // Note: Timestamps are handled by the caller, as they might be serialized for response.
+    return data as T & { id: string };
 };
 
 
 // --- Action Handlers ---
+
+async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
+    const db = admin.firestore();
+    const { bookingId, googleDriveLink, currentUserId } = req.body;
+    if (!bookingId || !googleDriveLink || !currentUserId) {
+        return res.status(400).json({ message: 'bookingId, googleDriveLink, and currentUserId are required.' });
+    }
+
+    const currentUserDoc = await db.collection('users').doc(currentUserId).get();
+    const currentUserRole = currentUserDoc.data()?.role;
+    if (!currentUserDoc.exists || (currentUserRole !== UserRole.Admin && currentUserRole !== UserRole.Staff)) {
+        return res.status(403).json({ message: 'Forbidden: You do not have permission to complete sessions.' });
+    }
+
+    try {
+        const bookingRef = db.collection('bookings').doc(bookingId);
+        
+        let referrerRef: admin.firestore.DocumentReference | null = null;
+        
+        const preTxBookingDoc = await bookingRef.get();
+        if (!preTxBookingDoc.exists) throw new Error("Booking not found.");
+        const bookingToComplete = fromFirestore<Booking>(preTxBookingDoc);
+
+        if (bookingToComplete.referralCodeUsed) {
+            const clientDoc = await db.collection('clients').doc(bookingToComplete.clientEmail.toLowerCase()).get();
+            if (clientDoc.exists && clientDoc.data()!.totalBookings === 0) {
+                 const referrerQuery = await db.collection('clients').where('referralCode', '==', bookingToComplete.referralCodeUsed).limit(1).get();
+                 if (!referrerQuery.empty) {
+                     referrerRef = referrerQuery.docs[0].ref;
+                 }
+            }
+        }
+
+        let updatedBookingData: any = null;
+        await db.runTransaction(async (transaction) => {
+            const bookingDoc = await transaction.get(bookingRef);
+            if (!bookingDoc.exists) throw new Error("Booking not found inside transaction.");
+            const bookingData = fromFirestore<Booking>(bookingDoc);
+            
+            const settingsDoc = await transaction.get(db.collection('settings').doc('main'));
+            if (!settingsDoc.exists) throw new Error("System settings not found.");
+            const settings = settingsDoc.data() as SystemSettings;
+            
+            const clientRef = db.collection('clients').doc(bookingData.clientEmail.toLowerCase());
+            const clientDoc = await transaction.get(clientRef);
+            if (!clientDoc.exists) throw new Error("Client not found for booking completion");
+            const client = fromFirestore<Client>(clientDoc);
+
+            const pointsEarned = Math.floor(bookingData.totalPrice * settings.loyaltySettings.pointsPerRupiah);
+
+            const clientUpdateData: any = {
+                loyaltyPoints: admin.firestore.FieldValue.increment(pointsEarned),
+                totalBookings: admin.firestore.FieldValue.increment(1),
+                totalSpent: admin.firestore.FieldValue.increment(bookingData.totalPrice),
+                lastBooking: admin.firestore.FieldValue.serverTimestamp(),
+            };
+
+            if (referrerRef && client.totalBookings === 0) {
+                const referrerBonus = settings.loyaltySettings.referralBonusPoints;
+                transaction.update(referrerRef, { loyaltyPoints: admin.firestore.FieldValue.increment(referrerBonus) });
+                clientUpdateData.loyaltyPoints = admin.firestore.FieldValue.increment(pointsEarned + referrerBonus);
+            }
+
+            const newTotalBookings = client.totalBookings + 1;
+            const sortedTiers = settings.loyaltySettings.loyaltyTiers.sort((a, b) => b.bookingThreshold - a.bookingThreshold);
+            const newTier = sortedTiers.find(tier => newTotalBookings >= tier.bookingThreshold);
+        
+            if (newTier && newTier.name !== client.loyaltyTier) {
+                clientUpdateData.loyaltyTier = newTier.name;
+            }
+
+            const finalPaymentAmount = bookingData.remainingBalance;
+
+            const bookingUpdateData = {
+                bookingStatus: BookingStatus.Completed,
+                paymentStatus: PaymentStatus.Paid,
+                remainingBalance: 0,
+                googleDriveLink: googleDriveLink,
+                pointsEarned: pointsEarned,
+            };
+            transaction.update(bookingRef, bookingUpdateData);
+            transaction.update(clientRef, clientUpdateData);
+
+            if (finalPaymentAmount > 0) {
+                const transactionRef = db.collection('transactions').doc();
+                transaction.set(transactionRef, {
+                    date: admin.firestore.FieldValue.serverTimestamp(),
+                    description: `Pelunasan Sesi ${bookingData.bookingCode} - ${bookingData.clientName}`,
+                    type: 'Income',
+                    amount: finalPaymentAmount,
+                    bookingId: bookingId,
+                });
+            }
+            
+            updatedBookingData = { ...bookingData, ...bookingUpdateData };
+        });
+
+        await admin.firestore().collection('activity_logs').add({
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            userId: currentUserId,
+            userName: currentUserDoc.data()?.name || 'Unknown User',
+            action: `Menyelesaikan sesi ${updatedBookingData.bookingCode}`,
+            details: `Pelunasan Rp ${(updatedBookingData.totalPrice - (updatedBookingData.totalPrice - updatedBookingData.remainingBalance)).toLocaleString('id-ID')} dicatat.`
+        });
+        
+        if (updatedBookingData) {
+            Object.keys(updatedBookingData).forEach(key => {
+                if (updatedBookingData[key] instanceof admin.firestore.Timestamp) {
+                    updatedBookingData[key] = updatedBookingData[key].toDate().toISOString();
+                }
+            });
+        }
+        
+        return res.status(200).json(updatedBookingData);
+
+    } catch(error: any) {
+        console.error("Error in handleCompleteSession:", error);
+        return res.status(500).json({ message: error.message || 'Failed to complete session.' });
+    }
+}
+
 
 async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
     const db = admin.firestore();
@@ -295,6 +421,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return await handleCreateInstitutional(req, res);
             case 'createPublicInstitutional':
                 return await handleCreatePublicInstitutional(req, res);
+            case 'complete':
+                return await handleCompleteSession(req, res);
             default:
                 return res.status(400).json({ message: `Unknown booking action: ${action}` });
         }

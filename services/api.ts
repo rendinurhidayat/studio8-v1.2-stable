@@ -1,3 +1,6 @@
+
+
+
 import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
 import { notificationService } from './notificationService';
 import { db, auth } from '../firebase';
@@ -24,9 +27,8 @@ import {
     DocumentSnapshot,
     setDoc
 } from 'firebase/firestore';
-import { getAuth, createUserWithEmailAndPassword, Auth } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import format from 'date-fns/format';
-import { ref as storageRef } from 'firebase/storage';
 
 // --- Helper Functions ---
 
@@ -272,79 +274,36 @@ export const confirmBooking = async (bookingId: string, currentUserId: string): 
 
 export const completeBookingSession = async (bookingId: string, googleDriveLink: string, currentUserId: string): Promise<Booking | null> => {
     try {
-        const bookingRef = doc(db, 'bookings', bookingId);
-        const docToComplete = await getDoc(bookingRef);
-        if (!docToComplete.exists()) return null;
-        const bookingToComplete = fromFirestore<Booking>(docToComplete, ['bookingDate', 'createdAt']);
-
-        const settings = await getSystemSettings();
-        const client = await getClientByEmail(bookingToComplete.clientEmail);
-        if (!client) {
-            console.error("Client not found for booking completion");
-            return null;
-        }
-        
-        const clientRef = doc(db, 'clients', client.email);
-        const batch = writeBatch(db);
-
-        const pointsEarned = Math.floor(bookingToComplete.totalPrice * settings.loyaltySettings.pointsPerRupiah);
-
-        const clientUpdateData: any = {
-            loyaltyPoints: increment(pointsEarned),
-            totalBookings: increment(1),
-            totalSpent: increment(bookingToComplete.totalPrice),
-            lastBooking: new Date(),
-        };
-
-        if (client.totalBookings === 0 && bookingToComplete.referralCodeUsed) {
-            const referrer = await getClientByReferralCode(bookingToComplete.referralCodeUsed);
-            if (referrer) {
-                const referrerBonus = settings.loyaltySettings.referralBonusPoints;
-                const referrerRef = doc(db, 'clients', referrer.email);
-                batch.update(referrerRef, { loyaltyPoints: increment(referrerBonus) });
-                clientUpdateData.loyaltyPoints = increment(pointsEarned + referrerBonus);
-            }
-        }
-
-        const newTotalBookings = client.totalBookings + 1;
-        const sortedTiers = settings.loyaltySettings.loyaltyTiers.sort((a, b) => b.bookingThreshold - a.bookingThreshold);
-        const newTier = sortedTiers.find(tier => newTotalBookings >= tier.bookingThreshold);
-        
-        if (newTier && newTier.name !== client.loyaltyTier) {
-            clientUpdateData.loyaltyTier = newTier.name;
-             notificationService.notify({ recipient: UserRole.Admin, type: 'success', message: `Selamat! Klien ${client.name} mencapai tier loyalitas ${newTier.name}.`, link: '/admin/clients'});
-        }
-
-        const finalPaymentAmount = bookingToComplete.remainingBalance;
-
-        batch.update(bookingRef, {
-            bookingStatus: BookingStatus.Completed,
-            paymentStatus: PaymentStatus.Paid,
-            remainingBalance: 0,
-            googleDriveLink: googleDriveLink,
-            pointsEarned: pointsEarned,
+        const response = await fetch('/api/bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'complete',
+                bookingId,
+                googleDriveLink,
+                currentUserId,
+            }),
         });
 
-        batch.update(clientRef, clientUpdateData);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Gagal menyelesaikan sesi.');
+        }
 
-        if (finalPaymentAmount > 0) {
-            const transactionRef = doc(collection(db, 'transactions'));
-            batch.set(transactionRef, {
-                date: serverTimestamp(),
-                description: `Pelunasan Sesi ${bookingToComplete.bookingCode} - ${bookingToComplete.clientName}`,
-                type: TransactionType.Income,
-                amount: finalPaymentAmount,
-                bookingId: bookingId,
-            });
+        const updatedBookingData = await response.json();
+        
+        // Convert ISO date strings back to Date objects
+        const dateFields = ['bookingDate', 'createdAt', 'rescheduleRequestDate'];
+        for (const field of dateFields) {
+            if (updatedBookingData[field]) {
+                updatedBookingData[field] = new Date(updatedBookingData[field]);
+            }
         }
         
-        await batch.commit();
-        await logActivity(currentUserId, `Menyelesaikan sesi ${bookingToComplete.bookingCode}`, `Pelunasan Rp ${finalPaymentAmount.toLocaleString('id-ID')} dicatat.`);
-        
-        const updatedDoc = await getDoc(bookingRef);
-        return fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt']);
+        return updatedBookingData as Booking;
+
     } catch (error) {
-        console.error("Error completing booking session:", error);
+        console.error("Error completing booking session via API:", error);
         return null;
     }
 };
@@ -474,21 +433,32 @@ export const getUserById = async (userId: string): Promise<User | null> => {
 
 
 export const addUser = async (user: Omit<User, 'id'>, currentUserId: string): Promise<User> => {
-    if (!user.password) {
-        throw new Error("Password is required to create a new user.");
-    }
-    const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
-    const firebaseUser = userCredential.user;
-    if (!firebaseUser) throw new Error("Failed to create user in Firebase Auth.");
+    const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'create',
+            userData: user,
+            currentUserId: currentUserId,
+        }),
+    });
 
-    const { password, ...userDataForFirestore } = user;
-    if (userDataForFirestore.username) {
-        userDataForFirestore.username = userDataForFirestore.username.toLowerCase();
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Gagal membuat pengguna baru.');
     }
 
-    await setDoc(doc(db, 'users', firebaseUser.uid), userDataForFirestore);
-    await logActivity(currentUserId, `Membuat user baru: ${user.name}`, `Role: ${user.role}`);
-    return { id: firebaseUser.uid, ...userDataForFirestore };
+    const createdUserData = await response.json();
+    
+    // Convert date strings if they exist
+    const dateFields = ['startDate', 'endDate'];
+    for (const field of dateFields) {
+        if (createdUserData[field]) {
+            createdUserData[field] = new Date(createdUserData[field]);
+        }
+    }
+
+    return createdUserData as User;
 };
 
 
