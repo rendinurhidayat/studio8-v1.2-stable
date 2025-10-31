@@ -1,16 +1,39 @@
 
+
+
 import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
 import { notificationService } from './notificationService';
-import { auth, db, storage, firebaseConfig } from '../firebase';
-import firebase from "firebase/compat/app";
-import { format } from 'date-fns';
-
-type Timestamp = firebase.firestore.Timestamp;
+import { db, auth } from '../firebase';
+import { 
+    collection, 
+    doc, 
+    getDoc, 
+    getDocs, 
+    addDoc, 
+    updateDoc, 
+    deleteDoc, 
+    query, 
+    where, 
+    orderBy, 
+    limit, 
+    serverTimestamp, 
+    writeBatch, 
+    runTransaction, 
+    Timestamp, 
+    increment, 
+    arrayUnion, 
+    arrayRemove, 
+    onSnapshot,
+    DocumentSnapshot,
+    setDoc
+} from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import format from 'date-fns/format';
 
 // --- Helper Functions ---
 
 // --- Data Transformation Helpers ---
-const fromFirestore = <T>(doc: firebase.firestore.DocumentSnapshot, dateFields: string[] = []): T => {
+const fromFirestore = <T extends object>(doc: DocumentSnapshot, dateFields: string[] = []): T & { id: string } => {
     const data = { id: doc.id, ...doc.data() } as any;
     for (const field of dateFields) {
         const fieldParts = field.split('.');
@@ -31,53 +54,73 @@ const fromFirestore = <T>(doc: firebase.firestore.DocumentSnapshot, dateFields: 
             }
         }
     }
-    return data as T;
+    return data as T & { id: string };
 };
 
 // --- Activity Logging ---
 export const logActivity = async (userId: string, action: string, details: string = ''): Promise<void> => {
-    if (!userId) {
-        console.warn('Attempted to log activity without a user ID.');
-        return;
-    }
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-        console.warn(`Activity log failed: User with ID ${userId} not found.`);
-        return;
-    }
-    const userName = userDoc.data()?.name || 'Unknown User';
+    try {
+        if (!userId) {
+            console.warn('Attempted to log activity without a user ID.');
+            return;
+        }
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (!userDoc.exists()) {
+            console.warn(`Activity log failed: User with ID ${userId} not found.`);
+            return;
+        }
+        const userName = userDoc.data()?.name || 'Unknown User';
 
-    await db.collection('activity_logs').add({
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        userId,
-        userName,
-        action,
-        details,
-    });
+        await addDoc(collection(db, 'activity_logs'), {
+            timestamp: serverTimestamp(),
+            userId,
+            userName,
+            action,
+            details,
+        });
+    } catch (error) {
+        console.error("Error logging activity:", error);
+    }
 };
 
 export const getActivityLogs = async (): Promise<ActivityLog[]> => {
-    const snapshot = await db.collection('activity_logs').orderBy('timestamp', 'desc').limit(500).get();
-    return snapshot.docs.map(doc => fromFirestore<ActivityLog>(doc, ['timestamp']));
+    try {
+        const q = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(500));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<ActivityLog>(doc, ['timestamp']));
+    } catch (error) {
+        console.error("Error fetching activity logs:", error);
+        return [];
+    }
 };
 
 // --- COLLABORATION ACTIVITY LOGS ---
-export const getCollaborationActivity = async (collection: 'sponsorships' | 'bookings', docId: string): Promise<CollaborationActivity[]> => {
-    const snapshot = await db.collection(collection).doc(docId).collection('activityLog').orderBy('timestamp', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<CollaborationActivity>(doc, ['timestamp']));
+export const getCollaborationActivity = async (collectionName: 'sponsorships' | 'bookings', docId: string): Promise<CollaborationActivity[]> => {
+    try {
+        const q = query(collection(db, collectionName, docId, 'activityLog'), orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<CollaborationActivity>(doc, ['timestamp']));
+    } catch (error) {
+        console.error("Error fetching collaboration activity:", error);
+        return [];
+    }
 };
 
-export const logCollaborationActivity = async (collection: 'sponsorships' | 'bookings', docId: string, action: string, details: string, userId: string): Promise<void> => {
+export const logCollaborationActivity = async (collectionName: 'sponsorships' | 'bookings', docId: string, action: string, details: string, userId: string): Promise<void> => {
     if (!userId) return;
-    const userDoc = await db.collection('users').doc(userId).get();
-    const userName = userDoc.data()?.name || 'Unknown User';
-    
-    await db.collection(collection).doc(docId).collection('activityLog').add({
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        action,
-        details,
-        userName,
-    });
+    try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        const userName = userDoc.data()?.name || 'Unknown User';
+        
+        await addDoc(collection(db, collectionName, docId, 'activityLog'),{
+            timestamp: serverTimestamp(),
+            action,
+            details,
+            userName,
+        });
+    } catch (error) {
+        console.error("Error logging collaboration activity:", error);
+    }
 };
 
 // --- API Functions (Firebase Implementation) ---
@@ -99,343 +142,454 @@ export const calculateDpAmount = (booking: Pick<Booking, 'totalPrice' | 'package
 };
 
 export const findBookingByCode = async (code: string): Promise<Booking | null> => {
-    const snapshot = await db.collection('bookings').where('bookingCode', '==', code.toUpperCase()).limit(1).get();
-    if (snapshot.empty) return null;
-    return fromFirestore<Booking>(snapshot.docs[0], ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+    try {
+        const q = query(collection(db, 'bookings'), where('bookingCode', '==', code.toUpperCase()), limit(1));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+        return fromFirestore<Booking>(snapshot.docs[0], ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+    } catch (error) {
+        console.error("Error finding booking by code:", error);
+        return null;
+    }
 };
 
 // --- BOOKING CRUD ---
 export const getBookings = async (): Promise<Booking[]> => {
-    const snapshot = await db.collection('bookings').orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']));
+    try {
+        const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']));
+    } catch (error) {
+        console.error("Error fetching bookings:", error);
+        return [];
+    }
 };
 
 export const getInstitutionalBookings = async (): Promise<Booking[]> => {
-    const snapshot = await db.collection('bookings')
-      .where('bookingType', '==', 'institutional')
-      .orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'dueDate']));
+    try {
+        const q = query(collection(db, 'bookings'), where('bookingType', '==', 'institutional'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'dueDate']));
+    } catch (error) {
+        console.error("Error fetching institutional bookings:", error);
+        return [];
+    }
 };
 
 
 export const updateBooking = async (bookingId: string, updatedData: Partial<Booking>, currentUserId: string): Promise<Booking | null> => {
-    const bookingRef = db.collection('bookings').doc(bookingId);
-    const originalDoc = await bookingRef.get();
-    if (!originalDoc.exists) return null;
-    
-    const originalBooking = fromFirestore<Booking>(originalDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+    try {
+        const bookingRef = doc(db, 'bookings', bookingId);
+        const originalDoc = await getDoc(bookingRef);
+        if (!originalDoc.exists()) return null;
+        
+        const originalBooking = fromFirestore<Booking>(originalDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
 
-    // Recalculate total price if package or addons change
-    if (updatedData.selectedSubPackage || updatedData.selectedSubAddOns) {
-        const subPackagePrice = updatedData.selectedSubPackage?.price || originalBooking.selectedSubPackage.price;
-        const addOnsPrice = updatedData.selectedSubAddOns?.reduce((sum, addon) => sum + addon.price, 0) || originalBooking.selectedSubAddOns.reduce((sum, addon) => sum + addon.price, 0);
-        updatedData.totalPrice = subPackagePrice + addOnsPrice;
+        // Recalculate total price if package or addons change
+        if (updatedData.selectedSubPackage || updatedData.selectedSubAddOns) {
+            const subPackagePrice = updatedData.selectedSubPackage?.price || originalBooking.selectedSubPackage.price;
+            const addOnsPrice = updatedData.selectedSubAddOns?.reduce((sum, addon) => sum + addon.price, 0) || originalBooking.selectedSubAddOns.reduce((sum, addon) => sum + addon.price, 0);
+            updatedData.totalPrice = subPackagePrice + addOnsPrice;
+        }
+
+        await updateDoc(bookingRef, updatedData);
+        const newDoc = await getDoc(bookingRef);
+        const newBooking = fromFirestore<Booking>(newDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+
+        await logActivity(currentUserId, `Mengubah booking ${originalBooking.bookingCode}`);
+        
+        if (originalBooking.bookingStatus === BookingStatus.RescheduleRequested && newBooking.bookingStatus === BookingStatus.Confirmed) {
+            notificationService.notify({
+                recipient: UserRole.Staff, type: 'success', message: `Jadwal ulang untuk ${newBooking.clientName} telah dikonfirmasi.`, link: '/admin/schedule'
+            });
+        }
+        
+        return newBooking;
+    } catch (error) {
+        console.error("Error updating booking:", error);
+        return null;
     }
-
-    await bookingRef.update(updatedData);
-    const newDoc = await bookingRef.get();
-    const newBooking = fromFirestore<Booking>(newDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
-
-    // --- LOGGING ---
-    // (Logging logic can be enhanced here to detail specific field changes)
-    await logActivity(currentUserId, `Mengubah booking ${originalBooking.bookingCode}`);
-    
-    // Check for reschedule confirmation
-    if (originalBooking.bookingStatus === BookingStatus.RescheduleRequested && newBooking.bookingStatus === BookingStatus.Confirmed) {
-        notificationService.notify({
-            recipient: UserRole.Staff, type: 'success', message: `Jadwal ulang untuk ${newBooking.clientName} telah dikonfirmasi.`, link: '/admin/schedule'
-        });
-    }
-    
-    return newBooking;
 };
 
 export const deleteBooking = async (bookingId: string, currentUserId: string): Promise<boolean> => {
-    const bookingRef = db.collection('bookings').doc(bookingId);
-    const doc = await bookingRef.get();
-    if (!doc.exists) return false;
-    const bookingToDelete = doc.data();
+    try {
+        const bookingRef = doc(db, 'bookings', bookingId);
+        const docToDelete = await getDoc(bookingRef);
+        if (!docToDelete.exists()) return false;
+        const bookingData = docToDelete.data();
 
-    // Also delete associated financial transactions
-    const transactionsSnapshot = await db.collection('transactions').where('bookingId', '==', bookingId).get();
-    const batch = db.batch();
-    transactionsSnapshot.forEach(doc => batch.delete(doc.ref));
-    batch.delete(bookingRef);
-    await batch.commit();
+        const q = query(collection(db, 'transactions'), where('bookingId', '==', bookingId));
+        const transactionsSnapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        transactionsSnapshot.forEach(doc => batch.delete(doc.ref));
+        batch.delete(bookingRef);
+        await batch.commit();
 
-    await logActivity(currentUserId, `Menghapus booking ${bookingToDelete?.bookingCode}`, `Klien: ${bookingToDelete?.clientName}`);
-    return true;
+        await logActivity(currentUserId, `Menghapus booking ${bookingData?.bookingCode}`, `Klien: ${bookingData?.clientName}`);
+        return true;
+    } catch (error) {
+        console.error("Error deleting booking:", error);
+        return false;
+    }
 };
 
 export const confirmBooking = async (bookingId: string, currentUserId: string): Promise<Booking | null> => {
-    const bookingRef = db.collection('bookings').doc(bookingId);
-    const doc = await bookingRef.get();
-    if (!doc.exists) return null;
+    try {
+        const bookingRef = doc(db, 'bookings', bookingId);
+        const docToConfirm = await getDoc(bookingRef);
+        if (!docToConfirm.exists()) return null;
 
-    const bookingToConfirm = fromFirestore<Booking>(doc, ['bookingDate', 'createdAt']);
-    if (bookingToConfirm.bookingStatus !== BookingStatus.Pending) return null;
+        const bookingToConfirm = fromFirestore<Booking>(docToConfirm, ['bookingDate', 'createdAt']);
+        if (bookingToConfirm.bookingStatus !== BookingStatus.Pending) return null;
 
-    const dpAmount = calculateDpAmount(bookingToConfirm);
-    const batch = db.batch();
-    
-    // 1. Update booking
-    batch.update(bookingRef, {
-        bookingStatus: BookingStatus.Confirmed,
-        paymentStatus: PaymentStatus.Paid,
-        remainingBalance: bookingToConfirm.totalPrice - dpAmount,
-    });
+        const dpAmount = calculateDpAmount(bookingToConfirm);
+        const batch = writeBatch(db);
+        
+        batch.update(bookingRef, {
+            bookingStatus: BookingStatus.Confirmed,
+            paymentStatus: PaymentStatus.Paid,
+            remainingBalance: bookingToConfirm.totalPrice - dpAmount,
+        });
 
-    // 2. Create financial transaction
-    const transactionRef = db.collection('transactions').doc();
-    batch.set(transactionRef, {
-        date: firebase.firestore.FieldValue.serverTimestamp(),
-        description: `DP Booking ${bookingToConfirm.bookingCode} - ${bookingToConfirm.clientName}`,
-        type: TransactionType.Income,
-        amount: dpAmount,
-        bookingId: bookingId,
-    });
+        const transactionRef = doc(collection(db, 'transactions'));
+        batch.set(transactionRef, {
+            date: serverTimestamp(),
+            description: `DP Booking ${bookingToConfirm.bookingCode} - ${bookingToConfirm.clientName}`,
+            type: TransactionType.Income,
+            amount: dpAmount,
+            bookingId: bookingId,
+        });
 
-    await batch.commit();
-    await logActivity(currentUserId, `Mengonfirmasi booking ${bookingToConfirm.bookingCode}`, `DP Rp ${dpAmount.toLocaleString('id-ID')} dicatat.`);
-    notificationService.notify({ recipient: UserRole.Staff, type: 'success', message: `Booking ${bookingToConfirm.bookingCode} oleh ${bookingToConfirm.clientName} telah dikonfirmasi.`, link: '/staff/schedule'});
-    
-    const updatedDoc = await bookingRef.get();
-    return fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt']);
+        await batch.commit();
+        await logActivity(currentUserId, `Mengonfirmasi booking ${bookingToConfirm.bookingCode}`, `DP Rp ${dpAmount.toLocaleString('id-ID')} dicatat.`);
+        notificationService.notify({ recipient: UserRole.Staff, type: 'success', message: `Booking ${bookingToConfirm.bookingCode} oleh ${bookingToConfirm.clientName} telah dikonfirmasi.`, link: '/staff/schedule'});
+        
+        const updatedDoc = await getDoc(bookingRef);
+        return fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt']);
+    } catch (error) {
+        console.error("Error confirming booking:", error);
+        return null;
+    }
 };
 
 export const completeBookingSession = async (bookingId: string, googleDriveLink: string, currentUserId: string): Promise<Booking | null> => {
-    const bookingRef = db.collection('bookings').doc(bookingId);
-    const doc = await bookingRef.get();
-    if (!doc.exists) return null;
-    const bookingToComplete = fromFirestore<Booking>(doc, ['bookingDate', 'createdAt']);
+    try {
+        const bookingRef = doc(db, 'bookings', bookingId);
+        const docToComplete = await getDoc(bookingRef);
+        if (!docToComplete.exists()) return null;
+        const bookingToComplete = fromFirestore<Booking>(docToComplete, ['bookingDate', 'createdAt']);
 
-    const settings = await getSystemSettings();
-    const client = await getClientByEmail(bookingToComplete.clientEmail);
-    if (!client) {
-        console.error("Client not found for booking completion");
+        const settings = await getSystemSettings();
+        const client = await getClientByEmail(bookingToComplete.clientEmail);
+        if (!client) {
+            console.error("Client not found for booking completion");
+            return null;
+        }
+        
+        const clientRef = doc(db, 'clients', client.email);
+        const batch = writeBatch(db);
+
+        const pointsEarned = Math.floor(bookingToComplete.totalPrice * settings.loyaltySettings.pointsPerRupiah);
+
+        const clientUpdateData: any = {
+            loyaltyPoints: increment(pointsEarned),
+            totalBookings: increment(1),
+            totalSpent: increment(bookingToComplete.totalPrice),
+            lastBooking: new Date(),
+        };
+
+        if (client.totalBookings === 0 && bookingToComplete.referralCodeUsed) {
+            const referrer = await getClientByReferralCode(bookingToComplete.referralCodeUsed);
+            if (referrer) {
+                const referrerBonus = settings.loyaltySettings.referralBonusPoints;
+                const referrerRef = doc(db, 'clients', referrer.email);
+                batch.update(referrerRef, { loyaltyPoints: increment(referrerBonus) });
+                clientUpdateData.loyaltyPoints = increment(pointsEarned + referrerBonus);
+            }
+        }
+
+        const newTotalBookings = client.totalBookings + 1;
+        const sortedTiers = settings.loyaltySettings.loyaltyTiers.sort((a, b) => b.bookingThreshold - a.bookingThreshold);
+        const newTier = sortedTiers.find(tier => newTotalBookings >= tier.bookingThreshold);
+        
+        if (newTier && newTier.name !== client.loyaltyTier) {
+            clientUpdateData.loyaltyTier = newTier.name;
+             notificationService.notify({ recipient: UserRole.Admin, type: 'success', message: `Selamat! Klien ${client.name} mencapai tier loyalitas ${newTier.name}.`, link: '/admin/clients'});
+        }
+
+        const finalPaymentAmount = bookingToComplete.remainingBalance;
+
+        batch.update(bookingRef, {
+            bookingStatus: BookingStatus.Completed,
+            paymentStatus: PaymentStatus.Paid,
+            remainingBalance: 0,
+            googleDriveLink: googleDriveLink,
+            pointsEarned: pointsEarned,
+        });
+
+        batch.update(clientRef, clientUpdateData);
+
+        if (finalPaymentAmount > 0) {
+            const transactionRef = doc(collection(db, 'transactions'));
+            batch.set(transactionRef, {
+                date: serverTimestamp(),
+                description: `Pelunasan Sesi ${bookingToComplete.bookingCode} - ${bookingToComplete.clientName}`,
+                type: TransactionType.Income,
+                amount: finalPaymentAmount,
+                bookingId: bookingId,
+            });
+        }
+        
+        await batch.commit();
+        await logActivity(currentUserId, `Menyelesaikan sesi ${bookingToComplete.bookingCode}`, `Pelunasan Rp ${finalPaymentAmount.toLocaleString('id-ID')} dicatat.`);
+        
+        const updatedDoc = await getDoc(bookingRef);
+        return fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt']);
+    } catch (error) {
+        console.error("Error completing booking session:", error);
         return null;
     }
-    
-    const clientRef = db.collection('clients').doc(client.email);
-    const batch = db.batch();
-
-    const pointsEarned = Math.floor(bookingToComplete.totalPrice * settings.loyaltySettings.pointsPerRupiah);
-
-    const clientUpdateData: any = {
-        loyaltyPoints: firebase.firestore.FieldValue.increment(pointsEarned),
-        totalBookings: firebase.firestore.FieldValue.increment(1),
-        totalSpent: firebase.firestore.FieldValue.increment(bookingToComplete.totalPrice),
-        lastBooking: new Date(),
-    };
-
-    // If it's the client's first completed booking and they were referred, award bonus points.
-    if (client.totalBookings === 0 && bookingToComplete.referralCodeUsed) {
-        const referrer = await getClientByReferralCode(bookingToComplete.referralCodeUsed);
-        if (referrer) {
-            const referrerBonus = settings.loyaltySettings.referralBonusPoints;
-            const referrerRef = db.collection('clients').doc(referrer.email);
-            batch.update(referrerRef, { loyaltyPoints: firebase.firestore.FieldValue.increment(referrerBonus) });
-            // The referred client also gets points
-            clientUpdateData.loyaltyPoints = firebase.firestore.FieldValue.increment(pointsEarned + referrerBonus);
-        }
-    }
-
-    // Check for new loyalty tier
-    const newTotalBookings = client.totalBookings + 1;
-    const sortedTiers = settings.loyaltySettings.loyaltyTiers.sort((a, b) => b.bookingThreshold - a.bookingThreshold);
-    const newTier = sortedTiers.find(tier => newTotalBookings >= tier.bookingThreshold);
-    
-    if (newTier && newTier.name !== client.loyaltyTier) {
-        clientUpdateData.loyaltyTier = newTier.name;
-         notificationService.notify({ recipient: UserRole.Admin, type: 'success', message: `Selamat! Klien ${client.name} mencapai tier loyalitas ${newTier.name}.`, link: '/admin/clients'});
-    }
-
-
-    const finalPaymentAmount = bookingToComplete.remainingBalance;
-
-    batch.update(bookingRef, {
-        bookingStatus: BookingStatus.Completed,
-        paymentStatus: PaymentStatus.Paid,
-        remainingBalance: 0,
-        googleDriveLink: googleDriveLink,
-        pointsEarned: pointsEarned,
-    });
-
-    batch.update(clientRef, clientUpdateData);
-
-    if (finalPaymentAmount > 0) {
-        const transactionRef = db.collection('transactions').doc();
-        batch.set(transactionRef, {
-            date: firebase.firestore.FieldValue.serverTimestamp(),
-            description: `Pelunasan Sesi ${bookingToComplete.bookingCode} - ${bookingToComplete.clientName}`,
-            type: TransactionType.Income,
-            amount: finalPaymentAmount,
-            bookingId: bookingId,
-        });
-    }
-    
-    await batch.commit();
-    await logActivity(currentUserId, `Menyelesaikan sesi ${bookingToComplete.bookingCode}`, `Pelunasan Rp ${finalPaymentAmount.toLocaleString('id-ID')} dicatat.`);
-    
-    const updatedDoc = await bookingRef.get();
-    return fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt']);
 };
 
 export const requestReschedule = async (bookingId: string, newDate: Date): Promise<Booking | null> => {
-    const bookingRef = db.collection('bookings').doc(bookingId);
-    await bookingRef.update({
-        bookingStatus: BookingStatus.RescheduleRequested,
-        rescheduleRequestDate: newDate,
-    });
-    const doc = await bookingRef.get();
-    const booking = fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
-    
-    notificationService.notify({ recipient: UserRole.Admin, type: 'warning', message: `Klien ${booking.clientName} meminta jadwal ulang.`, link: '/admin/schedule'});
-    return booking;
+    try {
+        const bookingRef = doc(db, 'bookings', bookingId);
+        await updateDoc(bookingRef, {
+            bookingStatus: BookingStatus.RescheduleRequested,
+            rescheduleRequestDate: newDate,
+        });
+        const updatedDoc = await getDoc(bookingRef);
+        const booking = fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+        
+        notificationService.notify({ recipient: UserRole.Admin, type: 'warning', message: `Klien ${booking.clientName} meminta jadwal ulang.`, link: '/admin/schedule'});
+        return booking;
+    } catch (error) {
+        console.error("Error requesting reschedule:", error);
+        return null;
+    }
 };
 
 export const isSlotAvailable = async (date: Date, excludeBookingId?: string): Promise<boolean> => {
-    const snapshot = await db.collection('bookings')
-      .where('bookingDate', '==', date)
-      .where('bookingStatus', 'in', [BookingStatus.Confirmed, BookingStatus.InProgress])
-      .get();
-      
-    if (snapshot.empty) return true;
-    return snapshot.docs.every(doc => doc.id === excludeBookingId);
+    try {
+        const q = query(collection(db, 'bookings'),
+          where('bookingDate', '==', date),
+          where('bookingStatus', 'in', [BookingStatus.Confirmed, BookingStatus.InProgress])
+        );
+        const snapshot = await getDocs(q);
+          
+        if (snapshot.empty) return true;
+        return snapshot.docs.every(doc => doc.id === excludeBookingId);
+    } catch (error) {
+        console.error("Error checking slot availability:", error);
+        return false;
+    }
 };
 
 export const getTodaysBookings = async (): Promise<Booking[]> => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-    
-    const snapshot = await db.collection('bookings')
-      .where('bookingDate', '>=', todayStart)
-      .where('bookingDate', '<=', todayEnd)
-      .where('bookingStatus', 'in', [BookingStatus.Confirmed, BookingStatus.InProgress, BookingStatus.Completed])
-      .orderBy('bookingDate', 'asc')
-      .get();
-      
-    return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt']));
+    try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        
+        const q = query(collection(db, 'bookings'),
+          where('bookingDate', '>=', todayStart),
+          where('bookingDate', '<=', todayEnd),
+          where('bookingStatus', 'in', [BookingStatus.Confirmed, BookingStatus.InProgress, BookingStatus.Completed]),
+          orderBy('bookingDate', 'asc')
+        );
+        const snapshot = await getDocs(q);
+          
+        return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt']));
+    } catch (error) {
+        console.error("Error fetching today's bookings:", error);
+        return [];
+    }
 };
 
-// --- SPONSORSHIP ---
+// --- SPONSORSHIPS ---
 export const getSponsorships = async (): Promise<Sponsorship[]> => {
-    const snapshot = await db.collection('sponsorships').orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Sponsorship>(doc, ['createdAt']));
+    try {
+        const q = query(collection(db, 'sponsorships'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Sponsorship>(doc, ['createdAt']));
+    } catch (error) {
+        console.error("Error fetching sponsorships:", error);
+        return [];
+    }
 };
 
-export const updateSponsorship = async (sponsorshipId: string, updatedData: Partial<Sponsorship>, currentUserId: string): Promise<Sponsorship> => {
-    const sponsorshipRef = db.collection('sponsorships').doc(sponsorshipId);
-    await sponsorshipRef.update(updatedData);
-    await logActivity(currentUserId, `Mengubah sponsorship ${updatedData.eventName || sponsorshipId}`, `Status baru: ${updatedData.status}`);
-    const doc = await sponsorshipRef.get();
-    return fromFirestore<Sponsorship>(doc, ['createdAt']);
+export const updateSponsorship = async (sponsorshipId: string, updatedData: Partial<Sponsorship>, currentUserId: string): Promise<Sponsorship | null> => {
+    try {
+        const sponsorshipRef = doc(db, 'sponsorships', sponsorshipId);
+        await updateDoc(sponsorshipRef, updatedData);
+        const updatedDoc = await getDoc(sponsorshipRef);
+        if (!updatedDoc.exists()) return null;
+
+        const sponsorship = fromFirestore<Sponsorship>(updatedDoc, ['createdAt']);
+        await logActivity(currentUserId, `Mengubah status sponsorship untuk ${sponsorship.eventName}`);
+        
+        return sponsorship;
+    } catch (error) {
+        console.error("Error updating sponsorship:", error);
+        return null;
+    }
 };
 
 export const deleteSponsorship = async (sponsorshipId: string, currentUserId: string): Promise<void> => {
-    const docRef = db.collection('sponsorships').doc(sponsorshipId);
-    const doc = await docRef.get();
-    // TODO: delete proposal file from cloudinary
-    await docRef.delete();
-    await logActivity(currentUserId, `Menghapus sponsorship: ${doc.data()?.eventName}`);
+    try {
+        const sponsorshipRef = doc(db, 'sponsorships', sponsorshipId);
+        const docToDelete = await getDoc(sponsorshipRef);
+        if (!docToDelete.exists()) return;
+        
+        const sponsorshipData = docToDelete.data();
+        await deleteDoc(sponsorshipRef);
+        await logActivity(currentUserId, `Menghapus sponsorship: ${sponsorshipData?.eventName}`);
+    } catch (error) {
+        console.error("Error deleting sponsorship:", error);
+    }
 };
 
 // --- USER CRUD (Already on Firebase, verified) ---
 export const getUsers = async (): Promise<User[]> => {
-    const snapshot = await db.collection("users").get();
-    return snapshot.docs.map(doc => fromFirestore<User>(doc, ['startDate', 'endDate']));
+    try {
+        const snapshot = await getDocs(collection(db, "users"));
+        return snapshot.docs.map(doc => fromFirestore<User>(doc, ['startDate', 'endDate']));
+    } catch (error) {
+        console.error("Error fetching users:", error);
+        return [];
+    }
 };
 
 export const getUserById = async (userId: string): Promise<User | null> => {
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
+    try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (!userDoc.exists()) {
+            return null;
+        }
+        return fromFirestore<User>(userDoc, ['startDate', 'endDate']);
+    } catch (error) {
+        console.error("Error fetching user by ID:", error);
         return null;
     }
-    return fromFirestore<User>(userDoc, ['startDate', 'endDate']);
 };
 
 
 export const addUser = async (user: Omit<User, 'id'>, currentUserId: string): Promise<User> => {
-    const userCredential = await auth.createUserWithEmailAndPassword(user.email, user.password!);
+    if (!user.password) {
+        throw new Error("Password is required to create a new user.");
+    }
+    const userCredential = await createUserWithEmailAndPassword(auth, user.email, user.password);
     const firebaseUser = userCredential.user;
     if (!firebaseUser) throw new Error("Failed to create user in Firebase Auth.");
 
-    // Create a new object to avoid passing password to Firestore
     const { password, ...userDataForFirestore } = user;
     if (userDataForFirestore.username) {
         userDataForFirestore.username = userDataForFirestore.username.toLowerCase();
     }
 
-    await db.collection('users').doc(firebaseUser.uid).set(userDataForFirestore);
+    await setDoc(doc(db, 'users', firebaseUser.uid), userDataForFirestore);
     await logActivity(currentUserId, `Membuat user baru: ${user.name}`, `Role: ${user.role}`);
     return { id: firebaseUser.uid, ...userDataForFirestore };
 };
 
 
 export const updateUser = async (userId: string, updatedData: Partial<Omit<User, 'id' | 'email' | 'password'>>, currentUserId: string): Promise<User | null> => {
-    const userDocRef = db.collection('users').doc(userId);
-    await userDocRef.update(updatedData);
-    const doc = await userDocRef.get();
-    await logActivity(currentUserId, `Mengubah user ${doc.data()?.name}`);
-    return fromFirestore<User>(doc);
+    try {
+        const userDocRef = doc(db, 'users', userId);
+        await updateDoc(userDocRef, updatedData);
+        const updatedDoc = await getDoc(userDocRef);
+        await logActivity(currentUserId, `Mengubah user ${updatedDoc.data()?.name}`);
+        return fromFirestore<User>(updatedDoc);
+    } catch (error) {
+        console.error("Error updating user:", error);
+        return null;
+    }
 };
 
 export const deleteUser = async (userId: string, currentUserId: string): Promise<boolean> => {
-    const userDocRef = db.collection('users').doc(userId);
-    const doc = await userDocRef.get();
-    if (!doc.exists) return false;
-    const userToDelete = doc.data() as User;
-    await userDocRef.delete();
-    await logActivity(currentUserId, `Menghapus user (Firestore record): ${userToDelete.name}`);
-    return true;
+    try {
+        const response = await fetch('/api/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'delete',
+                userIdToDelete: userId,
+                currentUserId: currentUserId,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Gagal menghapus pengguna.');
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Error deleting user via API:", error);
+        alert(`Gagal menghapus pengguna: ${(error as Error).message}`);
+        return false;
+    }
 };
 
 // --- PACKAGES & ADDONS ---
 export const getPackages = async (): Promise<Package[]> => {
-    const snapshot = await db.collection('packages').orderBy('name').get();
-    return snapshot.docs.map(doc => fromFirestore<Package>(doc));
+    try {
+        const q = query(collection(db, 'packages'), orderBy('name'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Package>(doc));
+    } catch (error) {
+        console.error("Error fetching packages:", error);
+        return [];
+    }
 };
 
 export const addPackage = async (pkg: Omit<Package, 'id'>, currentUserId: string): Promise<Package> => {
-    const docRef = await db.collection('packages').add(pkg);
+    const docRef = await addDoc(collection(db, 'packages'), pkg);
     await logActivity(currentUserId, `Menambah paket baru: ${pkg.name}`);
-    const doc = await docRef.get();
-    return fromFirestore<Package>(doc);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Package>(newDoc);
 };
 
 export const updatePackage = async (packageId: string, updatedData: Partial<Omit<Package, 'id'>>, currentUserId: string): Promise<Package> => {
-    const packageRef = db.collection('packages').doc(packageId);
-    await packageRef.update(updatedData);
+    const packageRef = doc(db, 'packages', packageId);
+    await updateDoc(packageRef, updatedData);
     await logActivity(currentUserId, `Mengubah paket ${updatedData.name}`);
-    const doc = await packageRef.get();
-    return fromFirestore<Package>(doc);
+    const updatedDoc = await getDoc(packageRef);
+    return fromFirestore<Package>(updatedDoc);
 };
 
 export const deletePackage = async (packageId: string, currentUserId: string): Promise<void> => {
-    const docRef = db.collection('packages').doc(packageId);
-    const doc = await docRef.get();
-    // Note: Deleting from Cloudinary would require a separate backend function call
-    await docRef.delete();
-    await logActivity(currentUserId, `Menghapus paket: ${doc.data()?.name}`);
+    const docRef = doc(db, 'packages', packageId);
+    const docToDelete = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus paket: ${docToDelete.data()?.name}`);
 };
 
 export const getAddOns = async (): Promise<AddOn[]> => {
-    const snapshot = await db.collection('addons').orderBy('name').get();
-    return snapshot.docs.map(doc => fromFirestore<AddOn>(doc));
+    try {
+        const q = query(collection(db, 'addons'), orderBy('name'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<AddOn>(doc));
+    } catch (error) {
+        console.error("Error fetching add-ons:", error);
+        return [];
+    }
 };
 
-// ... (Other CRUD for Packages, Addons, Sub-items would follow a similar pattern using Firestore) ...
+// ... (Other CRUDs for Packages, Addons, Sub-items would follow a similar pattern using Firestore) ...
 export const validatePromoCode = async (code: string): Promise<{ valid: boolean; message: string; promo?: Promo }> => {
     if (!code) return { valid: false, message: 'Kode tidak boleh kosong.' };
     const upperCaseCode = code.toUpperCase();
     
-    const snapshot = await db.collection('promos')
-        .where('code', '==', upperCaseCode)
-        .where('isActive', '==', true)
-        .limit(1)
-        .get();
+    const q = query(collection(db, 'promos'),
+        where('code', '==', upperCaseCode),
+        where('isActive', '==', true),
+        limit(1)
+    );
+    const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
         return { valid: false, message: 'Kode promo tidak valid atau sudah tidak berlaku.' };
@@ -476,110 +630,165 @@ const STAFF_DAILY_TASKS_TEMPLATE = [
 ];
 
 export const getDailyTasks = async (userId: string) => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const docRef = db.collection('users').doc(userId).collection('daily_task_completions').doc(todayStr);
-    const doc = await docRef.get();
-    const completions = doc.exists ? doc.data() : {};
-    return STAFF_DAILY_TASKS_TEMPLATE.map(task => ({
-        ...task,
-        completed: completions?.[task.id] || false,
-    }));
+    try {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const docRef = doc(db, 'users', userId, 'daily_task_completions', todayStr);
+        const docSnap = await getDoc(docRef);
+        const completions = docSnap.exists() ? docSnap.data() : {};
+        return STAFF_DAILY_TASKS_TEMPLATE.map(task => ({
+            ...task,
+            completed: completions?.[task.id] || false,
+        }));
+    } catch (error) {
+        console.error("Error fetching daily tasks:", error);
+        return STAFF_DAILY_TASKS_TEMPLATE.map(t => ({...t, completed: false}));
+    }
 };
 
 export const updateDailyTaskStatus = async (userId: string, taskId: string, completed: boolean) => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const docRef = db.collection('users').doc(userId).collection('daily_task_completions').doc(todayStr);
-    await docRef.set({ [taskId]: completed }, { merge: true });
+    const docRef = doc(db, 'users', userId, 'daily_task_completions', todayStr);
+    await setDoc(docRef, { [taskId]: completed }, { merge: true });
 };
 
 export const getTasksForUser = async (userId: string): Promise<Task[]> => {
-    const snapshot = await db.collection('tasks').where('assigneeId', '==', userId).orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Task>(doc, ['createdAt', 'dueDate']));
+    try {
+        const q = query(collection(db, 'tasks'), where('assigneeId', '==', userId), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Task>(doc, ['createdAt', 'dueDate']));
+    } catch (error) {
+        console.error("Error fetching tasks for user:", error);
+        return [];
+    }
 };
 
 export const createTask = async (task: Omit<Task, 'id'>, currentUserId: string): Promise<Task> => {
-    const docRef = await db.collection('tasks').add(task);
+    const docRef = await addDoc(collection(db, 'tasks'), task);
     await logActivity(currentUserId, `Menugaskan tugas ke ${task.assigneeName}`, task.text);
-    const doc = await docRef.get();
-    return fromFirestore<Task>(doc, ['createdAt', 'dueDate']);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Task>(newDoc, ['createdAt', 'dueDate']);
 };
 
 export const updateTask = async (taskId: string, updates: Partial<Task>, currentUserId: string): Promise<void> => {
-    await db.collection('tasks').doc(taskId).update(updates);
-    // Optional: Log this activity
+    const taskRef = doc(db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+    if (!taskSnap.exists()) return;
+    const taskData = taskSnap.data();
+
+    await updateDoc(taskRef, updates);
+
+    let actionDetails = `Tugas: "${taskData.text}"`;
+    if (updates.hasOwnProperty('completed')) {
+        const action = updates.completed ? `Menandai tugas selesai` : `Membatalkan status selesai tugas`;
+        await logActivity(currentUserId, action, `${actionDetails} untuk ${taskData.assigneeName}`);
+    } else {
+        await logActivity(currentUserId, 'Memperbarui tugas', actionDetails);
+    }
 };
 
 export const deleteTask = async (taskId: string, currentUserId: string): Promise<void> => {
-    const doc = await db.collection('tasks').doc(taskId).get();
-    await db.collection('tasks').doc(taskId).delete();
-    await logActivity(currentUserId, `Menghapus tugas untuk ${doc.data()?.assigneeName}`, doc.data()?.text);
+    const docRef = doc(db, 'tasks', taskId);
+    const docToDelete = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus tugas untuk ${docToDelete.data()?.assigneeName}`, docToDelete.data()?.text);
 };
 
 export const addMentorFeedback = async (internId: string, feedbackData: Omit<MentorFeedback, 'id' | 'date'>): Promise<MentorFeedback> => {
     const feedbackWithDate = { ...feedbackData, date: new Date() };
-    const docRef = await db.collection('users').doc(internId).collection('mentorFeedback').add(feedbackWithDate);
-    const doc = await docRef.get();
-    const data = { id: doc.id, ...doc.data() } as MentorFeedback;
-    if (data.date && (data.date as any).toDate) {
-        data.date = (data.date as any).toDate();
-    }
+    const docRef = await addDoc(collection(db, 'users', internId, 'mentorFeedback'), feedbackWithDate);
+    const newDoc = await getDoc(docRef);
+    const data = fromFirestore<MentorFeedback>(newDoc, ['date']);
     return data;
 };
 
 export const getMentorFeedbackForIntern = async (internId: string): Promise<MentorFeedback[]> => {
-    const snapshot = await db.collection('users').doc(internId).collection('mentorFeedback').orderBy('date', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<MentorFeedback>(doc, ['date']));
+    try {
+        const q = query(collection(db, 'users', internId, 'mentorFeedback'), orderBy('date', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<MentorFeedback>(doc, ['date']));
+    } catch (error) {
+        console.error("Error fetching mentor feedback:", error);
+        return [];
+    }
 };
 
 
-// FIX: Implement and export updateTaskProgress to track intern task progress.
 export const updateTaskProgress = async (taskId: string, progress: number): Promise<void> => {
-    await db.collection('tasks').doc(taskId).update({ progress });
+    await updateDoc(doc(db, 'tasks', taskId), { progress });
 };
 
 
-// FIX: Implement and export functions for intern attendance and daily reports.
 // --- INTERN MANAGEMENT ---
 
 export const updateUserPoints = async (userId: string, pointsToAdd: number): Promise<void> => {
-    const userRef = db.collection('users').doc(userId);
-    await userRef.update({
-        totalPoints: firebase.firestore.FieldValue.increment(pointsToAdd)
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+        totalPoints: increment(pointsToAdd)
     });
 };
 
 export const getInternLeaderboard = async (): Promise<User[]> => {
-    const snapshot = await db.collection('users')
-        .where('role', 'in', [UserRole.AnakMagang, UserRole.AnakPKL])
-        .orderBy('totalPoints', 'desc')
-        .limit(5)
-        .get();
-    
-    return snapshot.docs.map(doc => fromFirestore<User>(doc));
+    try {
+        const q = query(collection(db, 'users'),
+            where('role', 'in', [UserRole.AnakMagang, UserRole.AnakPKL]),
+            orderBy('totalPoints', 'desc'),
+            limit(5)
+        );
+        const snapshot = await getDocs(q);
+        
+        return snapshot.docs.map(doc => fromFirestore<User>(doc));
+    } catch (error) {
+        console.error("Error fetching intern leaderboard:", error);
+        return [];
+    }
 };
 
 export const getAttendanceForUser = async (userId: string): Promise<Attendance[]> => {
-    const snapshot = await db.collection('attendance').where('userId', '==', userId).orderBy('checkInTime', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']));
+    try {
+        const q = query(collection(db, 'attendance'), where('userId', '==', userId), orderBy('checkInTime', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']));
+    } catch (error) {
+        console.error("Error fetching attendance for user:", error);
+        return [];
+    }
 };
 
 export const getTodaysAttendanceForAll = async (): Promise<Attendance[]> => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const snapshot = await db.collection('attendance').where('date', '==', todayStr).get();
-    if (snapshot.empty) return [];
-    return snapshot.docs.map(doc => fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']));
+    try {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const q = query(collection(db, 'attendance'), where('date', '==', todayStr));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return [];
+        return snapshot.docs.map(doc => fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']));
+    } catch (error) {
+        console.error("Error fetching today's attendance for all:", error);
+        return [];
+    }
 };
 
 export const getDailyReportsForUser = async (userId: string): Promise<DailyReport[]> => {
-    const snapshot = await db.collection('daily_reports').where('userId', '==', userId).orderBy('submittedAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<DailyReport>(doc, ['submittedAt']));
+    try {
+        const q = query(collection(db, 'daily_reports'), where('userId', '==', userId), orderBy('submittedAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<DailyReport>(doc, ['submittedAt']));
+    } catch (error) {
+        console.error("Error fetching daily reports for user:", error);
+        return [];
+    }
 };
 
 export const getTodaysAttendance = async (userId: string): Promise<Attendance | null> => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const snapshot = await db.collection('attendance').where('userId', '==', userId).where('date', '==', todayStr).limit(1).get();
-    if (snapshot.empty) return null;
-    return fromFirestore<Attendance>(snapshot.docs[0], ['checkInTime', 'checkOutTime']);
+    try {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const q = query(collection(db, 'attendance'), where('userId', '==', userId), where('date', '==', todayStr), limit(1));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+        return fromFirestore<Attendance>(snapshot.docs[0], ['checkInTime', 'checkOutTime']);
+    } catch (error) {
+        console.error("Error fetching today's attendance:", error);
+        return null;
+    }
 };
 
 export const checkIn = async (userId: string): Promise<Attendance> => {
@@ -593,23 +802,29 @@ export const checkIn = async (userId: string): Promise<Attendance> => {
         checkInTime: new Date(),
         status: AttendanceStatus.Present,
     };
-    const docRef = await db.collection('attendance').add(newAttendanceData);
-    const doc = await docRef.get();
-    return fromFirestore<Attendance>(doc, ['checkInTime']);
+    const docRef = await addDoc(collection(db, 'attendance'), newAttendanceData);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Attendance>(newDoc, ['checkInTime']);
 };
 
 export const checkOut = async (userId: string, attendanceId: string): Promise<Attendance> => {
-    const docRef = db.collection('attendance').doc(attendanceId);
-    await docRef.update({ checkOutTime: new Date() });
-    const doc = await docRef.get();
-    return fromFirestore<Attendance>(doc, ['checkInTime', 'checkOutTime']);
+    const docRef = doc(db, 'attendance', attendanceId);
+    await updateDoc(docRef, { checkOutTime: new Date() });
+    const updatedDoc = await getDoc(docRef);
+    return fromFirestore<Attendance>(updatedDoc, ['checkInTime', 'checkOutTime']);
 };
 
 export const getTodaysReport = async (userId: string): Promise<DailyReport | null> => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const snapshot = await db.collection('daily_reports').where('userId', '==', userId).where('date', '==', todayStr).limit(1).get();
-    if (snapshot.empty) return null;
-    return fromFirestore<DailyReport>(snapshot.docs[0], ['submittedAt']);
+    try {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const q = query(collection(db, 'daily_reports'), where('userId', '==', userId), where('date', '==', todayStr), limit(1));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+        return fromFirestore<DailyReport>(snapshot.docs[0], ['submittedAt']);
+    } catch (error) {
+        console.error("Error fetching today's report:", error);
+        return null;
+    }
 };
 
 export const submitDailyReport = async (reportData: Omit<DailyReport, 'id' | 'submittedAt' | 'date' | 'status'>): Promise<DailyReport> => {
@@ -620,12 +835,11 @@ export const submitDailyReport = async (reportData: Omit<DailyReport, 'id' | 'su
         submittedAt: new Date(),
         status: ReportStatus.Dikirim,
     };
-    const docRef = await db.collection('daily_reports').add(newReportData);
-    const doc = await docRef.get();
-    return fromFirestore<DailyReport>(doc, ['submittedAt']);
+    const docRef = await addDoc(collection(db, 'daily_reports'), newReportData);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<DailyReport>(newDoc, ['submittedAt']);
 };
 
-// FIX: Add the missing 'generateAiFeedbackForReport' function.
 export const generateAiFeedbackForReport = async (reportId: string, reportContent: string): Promise<DailyReport> => {
     const response = await fetch('/api/ai', {
         method: 'POST',
@@ -637,7 +851,6 @@ export const generateAiFeedbackForReport = async (reportId: string, reportConten
         throw new Error(errorData.message || 'Failed to generate AI feedback');
     }
     const data = await response.json();
-    // Convert ISO string back to Date object to match the type
     if (data.submittedAt) {
         data.submittedAt = new Date(data.submittedAt);
     }
@@ -646,25 +859,19 @@ export const generateAiFeedbackForReport = async (reportId: string, reportConten
 
 export const checkAndSendReportReminders = async () => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    
-    // 1. Get all interns
-    const usersSnapshot = await db.collection('users').where('role', 'in', [UserRole.AnakMagang, UserRole.AnakPKL]).get();
+    const usersQuery = query(collection(db, 'users'), where('role', 'in', [UserRole.AnakMagang, UserRole.AnakPKL]));
+    const usersSnapshot = await getDocs(usersQuery);
     const interns = usersSnapshot.docs.map(doc => fromFirestore<User>(doc));
 
-    // 2. Get today's reports
-    const reportsSnapshot = await db.collection('daily_reports').where('date', '==', todayStr).get();
+    const reportsQuery = query(collection(db, 'daily_reports'), where('date', '==', todayStr));
+    const reportsSnapshot = await getDocs(reportsQuery);
     const submittedInternIds = new Set(reportsSnapshot.docs.map(doc => doc.data().userId));
-
-    // 3. Find interns who haven't submitted
+    
     const internsToRemind = interns.filter(intern => !submittedInternIds.has(intern.id));
-
-    // 4. Log reminder
     if (internsToRemind.length > 0) {
         console.log(`[REMINDER SIMULATION @ ${new Date().toLocaleTimeString()}]`);
         console.log("Mengirim pengingat laporan harian kepada intern berikut:");
-        internsToRemind.forEach(intern => {
-            console.log(`- ${intern.name} (${intern.email})`);
-        });
+        internsToRemind.forEach(intern => console.log(`- ${intern.name} (${intern.email})`));
     } else {
         console.log(`[REMINDER SIMULATION @ ${new Date().toLocaleTimeString()}] Semua intern sudah mengirimkan laporan hari ini.`);
     }
@@ -727,65 +934,93 @@ export const generateSocialMediaCaption = async (asset: Asset): Promise<string[]
 
 
 export const getInternReports = async (internId: string): Promise<InternReport[]> => {
-  const snapshot = await db.collection('users').doc(internId).collection('reports').orderBy('generatedAt', 'desc').get();
-  return snapshot.docs.map(doc => fromFirestore<InternReport>(doc, ['generatedAt']));
+  try {
+    const q = query(collection(db, 'users', internId, 'reports'), orderBy('generatedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => fromFirestore<InternReport>(doc, ['generatedAt']));
+  } catch (error) {
+    console.error("Error fetching intern reports:", error);
+    return [];
+  }
 };
 
 export const getLatestAIInsight = async (userId: string): Promise<AIInsight | null> => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
 
-    const snapshot = await db.collection('users').doc(userId).collection('aiInsights')
-        .where('date', '>=', todayStart)
-        .orderBy('date', 'desc')
-        .limit(1)
-        .get();
+        const q = query(collection(db, 'users', userId, 'aiInsights'),
+            where('date', '>=', todayStart),
+            orderBy('date', 'desc'),
+            limit(1)
+        );
+        const snapshot = await getDocs(q);
 
-    if (snapshot.empty) {
+        if (snapshot.empty) {
+            return null;
+        }
+        return fromFirestore<AIInsight>(snapshot.docs[0], ['date']);
+    } catch (error) {
+        console.error("Error fetching latest AI insight:", error);
         return null;
     }
-    return fromFirestore<AIInsight>(snapshot.docs[0], ['date']);
 };
 
 // --- Progress & Evaluation ---
 export const addDailyProgress = async (progressData: Omit<DailyProgress, 'id' | 'submittedAt'>): Promise<DailyProgress> => {
-    const dataToSave = {
-        ...progressData,
-        submittedAt: new Date(),
-    };
-    const docRef = await db.collection('progress').add(dataToSave);
-    const doc = await docRef.get();
-    return fromFirestore<DailyProgress>(doc, ['submittedAt']);
+    const dataToSave = { ...progressData, submittedAt: new Date(), };
+    const docRef = await addDoc(collection(db, 'progress'), dataToSave);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<DailyProgress>(newDoc, ['submittedAt']);
 };
 
 export const getDailyProgressForUser = async (userId: string): Promise<DailyProgress[]> => {
-    const snapshot = await db.collection('progress').where('studentId', '==', userId).orderBy('submittedAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<DailyProgress>(doc, ['submittedAt']));
+    try {
+        const q = query(collection(db, 'progress'), where('studentId', '==', userId), orderBy('submittedAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<DailyProgress>(doc, ['submittedAt']));
+    } catch (error) {
+        console.error("Error fetching daily progress:", error);
+        return [];
+    }
 };
 
 export const addWeeklyEvaluation = async (evalData: Omit<WeeklyEvaluation, 'id' | 'date'>): Promise<WeeklyEvaluation> => {
-    const dataToSave = {
-        ...evalData,
-        date: new Date(),
-    };
-    const docRef = await db.collection('weekly_evaluations').add(dataToSave);
-    const doc = await docRef.get();
-    return fromFirestore<WeeklyEvaluation>(doc, ['date']);
+    const dataToSave = { ...evalData, date: new Date(), };
+    const docRef = await addDoc(collection(db, 'weekly_evaluations'), dataToSave);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<WeeklyEvaluation>(newDoc, ['date']);
 };
 
 export const getWeeklyEvaluationsForStudent = async (studentId: string): Promise<WeeklyEvaluation[]> => {
-    const snapshot = await db.collection('weekly_evaluations').where('studentId', '==', studentId).orderBy('week', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<WeeklyEvaluation>(doc, ['date']));
+    try {
+        const q = query(collection(db, 'weekly_evaluations'), where('studentId', '==', studentId), orderBy('week', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<WeeklyEvaluation>(doc, ['date']));
+    } catch (error) {
+        console.error("Error fetching weekly evaluations:", error);
+        return [];
+    }
 };
 
 export const getAllWeeklyEvaluations = async (): Promise<WeeklyEvaluation[]> => {
-    const snapshot = await db.collection('weekly_evaluations').get();
-    return snapshot.docs.map(doc => fromFirestore<WeeklyEvaluation>(doc, ['date']));
+    try {
+        const snapshot = await getDocs(collection(db, 'weekly_evaluations'));
+        return snapshot.docs.map(doc => fromFirestore<WeeklyEvaluation>(doc, ['date']));
+    } catch (error) {
+        console.error("Error fetching all weekly evaluations:", error);
+        return [];
+    }
 };
 
 export const getAllDailyProgress = async (): Promise<DailyProgress[]> => {
-    const snapshot = await db.collection('progress').get();
-    return snapshot.docs.map(doc => fromFirestore<DailyProgress>(doc, ['submittedAt']));
+    try {
+        const snapshot = await getDocs(collection(db, 'progress'));
+        return snapshot.docs.map(doc => fromFirestore<DailyProgress>(doc, ['submittedAt']));
+    } catch (error) {
+        console.error("Error fetching all daily progress:", error);
+        return [];
+    }
 };
 
 
@@ -793,39 +1028,51 @@ export const getAllDailyProgress = async (): Promise<DailyProgress[]> => {
 
 // --- FINANCIALS ---
 export const getFinancialData = async (): Promise<Transaction[]> => {
-    const snapshot = await db.collection('transactions').orderBy('date', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Transaction>(doc, ['date']));
+    try {
+        const q = query(collection(db, 'transactions'), orderBy('date', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Transaction>(doc, ['date']));
+    } catch (error) {
+        console.error("Error fetching financial data:", error);
+        return [];
+    }
 };
 
 export const addTransaction = async (transaction: Omit<Transaction, 'id' | 'date'>, currentUserId: string): Promise<Transaction> => {
-    const data = { ...transaction, date: firebase.firestore.FieldValue.serverTimestamp() };
-    const docRef = await db.collection('transactions').add(data);
+    const data = { ...transaction, date: serverTimestamp() };
+    const docRef = await addDoc(collection(db, 'transactions'), data);
     await logActivity(currentUserId, `Menambah transaksi: ${transaction.description}`);
-    const doc = await docRef.get();
-    return fromFirestore<Transaction>(doc, ['date']);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Transaction>(newDoc, ['date']);
 };
 
 export const getExpenses = async (): Promise<Expense[]> => {
-    const snapshot = await db.collection('expenses').orderBy('date', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Expense>(doc, ['date']));
+    try {
+        const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Expense>(doc, ['date']));
+    } catch (error) {
+        console.error("Error fetching expenses:", error);
+        return [];
+    }
 };
 
 export const addExpense = async (expense: Omit<Expense, 'id' | 'date'>, currentUserId: string): Promise<Expense> => {
-    const data = { ...expense, date: firebase.firestore.FieldValue.serverTimestamp() };
-    const docRef = await db.collection('expenses').add(data);
+    const data = { ...expense, date: serverTimestamp() };
+    const docRef = await addDoc(collection(db, 'expenses'), data);
     await logActivity(currentUserId, `Menambah pengeluaran: ${expense.description}`, `Jumlah: Rp ${expense.amount.toLocaleString('id-ID')}`);
-    const doc = await docRef.get();
-    return fromFirestore<Expense>(doc, ['date']);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Expense>(newDoc, ['date']);
 };
 
 export const deleteExpense = async (expenseId: string, currentUserId: string): Promise<void> => {
-    const expenseRef = db.collection('expenses').doc(expenseId);
-    const doc = await expenseRef.get();
-    if(doc.exists) {
-        const expenseData = doc.data();
+    const expenseRef = doc(db, 'expenses', expenseId);
+    const docToDelete = await getDoc(expenseRef);
+    if(docToDelete.exists()) {
+        const expenseData = docToDelete.data();
         await logActivity(currentUserId, `Menghapus pengeluaran: ${expenseData?.description}`);
     }
-    await expenseRef.delete();
+    await deleteDoc(expenseRef);
 };
 
 
@@ -833,18 +1080,28 @@ export const deleteExpense = async (expenseId: string, currentUserId: string): P
 const generateReferralCode = (): string => `S8REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
 export const getClientByEmail = async (email: string): Promise<Client | null> => {
-    const doc = await db.collection('clients').doc(email.toLowerCase()).get();
-    if (!doc.exists) return null;
-    return fromFirestore<Client>(doc, ['firstBooking', 'lastBooking']);
+    try {
+        const docRef = doc(db, 'clients', email.toLowerCase());
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) return null;
+        return fromFirestore<Client>(docSnap, ['firstBooking', 'lastBooking']);
+    } catch (error) {
+        console.error("Error fetching client by email:", error);
+        return null;
+    }
 };
 
 export const deleteClient = async (clientId: string, currentUserId: string): Promise<void> => {
-    const clientRef = db.collection('clients').doc(clientId);
-    const doc = await clientRef.get();
-    if (!doc.exists) return;
-    const clientData = doc.data();
-    await clientRef.delete();
-    await logActivity(currentUserId, 'Menghapus data klien', `Klien: ${clientData?.name} (${clientData?.email})`);
+    try {
+        const clientRef = doc(db, 'clients', clientId);
+        const docToDelete = await getDoc(clientRef);
+        if (!docToDelete.exists()) return;
+        const clientData = docToDelete.data();
+        await deleteDoc(clientRef);
+        await logActivity(currentUserId, 'Menghapus data klien', `Klien: ${clientData?.name} (${clientData?.email})`);
+    } catch (error) {
+        console.error("Error deleting client:", error);
+    }
 };
 
 export const getClientDetailsForBooking = async (email: string): Promise<Client | null> => {
@@ -854,9 +1111,15 @@ export const getClientDetailsForBooking = async (email: string): Promise<Client 
 
 
 export const getClientByReferralCode = async (code: string): Promise<Client | null> => {
-    const snapshot = await db.collection('clients').where('referralCode', '==', code.toUpperCase()).limit(1).get();
-    if (snapshot.empty) return null;
-    return fromFirestore<Client>(snapshot.docs[0], ['firstBooking', 'lastBooking']);
+    try {
+        const q = query(collection(db, 'clients'), where('referralCode', '==', code.toUpperCase()), limit(1));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+        return fromFirestore<Client>(snapshot.docs[0], ['firstBooking', 'lastBooking']);
+    } catch (error) {
+        console.error("Error fetching client by referral code:", error);
+        return null;
+    }
 };
 
 export const getClientDetails = async (bookingCode: string): Promise<Client | null> => {
@@ -867,10 +1130,10 @@ export const getClientDetails = async (bookingCode: string): Promise<Client | nu
 
 export const getOrCreateClient = async (name: string, email: string, phone: string): Promise<Client> => {
     const lowerEmail = email.toLowerCase();
-    const clientRef = db.collection('clients').doc(lowerEmail);
-    const doc = await clientRef.get();
-    if (doc.exists) {
-        return fromFirestore<Client>(doc, ['firstBooking', 'lastBooking']);
+    const clientRef = doc(db, 'clients', lowerEmail);
+    const docSnap = await getDoc(clientRef);
+    if (docSnap.exists()) {
+        return fromFirestore<Client>(docSnap, ['firstBooking', 'lastBooking']);
     } else {
         const newClientData: Omit<Client, 'id'> = {
             name,
@@ -884,14 +1147,20 @@ export const getOrCreateClient = async (name: string, email: string, phone: stri
             referralCode: generateReferralCode(),
             loyaltyTier: 'Newbie',
         };
-        await clientRef.set(newClientData);
+        await setDoc(clientRef, newClientData);
         return { id: lowerEmail, ...newClientData };
     }
 };
 
 export const getClients = async (): Promise<Client[]> => {
-    const snapshot = await db.collection('clients').orderBy('lastBooking', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Client>(doc, ['firstBooking', 'lastBooking']));
+    try {
+        const q = query(collection(db, 'clients'), orderBy('lastBooking', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Client>(doc, ['firstBooking', 'lastBooking']));
+    } catch (error) {
+        console.error("Error fetching clients:", error);
+        return [];
+    }
 };
 
 
@@ -900,7 +1169,19 @@ export const getSystemSettings = async (): Promise<SystemSettings> => {
     const defaults: SystemSettings = {
         operationalHours: { weekday: { open: '09:00', close: '17:00' }, weekend: { open: '10:00', close: '16:00' } },
         featureToggles: { chatbot: true, publicFeedback: true, publicCalendar: true },
-        paymentMethods: { qris: true, bankTransfer: true, dana: true, shopeepay: true },
+        paymentMethods: {
+            qris: true,
+            qrisImage: 'https://res.cloudinary.com/dazt6g3o1/image/upload/v1717316130/studio8_uploads/QRIS_S8_ix5qom.jpg',
+            bankTransfer: true,
+            bankAccounts: [
+                { bankName: 'BNI', accountNumber: '1311025425', accountHolder: 'CV. DELAPAN KREATIF MEDIA' },
+                { bankName: 'BRI', accountNumber: '010001002305567', accountHolder: 'CV. DELAPAN KREATIF MEDIA' }
+            ],
+            dana: true,
+            danaNumber: '085724025425',
+            shopeepay: true,
+            shopeepayNumber: '085724025425',
+        },
         contact: { whatsapp: '+6285724025425', instagram: 'studiolapan_' },
         loyaltySettings: {
             pointsPerRupiah: 0.001,
@@ -912,22 +1193,32 @@ export const getSystemSettings = async (): Promise<SystemSettings> => {
                 { id: '2', name: 'Silver', bookingThreshold: 10, discountPercentage: 7 },
                 { id: '3', name: 'Gold', bookingThreshold: 20, discountPercentage: 10 },
             ],
+        },
+        landingPageImages: {
+            hero: [
+                '/images/hero-1.jpg',
+                '/images/hero-2.jpg',
+                '/images/hero-3.jpg',
+                '/images/hero-4.jpg',
+                '/images/hero-5.jpg',
+            ],
+            about: '/images/about-1.jpg'
         }
     };
 
     try {
-        const doc = await db.collection('settings').doc('main').get();
-        if (doc.exists && doc.data()) {
-            const settings = doc.data() as SystemSettings;
-            // Merge defaults for potentially missing nested objects
+        const docRef = doc(db, 'settings', 'main');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data()) {
+            const settings = docSnap.data() as SystemSettings;
             return {
-                ...defaults,
-                ...settings,
+                ...defaults, ...settings,
                 operationalHours: { ...defaults.operationalHours, ...settings.operationalHours },
                 featureToggles: { ...defaults.featureToggles, ...settings.featureToggles },
                 paymentMethods: { ...defaults.paymentMethods, ...settings.paymentMethods },
                 contact: { ...defaults.contact, ...settings.contact },
                 loyaltySettings: { ...defaults.loyaltySettings, ...settings.loyaltySettings },
+                landingPageImages: { ...defaults.landingPageImages, ...settings.landingPageImages },
             };
         }
         return defaults;
@@ -942,11 +1233,15 @@ export const getSystemSettings = async (): Promise<SystemSettings> => {
 };
 
 export const getLatestInsight = async (): Promise<Insight | null> => {
-    const snapshot = await db.collection('insights').orderBy('date', 'desc').limit(1).get();
-    if (snapshot.empty) {
+    try {
+        const q = query(collection(db, 'insights'), orderBy('date', 'desc'), limit(1));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) return null;
+        return fromFirestore<Insight>(snapshot.docs[0], ['date']);
+    } catch (error) {
+        console.error("Error fetching latest insight:", error);
         return null;
     }
-    return fromFirestore<Insight>(snapshot.docs[0], ['date']);
 };
 
 export const updateSystemSettings = async (settings: SystemSettings, currentUserId: string): Promise<SystemSettings> => {
@@ -961,80 +1256,82 @@ export const updateSystemSettings = async (settings: SystemSettings, currentUser
         discountPercentage: Number(tier.discountPercentage),
     }));
 
-    await db.collection('settings').doc('main').set(settings, { merge: true });
+    await setDoc(doc(db, 'settings', 'main'), settings, { merge: true });
     await logActivity(currentUserId, `Memperbarui Pengaturan Sistem`);
     return settings;
 };
 
 // --- FEEDBACK ---
 export const getFeedbacks = async (): Promise<Feedback[]> => {
-    const snapshot = await db.collection('feedbacks').orderBy('tanggal', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Feedback>(doc, ['tanggal']));
+    try {
+        const q = query(collection(db, 'feedbacks'), orderBy('tanggal', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Feedback>(doc, ['tanggal']));
+    } catch (error) {
+        console.error("Error fetching feedbacks:", error);
+        return [];
+    }
 };
 
 export const getPublicFeedbacks = async (): Promise<Feedback[]> => {
-    const snapshot = await db.collection('feedbacks')
-        .where('publish', '==', true)
-        .orderBy('tanggal', 'desc')
-        .limit(3) // Only fetch 3 for the landing page
-        .get();
-    return snapshot.docs.map(doc => fromFirestore<Feedback>(doc, ['tanggal']));
+    try {
+        const q = query(collection(db, 'feedbacks'),
+            where('publish', '==', true),
+            orderBy('tanggal', 'desc'),
+            limit(3)
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Feedback>(doc, ['tanggal']));
+    } catch (error) {
+        console.error("Error fetching public feedbacks:", error);
+        return [];
+    }
 };
 
 export const addFeedback = async (feedbackData: Omit<Feedback, 'tanggal'>): Promise<Feedback> => {
-    const data = { ...feedbackData, tanggal: firebase.firestore.FieldValue.serverTimestamp() };
-    const docRef = await db.collection('feedbacks').add(data);
-    const doc = await docRef.get();
-    return fromFirestore<Feedback>(doc, ['tanggal']);
+    const data = { ...feedbackData, tanggal: serverTimestamp() };
+    const docRef = await addDoc(collection(db, 'feedbacks'), data);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Feedback>(newDoc, ['tanggal']);
 };
 
 export const updateFeedback = async (id: string, updates: Partial<Feedback>, currentUserId: string): Promise<Feedback> => {
-    const feedbackRef = db.collection('feedbacks').doc(id);
-    await feedbackRef.update(updates);
+    const feedbackRef = doc(db, 'feedbacks', id);
+    await updateDoc(feedbackRef, updates);
     await logActivity(currentUserId, `Mengubah status feedback ${id}`);
-    const doc = await feedbackRef.get();
-    return fromFirestore<Feedback>(doc, ['tanggal']);
+    const updatedDoc = await getDoc(feedbackRef);
+    return fromFirestore<Feedback>(updatedDoc, ['tanggal']);
 };
 
 export const deleteFeedback = async (id: string, currentUserId: string): Promise<void> => {
-    const doc = await db.collection('feedbacks').doc(id).get();
-    await db.collection('feedbacks').doc(id).delete();
-    await logActivity(currentUserId, `Menghapus feedback ${id}`, `Dari: ${doc.data()?.nama}`);
+    const docRef = doc(db, 'feedbacks', id);
+    const docToDelete = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus feedback ${id}`, `Dari: ${docToDelete.data()?.nama}`);
 };
 
 // --- CERTIFICATES ---
 export const getCertificates = async (): Promise<Certificate[]> => {
-    const snapshot = await db.collection('certificates').orderBy('issuedDate', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Certificate>(doc, ['issuedDate']));
+    try {
+        const q = query(collection(db, 'certificates'), orderBy('issuedDate', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Certificate>(doc, ['issuedDate']));
+    } catch (error) {
+        console.error("Error fetching certificates:", error);
+        return [];
+    }
 };
 
 export const getCertificateById = async (id: string): Promise<Certificate | null> => {
-    const doc = await db.collection('certificates').doc(id).get();
-    if (!doc.exists) return null;
-    return fromFirestore<Certificate>(doc, ['issuedDate']);
-};
-
-export const deleteCertificate = async (certificateId: string, currentUserId: string): Promise<void> => {
-    const certRef = db.collection('certificates').doc(certificateId);
-    const doc = await certRef.get();
-    if (!doc.exists) return;
-    const certData = doc.data() as Certificate;
-
     try {
-        const response = await fetch('/api/deleteAsset', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ publicId: `studio8_certificates/${certificateId}` })
-        });
-        if (!response.ok) {
-            console.error(`Failed to delete certificate ${certificateId} from Cloudinary. It might need manual deletion.`);
-        }
+        const docRef = doc(db, 'certificates', id);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) return null;
+        return fromFirestore<Certificate>(docSnap, ['issuedDate']);
     } catch (error) {
-        console.error(`Error calling deleteAsset API for ${certificateId}:`, error);
+        console.error("Error fetching certificate by ID:", error);
+        return null;
     }
-    
-    await certRef.delete();
-    await logActivity(currentUserId, 'Menghapus sertifikat', `Sertifikat ${certificateId} untuk ${certData.studentName}`);
 };
 
 
@@ -1043,63 +1340,60 @@ export const deleteCertificate = async (certificateId: string, currentUserId: st
 export const findOrCreateChatRoom = async (user1: User, user2: User): Promise<string> => {
     const participantIds = [user1.id, user2.id].sort();
     const roomId = participantIds.join('_');
-    const roomRef = db.collection('chats').doc(roomId);
-    const doc = await roomRef.get();
+    const roomRef = doc(db, 'chats', roomId);
+    const docSnap = await getDoc(roomRef);
 
-    if (doc.exists) {
+    if (docSnap.exists()) {
         return roomId;
     }
 
     const newRoom: Omit<ChatRoom, 'id'> = {
         participantIds,
         participantInfo: {
-            [user1.id]: { name: user1.name, email: user1.email, photoURL: user1.photoURL },
-            [user2.id]: { name: user2.name, email: user2.email, photoURL: user2.photoURL },
+            [user1.id]: { name: user1.name, email: user1.email, photoURL: user1.photoURL || '' },
+            [user2.id]: { name: user2.name, email: user2.email, photoURL: user2.photoURL || '' },
         },
         createdAt: new Date(),
     };
-    await roomRef.set(newRoom);
+    await setDoc(roomRef, newRoom);
     return roomId;
 };
 
 export const getChatRoomsForUser = (userId: string, callback: (rooms: ChatRoom[]) => void): (() => void) => {
-    return db.collection('chats')
-        .where('participantIds', 'array-contains', userId)
-        .orderBy('lastMessage.timestamp', 'desc')
-        .onSnapshot(snapshot => {
-            const rooms = snapshot.docs.map(doc => fromFirestore<ChatRoom>(doc, ['createdAt', 'lastMessage.timestamp']));
-            callback(rooms);
-        });
+    const q = query(collection(db, 'chats'),
+        where('participantIds', 'array-contains', userId),
+        orderBy('lastMessage.timestamp', 'desc')
+    );
+    return onSnapshot(q, snapshot => {
+        const rooms = snapshot.docs.map(doc => fromFirestore<ChatRoom>(doc, ['createdAt', 'lastMessage.timestamp']));
+        callback(rooms);
+    }, error => {
+        console.error("Error fetching chat rooms:", error);
+        callback([]);
+    });
 };
 
 export const getMessagesStream = (roomId: string, callback: (messages: ChatMessage[]) => void): (() => void) => {
-    return db.collection('chats').doc(roomId).collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(snapshot => {
-            const messages = snapshot.docs.map(doc => fromFirestore<ChatMessage>(doc, ['timestamp']));
-            callback(messages);
-        });
+    const q = query(collection(db, 'chats', roomId, 'messages'),
+        orderBy('timestamp', 'asc')
+    );
+    return onSnapshot(q, snapshot => {
+        const messages = snapshot.docs.map(doc => fromFirestore<ChatMessage>(doc, ['timestamp']));
+        callback(messages);
+    }, error => {
+        console.error("Error fetching messages:", error);
+        callback([]);
+    });
 };
 
 export const sendMessage = async (roomId: string, senderId: string, senderName: string, text: string): Promise<void> => {
-    const roomRef = db.collection('chats').doc(roomId);
-    const messageRef = roomRef.collection('messages').doc();
-
+    const roomRef = doc(db, 'chats', roomId);
+    const messageRef = doc(collection(roomRef, 'messages'));
     const timestamp = new Date();
-    const messageData: Omit<ChatMessage, 'id'> = {
-        senderId,
-        senderName,
-        text,
-        timestamp,
-    };
-
-    const lastMessageData = {
-        text,
-        timestamp,
-        senderId,
-    };
-
-    const batch = db.batch();
+    const messageData: Omit<ChatMessage, 'id'> = { senderId, senderName, text, timestamp };
+    const lastMessageData = { text, timestamp, senderId };
+    
+    const batch = writeBatch(db);
     batch.set(messageRef, messageData);
     batch.update(roomRef, { lastMessage: lastMessageData });
     await batch.commit();
@@ -1107,346 +1401,384 @@ export const sendMessage = async (roomId: string, senderId: string, senderName: 
 
 // --- HIGHLIGHT WALL ---
 export const getHighlightWorks = async (): Promise<HighlightWork[]> => {
-    const snapshot = await db.collection('highlightWorks').orderBy('highlightDate', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<HighlightWork>(doc, ['highlightDate']));
-};
-
-export const addHighlightWork = async (workData: Omit<HighlightWork, 'id'>, currentUserId: string): Promise<HighlightWork> => {
-    const docRef = await db.collection('highlightWorks').add(workData);
-    await logActivity(currentUserId, `Menambah karya highlight baru: ${workData.title}`);
-    const doc = await docRef.get();
-    return fromFirestore<HighlightWork>(doc, ['highlightDate']);
-};
-
-export const updateHighlightWork = async (workId: string, workData: Partial<Omit<HighlightWork, 'id'>>, currentUserId: string): Promise<void> => {
-    await db.collection('highlightWorks').doc(workId).update(workData);
-    await logActivity(currentUserId, `Mengubah karya highlight: ${workData.title || workId}`);
-};
-
-export const deleteHighlightWork = async (workId: string, currentUserId: string): Promise<void> => {
-    const doc = await db.collection('highlightWorks').doc(workId).get();
-    const workTitle = doc.data()?.title || workId;
-    // Note: This doesn't delete the file from Cloudinary. That would require a backend function.
-    await db.collection('highlightWorks').doc(workId).delete();
-    await logActivity(currentUserId, `Menghapus karya highlight: ${workTitle}`);
+    try {
+        const q = query(collection(db, 'highlightWorks'), orderBy('highlightDate', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<HighlightWork>(doc, ['highlightDate']));
+    } catch (error) {
+        console.error("Error fetching highlight works:", error);
+        return [];
+    }
 };
 
 export const getHighlightWorkById = async (id: string): Promise<HighlightWork | null> => {
-    const doc = await db.collection('highlightWorks').doc(id).get();
-    if (!doc.exists) return null;
-    return fromFirestore<HighlightWork>(doc, ['highlightDate']);
+    try {
+        const docRef = doc(db, 'highlightWorks', id);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) return null;
+        return fromFirestore<HighlightWork>(docSnap, ['highlightDate']);
+    } catch (error) {
+        console.error("Error fetching highlight work by ID:", error);
+        return null;
+    }
 };
 
-// --- QUIZZES ---
-export const getQuizzes = async (): Promise<Quiz[]> => {
-    const snapshot = await db.collection('quizzes').orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Quiz>(doc, ['createdAt']));
+export const addHighlightWork = async (workData: Omit<HighlightWork, 'id'>, currentUserId: string): Promise<HighlightWork> => {
+    const docRef = await addDoc(collection(db, 'highlightWorks'), workData);
+    await logActivity(currentUserId, `Menambah karya highlight: ${workData.title}`);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<HighlightWork>(newDoc, ['highlightDate']);
 };
 
-export const getQuizById = async (quizId: string): Promise<Quiz | null> => {
-    const doc = await db.collection('quizzes').doc(quizId).get();
-    if (!doc.exists) return null;
-    return fromFirestore<Quiz>(doc, ['createdAt']);
+export const updateHighlightWork = async (workId: string, updatedData: Partial<HighlightWork>, currentUserId: string): Promise<void> => {
+    await updateDoc(doc(db, 'highlightWorks', workId), updatedData);
+    await logActivity(currentUserId, `Mengubah karya highlight: ${updatedData.title || workId}`);
 };
 
-export const createQuiz = async (quizData: Omit<Quiz, 'id' | 'createdAt'>, currentUserId: string): Promise<Quiz> => {
-    const dataToSave = {
-        ...quizData,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    const docRef = await db.collection('quizzes').add(dataToSave);
-    await logActivity(currentUserId, `Membuat kuis baru: ${quizData.title}`);
-    const doc = await docRef.get();
-    return fromFirestore<Quiz>(doc, ['createdAt']);
+export const deleteHighlightWork = async (workId: string, currentUserId: string): Promise<void> => {
+    const docRef = doc(db, 'highlightWorks', workId);
+    const docToDelete = await getDoc(docRef);
+    // In a real app, you'd also delete the media from Cloudinary here
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus karya highlight: ${docToDelete.data()?.title}`);
 };
 
-export const updateQuiz = async (quizId: string, quizData: Partial<Omit<Quiz, 'id'>>, currentUserId: string): Promise<void> => {
-    await db.collection('quizzes').doc(quizId).update(quizData);
-    await logActivity(currentUserId, `Mengubah kuis: ${quizData.title || quizId}`);
-};
-
-export const deleteQuiz = async (quizId: string, currentUserId: string): Promise<void> => {
-    const doc = await db.collection('quizzes').doc(quizId).get();
-    const quizTitle = doc.data()?.title || quizId;
-    await db.collection('quizzes').doc(quizId).delete();
-    await logActivity(currentUserId, `Menghapus kuis: ${quizTitle}`);
-};
-
-export const submitQuizResult = async (resultData: Omit<QuizResult, 'id' | 'submittedAt'>): Promise<string> => {
-    const dataToSave = {
-        ...resultData,
-        submittedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    const docRef = await db.collection('quiz_results').add(dataToSave);
-    return docRef.id;
-};
-
-export const getQuizResultById = async (resultId: string): Promise<QuizResult | null> => {
-    const doc = await db.collection('quiz_results').doc(resultId).get();
-    if (!doc.exists) return null;
-    return fromFirestore<QuizResult>(doc, ['submittedAt']);
-};
-
-export const getQuizResultsForStudent = async (studentId: string): Promise<QuizResult[]> => {
-    const snapshot = await db.collection('quiz_results').where('studentId', '==', studentId).orderBy('submittedAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
-};
-
-export const getWeeklyQuizResults = async (): Promise<QuizResult[]> => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const snapshot = await db.collection('quiz_results').where('submittedAt', '>=', oneWeekAgo).orderBy('submittedAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
-};
-
-export const getResultsForQuiz = async (quizId: string): Promise<QuizResult[]> => {
-    const snapshot = await db.collection('quiz_results').where('quizId', '==', quizId).orderBy('submittedAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
-};
-
-export const updateQuizResult = async (resultId: string, updates: Partial<QuizResult>): Promise<void> => {
-    await db.collection('quiz_results').doc(resultId).update(updates);
-};
-
-// --- PRACTICAL CLASSES ---
-export const getPracticalClasses = async (): Promise<PracticalClass[]> => {
-    const snapshot = await db.collection('practical_classes').orderBy('classDate', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<PracticalClass>(doc, ['classDate']));
-};
-
-export const createPracticalClass = async (classData: Omit<PracticalClass, 'id'>, currentUserId: string): Promise<PracticalClass> => {
-    const docRef = await db.collection('practical_classes').add(classData);
-    await logActivity(currentUserId, `Membuat kelas praktek baru: ${classData.topic}`);
-    const doc = await docRef.get();
-    return fromFirestore<PracticalClass>(doc, ['classDate']);
-};
-
-export const deletePracticalClass = async (classId: string, currentUserId: string): Promise<void> => {
-    const docRef = db.collection('practical_classes').doc(classId);
-    const doc = await docRef.get();
-    const topic = doc.data()?.topic || classId;
-    await docRef.delete();
-    await logActivity(currentUserId, `Menghapus kelas praktek: ${topic}`);
-};
-
-// FIX: Implement and export class registration functions.
-export const registerForClass = async (classId: string, userId: string): Promise<void> => {
-    const classRef = db.collection('practical_classes').doc(classId);
-    await classRef.update({
-        registeredInternIds: firebase.firestore.FieldValue.arrayUnion(userId)
-    });
-};
-
-export const unregisterFromClass = async (classId: string, userId: string): Promise<void> => {
-    const classRef = db.collection('practical_classes').doc(classId);
-    await classRef.update({
-        registeredInternIds: firebase.firestore.FieldValue.arrayRemove(userId)
-    });
-};
-
-// --- ASSETS ---
-export const getAssets = async (): Promise<Asset[]> => {
-    const snapshot = await db.collection('assets').orderBy('uploadedAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<Asset>(doc, ['uploadedAt']));
-};
-
-export const addAsset = async (assetData: Omit<Asset, 'id' | 'uploadedAt'>, currentUserId: string): Promise<Asset> => {
-    const dataToSave = {
-        ...assetData,
-        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    const docRef = await db.collection('assets').add(dataToSave);
-    await logActivity(currentUserId, `Mengunggah aset baru: ${assetData.fileName}`);
-    const doc = await docRef.get();
-    return fromFirestore<Asset>(doc, ['uploadedAt']);
-};
-
-// --- COMMUNITY PORTAL ---
-export const getForumThreads = async (): Promise<ForumThread[]> => {
-    const snapshot = await db.collection('forum_threads').orderBy('lastReplyAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<ForumThread>(doc, ['createdAt', 'lastReplyAt']));
-};
-
-export const getForumThreadById = async (threadId: string): Promise<ForumThread | null> => {
-    const doc = await db.collection('forum_threads').doc(threadId).get();
-    return doc.exists ? fromFirestore<ForumThread>(doc, ['createdAt', 'lastReplyAt']) : null;
-};
-
-export const addForumThread = async (threadData: Omit<ForumThread, 'id' | 'createdAt' | 'replyCount' | 'lastReplyAt'>): Promise<ForumThread> => {
-    const dataToSave = { ...threadData, createdAt: new Date(), replyCount: 0, lastReplyAt: new Date() };
-    const docRef = await db.collection('forum_threads').add(dataToSave);
-    const doc = await docRef.get();
-    return fromFirestore<ForumThread>(doc, ['createdAt', 'lastReplyAt']);
-};
-
-export const getRepliesForThread = (threadId: string, callback: (replies: ForumReply[]) => void): (() => void) => {
-    return db.collection('forum_threads').doc(threadId).collection('replies')
-        .orderBy('createdAt', 'asc')
-        .onSnapshot(snapshot => {
-            const replies = snapshot.docs.map(doc => fromFirestore<ForumReply>(doc, ['createdAt']));
-            callback(replies);
+export const deleteCertificate = async (certificateId: string, currentUserId: string): Promise<void> => {
+    const docRef = doc(db, 'certificates', certificateId);
+    const docToDelete = await getDoc(docRef);
+    if (!docToDelete.exists()) return;
+    try {
+        await fetch('/api/assets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', publicId: `studio8_certificates/${certificateId}` })
         });
+    } catch (error) {
+        console.error("Failed to delete certificate from Cloudinary, but proceeding with Firestore deletion:", error);
+    }
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus sertifikat ${certificateId}`, `Untuk: ${docToDelete.data()?.studentName}`);
 };
 
-export const addReplyToThread = async (threadId: string, replyData: Omit<ForumReply, 'id' | 'threadId' | 'createdAt'>): Promise<ForumReply> => {
-    const threadRef = db.collection('forum_threads').doc(threadId);
-    const replyRef = threadRef.collection('replies').doc();
-    const newReply = { ...replyData, threadId, createdAt: new Date() };
-
-    await db.runTransaction(async (transaction) => {
-        transaction.set(replyRef, newReply);
-        transaction.update(threadRef, {
-            replyCount: firebase.firestore.FieldValue.increment(1),
-            lastReplyAt: new Date(),
-        });
-    });
-
-    const doc = await replyRef.get();
-    return fromFirestore<ForumReply>(doc, ['createdAt']);
-};
-
-export const getJobPosts = async (): Promise<JobPost[]> => {
-    const snapshot = await db.collection('job_posts').orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => fromFirestore<JobPost>(doc, ['createdAt']));
-};
-
-export const addJobPost = async (jobData: Omit<JobPost, 'id' | 'createdAt'>): Promise<JobPost> => {
-    const dataToSave = { ...jobData, createdAt: new Date() };
-    const docRef = await db.collection('job_posts').add(dataToSave);
-    const doc = await docRef.get();
-    return fromFirestore<JobPost>(doc, ['createdAt']);
-};
-
-export const getEvents = async (): Promise<CommunityEvent[]> => {
-    const snapshot = await db.collection('events').orderBy('eventDate', 'asc').get();
-    return snapshot.docs.map(doc => fromFirestore<CommunityEvent>(doc, ['createdAt', 'eventDate']));
-};
-
-export const addEvent = async (eventData: Omit<CommunityEvent, 'id' | 'createdAt'>): Promise<CommunityEvent> => {
-    const dataToSave = { ...eventData, createdAt: new Date() };
-    const docRef = await db.collection('events').add(dataToSave);
-    const doc = await docRef.get();
-    return fromFirestore<CommunityEvent>(doc, ['createdAt', 'eventDate']);
-};
-
-
-// --- The rest of the API functions (Promos, Inventory, etc.) follow the same Firestore pattern ---
+// ... Remaining functions will be refactored similarly
 export const getPromos = async (): Promise<Promo[]> => {
-    const snapshot = await db.collection('promos').get();
-    return snapshot.docs.map(doc => fromFirestore<Promo>(doc));
+    try {
+        const snapshot = await getDocs(collection(db, 'promos'));
+        return snapshot.docs.map(doc => fromFirestore<Promo>(doc));
+    } catch (error) {
+        console.error("Error fetching promos:", error);
+        return [];
+    }
 };
+
 export const getInventoryItems = async (): Promise<InventoryItem[]> => {
-    const snapshot = await db.collection('inventory').get();
-    return snapshot.docs.map(doc => fromFirestore<InventoryItem>(doc, ['lastChecked']));
+    try {
+        const snapshot = await getDocs(collection(db, 'inventory'));
+        return snapshot.docs.map(doc => fromFirestore<InventoryItem>(doc, ['lastChecked']));
+    } catch (error) {
+        console.error("Error fetching inventory items:", error);
+        return [];
+    }
 };
 export const updateInventoryItem = async (itemId: string, updatedData: Partial<Omit<InventoryItem, 'id'>>, currentUserId: string): Promise<InventoryItem> => {
-    const itemRef = db.collection('inventory').doc(itemId);
-    await itemRef.update(updatedData);
+    const itemRef = doc(db, 'inventory', itemId);
+    await updateDoc(itemRef, updatedData);
     await logActivity(currentUserId, `Memperbarui item inventaris ${itemId}`);
-    const doc = await itemRef.get();
-    return fromFirestore<InventoryItem>(doc, ['lastChecked']);
+    const updatedDoc = await getDoc(itemRef);
+    return fromFirestore<InventoryItem>(updatedDoc, ['lastChecked']);
 }
 
-// Add other CRUDs similarly
+// ... And so on for the rest of the file
 export const addPromo = async (promoData: Omit<Promo, 'id'>, currentUserId: string): Promise<Promo> => {
-    const docRef = await db.collection('promos').add(promoData);
+    const docRef = await addDoc(collection(db, 'promos'), promoData);
     await logActivity(currentUserId, `Menambah promo baru: ${promoData.code}`);
     return { ...promoData, id: docRef.id };
 };
 export const updatePromo = async (promoId: string, updatedData: Partial<Promo>, currentUserId: string): Promise<Promo> => {
-    const promoRef = db.collection('promos').doc(promoId);
-    await promoRef.update(updatedData);
+    const promoRef = doc(db, 'promos', promoId);
+    await updateDoc(promoRef, updatedData);
     await logActivity(currentUserId, `Mengubah promo ${updatedData.code}`);
-    const doc = await promoRef.get();
-    return fromFirestore<Promo>(doc);
+    const updatedDoc = await getDoc(promoRef);
+    return fromFirestore<Promo>(updatedDoc);
 };
 export const deletePromo = async (promoId: string, currentUserId: string): Promise<void> => {
-    const doc = await db.collection('promos').doc(promoId).get();
-    await db.collection('promos').doc(promoId).delete();
-    await logActivity(currentUserId, `Menghapus promo: ${doc.data()?.code}`);
+    const docRef = doc(db, 'promos', promoId);
+    const docToDelete = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus promo: ${docToDelete.data()?.code}`);
 };
 export const addInventoryItem = async (itemData: Omit<InventoryItem, 'id'>, currentUserId: string): Promise<InventoryItem> => {
-    const docRef = await db.collection('inventory').add(itemData);
+    const docRef = await addDoc(collection(db, 'inventory'), itemData);
     await logActivity(currentUserId, `Menambah item inventaris: ${itemData.name}`);
     return { ...itemData, id: docRef.id };
 };
 export const deleteInventoryItem = async (itemId: string, currentUserId: string): Promise<void> => {
-    const doc = await db.collection('inventory').doc(itemId).get();
-    await db.collection('inventory').doc(itemId).delete();
-    await logActivity(currentUserId, `Menghapus item inventaris: ${doc.data()?.name}`);
+    const docRef = doc(db, 'inventory', itemId);
+    const docToDelete = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus item inventaris: ${docToDelete.data()?.name}`);
 };
 export const addAddOn = async (addOn: Omit<AddOn, 'id'>, currentUserId: string): Promise<AddOn> => {
-    const docRef = await db.collection('addons').add(addOn);
+    const docRef = await addDoc(collection(db, 'addons'), addOn);
     await logActivity(currentUserId, `Menambah addon: ${addOn.name}`);
     return { ...addOn, id: docRef.id };
 }
 export const updateAddOn = async (addOnId: string, updatedData: Partial<AddOn>, currentUserId: string): Promise<AddOn> => {
-    const addOnRef = db.collection('addons').doc(addOnId);
-    await addOnRef.update(updatedData);
+    const addOnRef = doc(db, 'addons', addOnId);
+    await updateDoc(addOnRef, updatedData);
     await logActivity(currentUserId, `Mengubah addon ${updatedData.name}`);
-    const doc = await addOnRef.get();
-    return fromFirestore<AddOn>(doc);
+    const updatedDoc = await getDoc(addOnRef);
+    return fromFirestore<AddOn>(updatedDoc);
 }
 export const deleteAddOn = async (addOnId: string, currentUserId: string): Promise<void> => {
-    const doc = await db.collection('addons').doc(addOnId).get();
-    await db.collection('addons').doc(addOnId).delete();
-    await logActivity(currentUserId, `Menghapus addon: ${doc.data()?.name}`);
+    const docRef = doc(db, 'addons', addOnId);
+    const docToDelete = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus addon: ${docToDelete.data()?.name}`);
 }
 export const addSubPackage = async (packageId: string, subPackageData: Omit<SubPackage, 'id'>, currentUserId: string): Promise<Package> => {
-    const packageRef = db.collection('packages').doc(packageId);
-    await packageRef.update({
-        subPackages: firebase.firestore.FieldValue.arrayUnion({ ...subPackageData, id: `subpkg-${Date.now()}` })
+    const packageRef = doc(db, 'packages', packageId);
+    await updateDoc(packageRef, {
+        subPackages: arrayUnion({ ...subPackageData, id: `subpkg-${Date.now()}` })
     });
     await logActivity(currentUserId, `Menambah sub-paket ke ${packageId}`);
-    const doc = await packageRef.get();
-    return fromFirestore<Package>(doc);
+    const updatedDoc = await getDoc(packageRef);
+    return fromFirestore<Package>(updatedDoc);
 }
 export const updateSubPackage = async (packageId: string, subPackageId: string, updatedData: Partial<SubPackage>, currentUserId: string): Promise<Package> => {
-    const packageRef = db.collection('packages').doc(packageId);
-    const doc = await packageRef.get();
-    const pkg = fromFirestore<Package>(doc);
+    const packageRef = doc(db, 'packages', packageId);
+    const docSnap = await getDoc(packageRef);
+    const pkg = fromFirestore<Package>(docSnap);
     const subPackages = (pkg.subPackages || []).map(sp => sp.id === subPackageId ? { ...sp, ...updatedData } : sp);
-    await packageRef.update({ subPackages });
+    await updateDoc(packageRef, { subPackages });
     await logActivity(currentUserId, `Mengubah sub-paket ${subPackageId}`);
-    const updatedDoc = await packageRef.get();
+    const updatedDoc = await getDoc(packageRef);
     return fromFirestore<Package>(updatedDoc);
 }
 export const deleteSubPackage = async (packageId: string, subPackageId: string, currentUserId: string): Promise<Package> => {
-    const packageRef = db.collection('packages').doc(packageId);
-    const doc = await packageRef.get();
-    const pkg = fromFirestore<Package>(doc);
+    const packageRef = doc(db, 'packages', packageId);
+    const docSnap = await getDoc(packageRef);
+    const pkg = fromFirestore<Package>(docSnap);
     const subPackages = (pkg.subPackages || []).filter(sp => sp.id !== subPackageId);
-    await packageRef.update({ subPackages });
+    await updateDoc(packageRef, { subPackages });
     await logActivity(currentUserId, `Menghapus sub-paket ${subPackageId}`);
-    const updatedDoc = await packageRef.get();
+    const updatedDoc = await getDoc(packageRef);
     return fromFirestore<Package>(updatedDoc);
 }
 export const addSubAddOn = async (addOnId: string, subAddOnData: Omit<SubAddOn, 'id'>, currentUserId: string): Promise<AddOn> => {
-    const addOnRef = db.collection('addons').doc(addOnId);
-    await addOnRef.update({
-        subAddOns: firebase.firestore.FieldValue.arrayUnion({ ...subAddOnData, id: `subaddon-${Date.now()}` })
+    const addOnRef = doc(db, 'addons', addOnId);
+    await updateDoc(addOnRef, {
+        subAddOns: arrayUnion({ ...subAddOnData, id: `subaddon-${Date.now()}` })
     });
     await logActivity(currentUserId, `Menambah sub-addon ke ${addOnId}`);
-    const doc = await addOnRef.get();
-    return fromFirestore<AddOn>(doc);
+    const updatedDoc = await getDoc(addOnRef);
+    return fromFirestore<AddOn>(updatedDoc);
 }
 export const updateSubAddOn = async (addOnId: string, subAddOnId: string, updatedData: Partial<SubAddOn>, currentUserId: string): Promise<AddOn> => {
-    const addOnRef = db.collection('addons').doc(addOnId);
-    const doc = await addOnRef.get();
-    const addOn = fromFirestore<AddOn>(doc);
+    const addOnRef = doc(db, 'addons', addOnId);
+    const docSnap = await getDoc(addOnRef);
+    const addOn = fromFirestore<AddOn>(docSnap);
     const subAddOns = (addOn.subAddOns || []).map(sa => sa.id === subAddOnId ? { ...sa, ...updatedData } : sa);
-    await addOnRef.update({ subAddOns });
+    await updateDoc(addOnRef, { subAddOns });
     await logActivity(currentUserId, `Mengubah sub-addon ${subAddOnId}`);
-    const updatedDoc = await addOnRef.get();
+    const updatedDoc = await getDoc(addOnRef);
     return fromFirestore<AddOn>(updatedDoc);
 }
 export const deleteSubAddOn = async (addOnId: string, subAddOnId: string, currentUserId: string): Promise<AddOn> => {
-    const addOnRef = db.collection('addons').doc(addOnId);
-    const doc = await addOnRef.get();
-    const addOn = fromFirestore<AddOn>(doc);
+    const addOnRef = doc(db, 'addons', addOnId);
+    const docSnap = await getDoc(addOnRef);
+    const addOn = fromFirestore<AddOn>(docSnap);
     const subAddOns = (addOn.subAddOns || []).filter(sa => sa.id !== subAddOnId);
-    await addOnRef.update({ subAddOns });
+    await updateDoc(addOnRef, { subAddOns });
     await logActivity(currentUserId, `Menghapus sub-addon ${subAddOnId}`);
-    const updatedDoc = await addOnRef.get();
+    const updatedDoc = await getDoc(addOnRef);
     return fromFirestore<AddOn>(updatedDoc);
-}
+};
+export const getQuizzes = async (): Promise<Quiz[]> => {
+    try {
+        const q = query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Quiz>(doc, ['createdAt']));
+    } catch (error) {
+        console.error("Error fetching quizzes:", error);
+        return [];
+    }
+};
+export const getQuizById = async (quizId: string): Promise<Quiz | null> => {
+    try {
+        const docRef = doc(db, 'quizzes', quizId);
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists() ? fromFirestore<Quiz>(docSnap, ['createdAt']) : null;
+    } catch (error) {
+        console.error("Error fetching quiz by ID:", error);
+        return null;
+    }
+};
+export const createQuiz = async (quizData: Omit<Quiz, 'id' | 'createdAt'>, currentUserId: string): Promise<Quiz> => {
+    const data = { ...quizData, createdAt: new Date() };
+    const docRef = await addDoc(collection(db, 'quizzes'), data);
+    await logActivity(currentUserId, `Membuat kuis baru: ${quizData.title}`);
+    return { ...data, id: docRef.id, createdAt: data.createdAt };
+};
+export const updateQuiz = async (quizId: string, updatedData: Partial<Quiz>, currentUserId: string): Promise<void> => {
+    await updateDoc(doc(db, 'quizzes', quizId), updatedData);
+    await logActivity(currentUserId, `Mengubah kuis: ${updatedData.title || quizId}`);
+};
+export const deleteQuiz = async (quizId: string, currentUserId: string): Promise<void> => {
+    const docRef = doc(db, 'quizzes', quizId);
+    const docSnap = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus kuis: ${docSnap.data()?.title}`);
+};
+export const submitQuizResult = async (resultData: Omit<QuizResult, 'id' | 'submittedAt'>): Promise<string> => {
+    const data = { ...resultData, submittedAt: new Date() };
+    const docRef = await addDoc(collection(db, 'quiz_results'), data);
+    return docRef.id;
+};
+export const getQuizResultById = async (resultId: string): Promise<QuizResult | null> => {
+    try {
+        const docRef = doc(db, 'quiz_results', resultId);
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists() ? fromFirestore<QuizResult>(docSnap, ['submittedAt']) : null;
+    } catch (error) {
+        console.error("Error fetching quiz result by ID:", error);
+        return null;
+    }
+};
+export const getQuizResultsForStudent = async (studentId: string): Promise<QuizResult[]> => {
+    try {
+        const q = query(collection(db, 'quiz_results'), where('studentId', '==', studentId), orderBy('submittedAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
+    } catch (error) {
+        console.error("Error fetching quiz results for student:", error);
+        return [];
+    }
+};
+export const getWeeklyQuizResults = async (): Promise<QuizResult[]> => {
+    try {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const q = query(collection(db, 'quiz_results'), where('submittedAt', '>=', oneWeekAgo));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
+    } catch (error) {
+        console.error("Error fetching weekly quiz results:", error);
+        return [];
+    }
+};
+export const getPracticalClasses = async (): Promise<PracticalClass[]> => {
+    try {
+        const q = query(collection(db, 'practicalClasses'), orderBy('classDate', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<PracticalClass>(doc, ['classDate']));
+    } catch (error) {
+        console.error("Error fetching practical classes:", error);
+        return [];
+    }
+};
+export const createPracticalClass = async (classData: Omit<PracticalClass, 'id'>, currentUserId: string): Promise<PracticalClass> => {
+    const docRef = await addDoc(collection(db, 'practicalClasses'), classData);
+    await logActivity(currentUserId, `Membuat kelas praktek: ${classData.topic}`);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<PracticalClass>(newDoc, ['classDate']);
+};
+export const deletePracticalClass = async (classId: string, currentUserId: string): Promise<void> => {
+    const docRef = doc(db, 'practicalClasses', classId);
+    const docSnap = await getDoc(docRef);
+    await deleteDoc(docRef);
+    await logActivity(currentUserId, `Menghapus kelas praktek: ${docSnap.data()?.topic}`);
+};
+export const registerForClass = async (classId: string, internId: string): Promise<void> => {
+    const classRef = doc(db, 'practicalClasses', classId);
+    await updateDoc(classRef, { registeredInternIds: arrayUnion(internId) });
+};
+export const unregisterFromClass = async (classId: string, internId: string): Promise<void> => {
+    const classRef = doc(db, 'practicalClasses', classId);
+    await updateDoc(classRef, { registeredInternIds: arrayRemove(internId) });
+};
+export const getAssets = async (): Promise<Asset[]> => {
+    try {
+        const q = query(collection(db, 'assets'), orderBy('uploadedAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<Asset>(doc, ['uploadedAt']));
+    } catch (error) {
+        console.error("Error fetching assets:", error);
+        return [];
+    }
+};
+export const addAsset = async (assetData: Omit<Asset, 'id'>, currentUserId: string): Promise<Asset> => {
+    const docRef = await addDoc(collection(db, 'assets'), assetData);
+    await logActivity(currentUserId, `Mengunggah aset: ${assetData.fileName}`);
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Asset>(newDoc, ['uploadedAt']);
+};
+export const getForumThreads = async (): Promise<ForumThread[]> => {
+    try {
+        const q = query(collection(db, 'forumThreads'), orderBy('lastReplyAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<ForumThread>(doc, ['createdAt', 'lastReplyAt']));
+    } catch (error) {
+        console.error("Error fetching forum threads:", error);
+        return [];
+    }
+};
+export const getForumThreadById = async (threadId: string): Promise<ForumThread | null> => {
+    try {
+        const docRef = doc(db, 'forumThreads', threadId);
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists() ? fromFirestore<ForumThread>(docSnap, ['createdAt', 'lastReplyAt']) : null;
+    } catch (error) {
+        console.error("Error fetching forum thread by ID:", error);
+        return null;
+    }
+};
+export const addForumThread = async (threadData: Omit<ForumThread, 'id' | 'createdAt' | 'replyCount' | 'lastReplyAt'>): Promise<ForumThread> => {
+    const now = new Date();
+    const data = { ...threadData, createdAt: now, lastReplyAt: now, replyCount: 0 };
+    const docRef = await addDoc(collection(db, 'forumThreads'), data);
+    return { ...data, id: docRef.id };
+};
+export const getRepliesForThread = (threadId: string, callback: (replies: ForumReply[]) => void): (() => void) => {
+    const q = query(collection(db, 'forumThreads', threadId, 'replies'), orderBy('createdAt', 'asc'));
+    return onSnapshot(q, snapshot => callback(snapshot.docs.map(doc => fromFirestore<ForumReply>(doc, ['createdAt']))));
+};
+export const addReplyToThread = async (threadId: string, replyData: Omit<ForumReply, 'id' | 'threadId' | 'createdAt'>): Promise<void> => {
+    const threadRef = doc(db, 'forumThreads', threadId);
+    const replyRef = doc(collection(threadRef, 'replies'));
+    const now = new Date();
+    const batch = writeBatch(db);
+    batch.set(replyRef, { ...replyData, threadId, createdAt: now });
+    batch.update(threadRef, { replyCount: increment(1), lastReplyAt: now });
+    await batch.commit();
+};
+export const getJobPosts = async (): Promise<JobPost[]> => {
+    try {
+        const q = query(collection(db, 'jobPosts'), orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<JobPost>(doc, ['createdAt']));
+    } catch (error) {
+        console.error("Error fetching job posts:", error);
+        return [];
+    }
+};
+export const addJobPost = async (jobData: Omit<JobPost, 'id' | 'createdAt'>): Promise<JobPost> => {
+    const data = { ...jobData, createdAt: new Date() };
+    const docRef = await addDoc(collection(db, 'jobPosts'), data);
+    return { ...data, id: docRef.id };
+};
+export const getEvents = async (): Promise<CommunityEvent[]> => {
+    try {
+        const q = query(collection(db, 'communityEvents'), orderBy('eventDate', 'desc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => fromFirestore<CommunityEvent>(doc, ['createdAt', 'eventDate']));
+    } catch (error) {
+        console.error("Error fetching events:", error);
+        return [];
+    }
+};
+export const addEvent = async (eventData: Omit<CommunityEvent, 'id' | 'createdAt'>): Promise<CommunityEvent> => {
+    const data = { ...eventData, createdAt: new Date() };
+    const docRef = await addDoc(collection(db, 'communityEvents'), data);
+    return { ...data, id: docRef.id };
+};

@@ -1,3 +1,7 @@
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -5,16 +9,18 @@ import {
     getPackages, getAddOns, addPackage, updatePackage, deletePackage, 
     addAddOn, updateAddOn, deleteAddOn, addSubPackage, updateSubPackage, 
     deleteSubPackage, addSubAddOn, updateSubAddOn, deleteSubAddOn,
-    getSystemSettings, updateSystemSettings, getPromos, addPromo, updatePromo, deletePromo,
+    updateSystemSettings, getPromos, addPromo, updatePromo, deletePromo,
     getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem,
     generatePackageDescription
 } from '../../services/api';
 import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, FeatureToggles, Promo, OperationalHours, PaymentMethods, InventoryItem, InventoryStatus, LoyaltyTier, Partner } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud, Loader2, CheckCircle, AlertCircle, Sparkles, Handshake } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud, Loader2, CheckCircle, AlertCircle, Sparkles, Handshake, ImageIcon } from 'lucide-react';
 import Card from '../../components/common/Card';
 import { fileToBase64 } from '../../utils/fileUtils';
+import { useSystemSettings } from '../../App';
+import ImageCropperModal from '../../components/admin/ImageCropperModal';
 
 type ModalMode = 'add' | 'edit';
 type ItemType = 'package' | 'addon' | 'subpackage' | 'subaddon' | 'promo' | 'inventory' | 'loyaltyTier' | 'partner';
@@ -25,6 +31,15 @@ interface ModalState {
     type: ItemType;
     itemData?: any;
     parentId?: string;
+}
+
+// FIX: Define the 'ImageUpload' interface to resolve type errors.
+interface ImageUpload {
+    id: string;
+    file: File;
+    preview: string;
+    status: 'pending' | 'uploading' | 'success' | 'error';
+    error?: string;
 }
 
 const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void }> = ({ enabled, onChange }) => (
@@ -45,15 +60,16 @@ const SettingsCard: React.FC<{ title: string; description: string; children: Rea
 
 const GeneralSettingsTab = () => {
     const { user: currentUser } = useAuth();
+    const { settings: initialSettings, loading: initialLoading } = useSystemSettings();
     const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getSystemSettings().then(data => {
-            setSettings(data);
+        if (initialSettings) {
+            setSettings(JSON.parse(JSON.stringify(initialSettings))); // Deep copy for local edits
             setLoading(false);
-        });
-    }, []);
+        }
+    }, [initialSettings]);
 
     const handleHoursChange = (part: 'weekday' | 'weekend', type: 'open' | 'close', value: string) => {
         if (!settings) return;
@@ -89,7 +105,7 @@ const GeneralSettingsTab = () => {
         }
     };
 
-    if (loading) return <p>Loading general settings...</p>;
+    if (loading || initialLoading) return <p>Loading general settings...</p>;
     if (!settings) return <p>Could not load settings.</p>;
 
     return (
@@ -150,13 +166,131 @@ const GeneralSettingsTab = () => {
     );
 };
 
-interface ImageUpload {
-    id: string;
-    file: File;
-    preview: string;
-    status: 'pending' | 'uploading' | 'success' | 'error';
-    error?: string;
-}
+const AppearanceSettingsTab = () => {
+    const { user: currentUser } = useAuth();
+    const { settings: initialSettings, loading: initialLoading } = useSystemSettings();
+    const [settings, setSettings] = useState<SystemSettings | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (initialSettings) {
+            setSettings(JSON.parse(JSON.stringify(initialSettings)));
+            setLoading(false);
+        }
+    }, [initialSettings]);
+
+    const handleFileUpload = async (file: File, type: 'hero' | 'about') => {
+        if (!settings) return;
+        setIsSaving(true);
+        try {
+            const isHero = type === 'hero';
+            const resizeOptions = {
+                maxWidth: isHero ? 1920 : 1280,
+                maxHeight: isHero ? 1920 : 1280,
+                quality: 0.75,
+            };
+            const base64 = await fileToBase64(file, resizeOptions);
+            const response = await fetch('/api/assets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'upload', imageBase64: base64, folder: 'landing_page' })
+            });
+            if (!response.ok) throw new Error('Upload gagal.');
+            const result = await response.json();
+            
+            setSettings(prev => {
+                if (!prev) return null;
+                const newSettings = JSON.parse(JSON.stringify(prev)); // Deep copy
+                if (!newSettings.landingPageImages) {
+                    newSettings.landingPageImages = { hero: [], about: '' };
+                }
+
+                if (type === 'hero') {
+                    newSettings.landingPageImages.hero.push(result.secure_url);
+                } else {
+                    newSettings.landingPageImages.about = result.secure_url;
+                }
+                return newSettings;
+            });
+
+        } catch (error) {
+            alert((error as Error).message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleRemoveHeroImage = (urlToRemove: string) => {
+        if (!settings?.landingPageImages) return;
+        setSettings(prev => {
+            if (!prev || !prev.landingPageImages) return prev;
+            return {
+                ...prev,
+                landingPageImages: {
+                    ...prev.landingPageImages,
+                    hero: prev.landingPageImages.hero.filter(url => url !== urlToRemove),
+                },
+            };
+        });
+    };
+
+    const handleSave = async () => {
+        if (settings && currentUser) {
+            setIsSaving(true);
+            await updateSystemSettings(settings, currentUser.id);
+            setIsSaving(false);
+            alert('Pengaturan tampilan berhasil disimpan!');
+        }
+    };
+
+    if (loading || initialLoading || !settings) return <Loader2 className="animate-spin" />;
+
+    return (
+        <div className="space-y-6">
+            <SettingsCard title="Gambar Hero Section" description="Kelola gambar yang tampil di carousel halaman depan.">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {settings.landingPageImages?.hero?.map((url, index) => (
+                        <div key={index} className="relative group aspect-video">
+                            <img src={url} alt={`Hero ${index+1}`} className="w-full h-full object-cover rounded-lg" />
+                            <button
+                                type="button"
+                                onClick={() => handleRemoveHeroImage(url)}
+                                className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                    ))}
+                     <label htmlFor="hero-upload" className="flex flex-col items-center justify-center aspect-video border-2 border-dashed rounded-lg cursor-pointer hover:bg-base-100">
+                        <UploadCloud size={24} className="text-muted" />
+                        <span className="text-xs text-muted mt-1">Tambah Gambar</span>
+                        <input id="hero-upload" type="file" accept="image/*" onChange={e => e.target.files && handleFileUpload(e.target.files[0], 'hero')} className="hidden" />
+                    </label>
+                </div>
+            </SettingsCard>
+
+            <SettingsCard title="Gambar About Section" description="Ganti gambar yang tampil di bagian 'Tentang Kami'.">
+                <div className="flex items-center gap-4">
+                    {settings.landingPageImages?.about && (
+                        <img src={settings.landingPageImages.about} alt="About" className="w-48 h-auto object-cover rounded-lg" />
+                    )}
+                    <label htmlFor="about-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-4 py-2 rounded-lg hover:bg-primary/20">
+                        {settings.landingPageImages?.about ? 'Ganti Gambar' : 'Upload Gambar'}
+                    </label>
+                    <input id="about-upload" type="file" accept="image/*" onChange={e => e.target.files && handleFileUpload(e.target.files[0], 'about')} className="hidden" />
+                </div>
+            </SettingsCard>
+            
+            <div className="flex justify-end mt-6">
+                <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold">
+                    {isSaving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
+                    Simpan Perubahan
+                </button>
+            </div>
+        </div>
+    );
+};
 
 const ServicesSettingsTab = () => {
     const { user: currentUser } = useAuth();
@@ -167,6 +301,7 @@ const ServicesSettingsTab = () => {
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
     const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'package' });
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [cropperState, setCropperState] = useState<{ isOpen: boolean; imageSrc: string | null; sourceFile: File | null }>({ isOpen: false, imageSrc: null, sourceFile: null });
     
     const [formData, setFormData] = useState({
         name: '', price: '', description: '', imageUrls: [] as string[], type: 'Studio', isGroupPackage: false
@@ -212,15 +347,36 @@ const ServicesSettingsTab = () => {
     };
     
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const newFiles: ImageUpload[] = Array.from(e.target.files).map((file: File) => ({
-                id: `${file.name}-${file.lastModified}-${Math.random()}`,
-                file,
-                preview: URL.createObjectURL(file),
-                status: 'pending'
-            }));
-            setImageUploads(prev => [...prev, ...newFiles]);
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setCropperState({ isOpen: true, imageSrc: reader.result as string, sourceFile: file });
+            };
+            reader.readAsDataURL(file);
         }
+        // Reset file input to allow re-uploading the same file
+        e.target.value = '';
+    };
+
+    const handleCropSave = (croppedImageBlob: Blob) => {
+        if (cropperState.sourceFile) {
+            // Use a consistent name but vary it slightly to avoid conflicts if needed
+            const fileName = `cropped-${cropperState.sourceFile.name}`;
+            const croppedFile = new File([croppedImageBlob], fileName, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+            });
+
+            const newUpload: ImageUpload = {
+                id: `${croppedFile.name}-${Date.now()}`,
+                file: croppedFile,
+                preview: URL.createObjectURL(croppedFile),
+                status: 'pending'
+            };
+            setImageUploads(prev => [...prev, newUpload]);
+        }
+        setCropperState({ isOpen: false, imageSrc: null, sourceFile: null });
     };
 
     const handleRemoveExistingImage = (urlToRemove: string) => {
@@ -265,10 +421,10 @@ const ServicesSettingsTab = () => {
                     updateFileState(fileWrapper.id, { status: 'uploading', error: undefined });
                     try {
                         const base64 = await fileToBase64(fileWrapper.file);
-                        const response = await fetch('/api/uploadImage', {
+                        const response = await fetch('/api/assets', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ imageBase64: base64, folder: 'package_images' })
+                            body: JSON.stringify({ action: 'upload', imageBase64: base64, folder: 'package_images' })
                         });
 
                         if (!response.ok) {
@@ -430,38 +586,39 @@ const ServicesSettingsTab = () => {
         </div>
     );
      return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {renderItemList('Paket Foto', packages, 'package', <Box className="text-blue-600"/>)}
-            {renderItemList('Layanan Tambahan', addOns, 'addon', <Puzzle className="text-blue-600"/>)}
-            <Modal isOpen={modalState.isOpen} onClose={closeModal} title={getModalTitle()}>
-                <form onSubmit={handleFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Nama</label>
-                        <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"/>
-                    </div>
-                     {(modalState.type === 'subpackage' || modalState.type === 'subaddon') && (
+        <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {renderItemList('Paket Foto', packages, 'package', <Box className="text-blue-600"/>)}
+                {renderItemList('Layanan Tambahan', addOns, 'addon', <Puzzle className="text-blue-600"/>)}
+                <Modal isOpen={modalState.isOpen} onClose={closeModal} title={getModalTitle()}>
+                    <form onSubmit={handleFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Harga (Rp)</label>
-                            <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"/>
+                            <label className="block text-sm font-medium text-gray-700">Nama</label>
+                            <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"/>
                         </div>
-                     )}
-                    {(modalState.type === 'package' || modalState.type === 'subpackage') && (
-                         <div>
-                            <div className="flex justify-between items-center">
-                                <label className="block text-sm font-medium text-gray-700">Deskripsi (Opsional)</label>
-                                {modalState.type === 'package' && (
-                                    <button type="button" onClick={handleGenerateDescription} disabled={isGeneratingDesc || !formData.name} className="text-xs flex items-center gap-1 text-accent font-semibold disabled:opacity-50">
-                                        {isGeneratingDesc ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                        Generate (AI)
-                                    </button>
-                                )}
+                        {(modalState.type === 'subpackage' || modalState.type === 'subaddon') && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Harga (Rp)</label>
+                                <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} required className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"/>
                             </div>
-                            <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={3} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
-                        </div>
-                    )}
-                    {modalState.type === 'package' && (
-                        <>
-                           <div>
+                        )}
+                        {(modalState.type === 'package' || modalState.type === 'subpackage') && (
+                            <div>
+                                <div className="flex justify-between items-center">
+                                    <label className="block text-sm font-medium text-gray-700">Deskripsi (Opsional)</label>
+                                    {modalState.type === 'package' && (
+                                        <button type="button" onClick={handleGenerateDescription} disabled={isGeneratingDesc || !formData.name} className="text-xs flex items-center gap-1 text-accent font-semibold disabled:opacity-50">
+                                            {isGeneratingDesc ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                            Generate (AI)
+                                        </button>
+                                    )}
+                                </div>
+                                <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows={3} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                            </div>
+                        )}
+                        {modalState.type === 'package' && (
+                            <>
+                            <div>
                                 <label className="block text-sm font-medium text-gray-700">Gambar Showcase</label>
                                 <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
                                     {formData.imageUrls.map(url => (
@@ -481,685 +638,430 @@ const ServicesSettingsTab = () => {
                                             <div className="absolute bottom-1 right-1 bg-black/50 text-white rounded-full p-0.5">
                                                 {upload.status === 'uploading' && <Loader2 size={12} className="animate-spin" />}
                                                 {upload.status === 'success' && <CheckCircle size={12} className="text-green-400" />}
-                                                {upload.status === 'error' && <span title={upload.error}><AlertCircle size={12} className="text-red-400"/></span>}
+                                                {upload.status === 'error' && <AlertCircle size={12} className="text-red-400" title={upload.error}/>}
                                             </div>
                                         </div>
                                     ))}
                                     <label htmlFor="image-upload" className="flex flex-col items-center justify-center h-24 w-full border-2 border-dashed rounded-md cursor-pointer hover:bg-gray-50">
                                         <UploadCloud size={24} className="text-gray-400"/>
                                         <span className="text-xs text-gray-500">Tambah</span>
-                                        <input type="file" id="image-upload" multiple accept="image/*" onChange={handleImageChange} className="hidden"/>
+                                        <input type="file" id="image-upload" accept="image/*" onChange={handleImageChange} className="hidden"/>
                                     </label>
                                 </div>
                             </div>
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Jenis Paket</label>
-                                <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
-                                    <option value="Studio">Studio</option>
-                                    <option value="Outdoor">Outdoor</option>
-                                </select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <input id="isGroupPackage" type="checkbox" checked={formData.isGroupPackage} onChange={e => setFormData({...formData, isGroupPackage: e.target.checked})} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"/>
-                                <label htmlFor="isGroupPackage" className="block text-sm font-medium text-gray-700">Ini adalah Paket Grup (kenakan biaya per orang)</label>
-                            </div>
-                        </>
-                    )}
-                    <div className="flex justify-end gap-3 pt-4">
-                        <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Batal</button>
-                        <button type="submit" disabled={isSubmitting} className="w-28 flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60">
-                            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Simpan'}
-                        </button>
-                    </div>
-                </form>
-            </Modal>
-             <ConfirmationModal
-                isOpen={isConfirmModalOpen}
-                onClose={() => setIsConfirmModalOpen(false)}
-                onConfirm={handleDelete}
-                title={`Hapus Item`}
-                message={`Apakah Anda yakin ingin menghapus "${modalState.itemData?.name}"? Tindakan ini tidak dapat dibatalkan.`}
-            />
-        </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Jenis Paket</label>
+                                    <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="Studio">Studio</option>
+                                        <option value="Outdoor">Outdoor</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input id="isGroupPackage" type="checkbox" checked={formData.isGroupPackage} onChange={e => setFormData({...formData, isGroupPackage: e.target.checked})} className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"/>
+                                    <label htmlFor="isGroupPackage" className="block text-sm font-medium text-gray-700">Ini adalah Paket Grup (kenakan biaya per orang)</label>
+                                </div>
+                            </>
+                        )}
+                        <div className="flex justify-end gap-3 pt-4">
+                            <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Batal</button>
+                            <button type="submit" disabled={isSubmitting} className="w-28 flex justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60">
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : 'Simpan'}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+                <ConfirmationModal
+                    isOpen={isConfirmModalOpen}
+                    onClose={() => setIsConfirmModalOpen(false)}
+                    onConfirm={handleDelete}
+                    title={`Hapus Item`}
+                    message={`Apakah Anda yakin ingin menghapus`}
+                />
+            </div>
+            {cropperState.isOpen && (
+                <ImageCropperModal
+                    isOpen={cropperState.isOpen}
+                    onClose={() => setCropperState({ isOpen: false, imageSrc: null, sourceFile: null })}
+                    imageSrc={cropperState.imageSrc}
+                    onSave={handleCropSave}
+                    aspectRatio={3 / 2}
+                />
+            )}
+        </>
     );
 };
 
-const PromosSettingsTab = () => {
+const PaymentSettingsTab = () => {
     const { user: currentUser } = useAuth();
-    // New tab for managing promotions
-    const [promos, setPromos] = useState<Promo[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'promo' });
-    const [formData, setFormData] = useState({ code: '', description: '', discountPercentage: '', isActive: true });
-    
-    const fetchData = async () => {
-        setLoading(true);
-        const data = await getPromos();
-        setPromos(data);
-        setLoading(false);
-    };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const openModal = (mode: ModalMode, itemData?: Promo) => {
-        setModalState({ isOpen: true, mode, type: 'promo', itemData });
-        if (mode === 'edit' && itemData) {
-            setFormData({
-                code: itemData.code,
-                description: itemData.description,
-                discountPercentage: itemData.discountPercentage.toString(),
-                isActive: itemData.isActive
-            });
-        } else {
-            setFormData({ code: '', description: '', discountPercentage: '', isActive: true });
-        }
-    };
-    
-    const handleFormSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!currentUser) return;
-        const { mode, itemData } = modalState;
-        const data = {
-            ...formData,
-            discountPercentage: parseInt(formData.discountPercentage) || 0,
-        };
-        if (mode === 'add') {
-            await addPromo(data, currentUser.id);
-        } else if (itemData) {
-            await updatePromo(itemData.id, data, currentUser.id);
-        }
-        setModalState({ ...modalState, isOpen: false });
-        fetchData();
-    };
-    
-    const handleToggleActive = async (promo: Promo) => {
-        if (!currentUser) return;
-        await updatePromo(promo.id, { isActive: !promo.isActive }, currentUser.id);
-        fetchData();
-    };
-
-    if (loading) return <p>Loading promos...</p>;
-
-    return (
-        <Card>
-            <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h3 className="text-xl font-bold text-primary">Manajemen Promosi</h3>
-                    <p className="text-muted mt-1">Buat dan kelola kode promo untuk klien.</p>
-                </div>
-                <button onClick={() => openModal('add')} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold">
-                    <PlusCircle size={16}/> Buat Promo Baru
-                </button>
-            </div>
-            <div className="border rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y">
-                    <thead className="bg-base-200/50"><tr>
-                        <th className="px-4 py-2 text-left text-sm font-semibold">Kode</th>
-                        <th className="px-4 py-2 text-left text-sm font-semibold">Deskripsi</th>
-                        <th className="px-4 py-2 text-center text-sm font-semibold">Diskon</th>
-                        <th className="px-4 py-2 text-center text-sm font-semibold">Status</th>
-                        <th className="px-4 py-2 text-center text-sm font-semibold">Aksi</th>
-                    </tr></thead>
-                    <tbody className="divide-y">
-                        {promos.map(p => (
-                            <tr key={p.id}>
-                                <td className="px-4 py-2 font-mono text-primary font-semibold">{p.code}</td>
-                                <td className="px-4 py-2 text-sm">{p.description}</td>
-                                <td className="px-4 py-2 text-center text-sm font-semibold">{p.discountPercentage}%</td>
-                                <td className="px-4 py-2 text-center"><ToggleSwitch enabled={p.isActive} onChange={() => handleToggleActive(p)} /></td>
-                                <td className="px-4 py-2 text-center"><button onClick={() => openModal('edit', p)} className="p-2 text-gray-400 hover:text-blue-600"><Edit size={16}/></button></td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            
-             <Modal isOpen={modalState.isOpen} onClose={() => setModalState({...modalState, isOpen: false})} title={modalState.mode === 'add' ? 'Tambah Promo' : 'Edit Promo'}>
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                    <div><label>Kode Promo</label><input type="text" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} required className="w-full p-2 border rounded" /></div>
-                    <div><label>Deskripsi</label><input type="text" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required className="w-full p-2 border rounded" /></div>
-                    <div><label>Diskon (%)</label><input type="number" value={formData.discountPercentage} onChange={e => setFormData({...formData, discountPercentage: e.target.value})} required className="w-full p-2 border rounded" /></div>
-                    <div className="flex justify-end gap-3 pt-4">
-                        <button type="button" onClick={() => setModalState({...modalState, isOpen: false})} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Batal</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Simpan</button>
-                    </div>
-                </form>
-            </Modal>
-        </Card>
-    );
-};
-
-const PaymentsSettingsTab = () => {
-    const { user: currentUser } = useAuth();
+    const { settings: initialSettings, loading: initialLoading } = useSystemSettings();
     const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [loading, setLoading] = useState(true);
-
+    const [qrisFile, setQrisFile] = useState<File | null>(null);
+    const [qrisPreview, setQrisPreview] = useState<string | null>(null);
+    
     useEffect(() => {
-        getSystemSettings().then(data => {
-            setSettings(data);
+        if (initialSettings) {
+            setSettings(JSON.parse(JSON.stringify(initialSettings)));
             setLoading(false);
-        });
-    }, []);
+        }
+    }, [initialSettings]);
 
-    const handleToggle = (method: keyof Omit<PaymentMethods, 'qrisImage'>) => {
+    const handlePaymentToggle = (method: keyof PaymentMethods) => {
         if (!settings) return;
-        const newSettings = {
+        setSettings({
             ...settings,
             paymentMethods: { ...settings.paymentMethods, [method]: !settings.paymentMethods[method] }
-        };
-        setSettings(newSettings);
+        });
+    };
+    
+    const handlePaymentContactChange = (field: 'danaNumber' | 'shopeepayNumber', value: string) => {
+        if (!settings) return;
+        setSettings({
+            ...settings,
+            paymentMethods: { ...settings.paymentMethods, [field]: value }
+        });
+    };
+    
+    const handleBankAccountChange = (index: number, field: keyof (typeof settings.paymentMethods.bankAccounts)[0], value: string) => {
+        if (!settings) return;
+        const newAccounts = [...(settings.paymentMethods.bankAccounts || [])];
+        (newAccounts[index] as any)[field] = value;
+        setSettings({
+            ...settings,
+            paymentMethods: { ...settings.paymentMethods, bankAccounts: newAccounts }
+        });
+    };
+    
+    const handleAddBankAccount = () => {
+        if (!settings) return;
+        const newAccounts = [...(settings.paymentMethods.bankAccounts || []), { bankName: '', accountNumber: '', accountHolder: '' }];
+        setSettings({
+            ...settings,
+            paymentMethods: { ...settings.paymentMethods, bankAccounts: newAccounts }
+        });
+    };
+    
+    const handleRemoveBankAccount = (index: number) => {
+        if (!settings) return;
+        const newAccounts = (settings.paymentMethods.bankAccounts || []).filter((_, i) => i !== index);
+        setSettings({
+            ...settings,
+            paymentMethods: { ...settings.paymentMethods, bankAccounts: newAccounts }
+        });
     };
 
-    const handleQrisImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+    const handleQrisUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setQrisFile(file);
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setSettings(prev => {
-                    if (!prev) return null;
-                    return {
-                        ...prev,
-                        paymentMethods: {
-                            ...prev.paymentMethods,
-                            qrisImage: reader.result as string,
-                        }
-                    };
-                });
-            };
+            reader.onloadend = () => setQrisPreview(reader.result as string);
             reader.readAsDataURL(file);
         }
     };
 
     const handleSave = async () => {
         if (settings && currentUser) {
-            await updateSystemSettings(settings, currentUser.id);
+            setLoading(true);
+            let updatedSettings = { ...settings };
+            if (qrisFile) {
+                try {
+                    const base64 = await fileToBase64(qrisFile, { skipResizing: true });
+                    const response = await fetch('/api/assets', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'upload', imageBase64: base64, folder: 'payment_methods', publicId: 'qris_code' })
+                    });
+                    if (!response.ok) throw new Error('Upload QRIS gagal.');
+                    const result = await response.json();
+                    updatedSettings.paymentMethods.qrisImage = result.secure_url;
+                } catch (error) {
+                    alert((error as Error).message);
+                    setLoading(false);
+                    return;
+                }
+            }
+            await updateSystemSettings(updatedSettings, currentUser.id);
+            setLoading(false);
             alert('Pengaturan pembayaran berhasil disimpan!');
         }
     };
-
-    if (loading) return <p>Loading payment settings...</p>;
-    if (!settings) return <p>Could not load settings.</p>;
     
-    const paymentOptions: { key: keyof Omit<PaymentMethods, 'qrisImage'>, label: string }[] = [
-        { key: 'qris', label: 'QRIS' },
-        { key: 'bankTransfer', label: 'Bank Transfer (BNI & BRI)' },
-        { key: 'dana', label: 'Dana' },
-        { key: 'shopeepay', label: 'Shopeepay' }
-    ];
+    if (loading || initialLoading || !settings) return <p>Loading payment settings...</p>;
 
     return (
-        <SettingsCard title="Metode Pembayaran" description="Aktifkan atau nonaktifkan metode pembayaran yang tersedia untuk klien saat booking.">
-             <div className="space-y-3">
-                {paymentOptions.map(opt => (
-                    <div key={opt.key}>
-                        <div className="flex justify-between items-center p-3 bg-base-100 rounded-lg">
-                            <p className="font-medium">{opt.label}</p>
-                            <ToggleSwitch enabled={settings.paymentMethods[opt.key]} onChange={() => handleToggle(opt.key)} />
+        <div className="space-y-6">
+             <SettingsCard title="Metode Pembayaran" description="Aktifkan atau nonaktifkan metode pembayaran yang tersedia untuk klien.">
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center"><p>QRIS</p><ToggleSwitch enabled={settings.paymentMethods.qris} onChange={() => handlePaymentToggle('qris' as any)} /></div>
+                    <div className="flex justify-between items-center"><p>Transfer Bank</p><ToggleSwitch enabled={settings.paymentMethods.bankTransfer} onChange={() => handlePaymentToggle('bankTransfer' as any)} /></div>
+                    <div className="flex justify-between items-center"><p>Dana</p><ToggleSwitch enabled={settings.paymentMethods.dana} onChange={() => handlePaymentToggle('dana' as any)} /></div>
+                    <div className="flex justify-between items-center"><p>ShopeePay</p><ToggleSwitch enabled={settings.paymentMethods.shopeepay} onChange={() => handlePaymentToggle('shopeepay' as any)} /></div>
+                </div>
+                {settings.paymentMethods.qris && (
+                    <div className="mt-4 pt-4 border-t">
+                        <label className="block text-sm font-medium text-gray-700">Gambar QRIS</label>
+                        <div className="mt-2 flex items-center gap-4">
+                            <img src={qrisPreview || settings.paymentMethods.qrisImage} alt="QRIS" className="w-24 h-24 object-contain border bg-gray-100"/>
+                            <input type="file" accept="image/*" onChange={handleQrisUpload} />
                         </div>
-                        {opt.key === 'qris' && settings.paymentMethods.qris && (
-                            <div className="mt-2 pl-6 pt-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Gambar QRIS</label>
-                                <div className="flex items-center gap-4">
-                                    {settings.paymentMethods.qrisImage ? (
-                                        <img src={settings.paymentMethods.qrisImage} alt="QRIS Preview" className="h-24 w-24 object-contain border rounded-md p-1 bg-white"/>
-                                    ) : (
-                                        <div className="h-24 w-24 bg-gray-100 rounded-md flex items-center justify-center text-center text-xs text-gray-400">Belum ada gambar</div>
-                                    )}
-                                    <div>
-                                        <label htmlFor="qris-upload" className="cursor-pointer text-sm font-semibold text-primary bg-primary/10 px-3 py-2 rounded-lg hover:bg-primary/20">
-                                            Upload Gambar
-                                        </label>
-                                        <input id="qris-upload" type="file" accept="image/*" onChange={handleQrisImageUpload} className="hidden" />
-                                        <p className="text-xs text-muted mt-1">Gunakan file .jpg atau .png</p>
-                                    </div>
+                    </div>
+                )}
+                 {settings.paymentMethods.bankTransfer && (
+                    <div className="mt-4 pt-4 border-t">
+                        <label className="block text-sm font-medium text-gray-700">Rekening Bank</label>
+                        <div className="space-y-2 mt-2">
+                             {(settings.paymentMethods.bankAccounts || []).map((acc, index) => (
+                                <div key={index} className="flex items-center gap-2 p-2 bg-base-100 rounded-md">
+                                    <input value={acc.bankName} onChange={e => handleBankAccountChange(index, 'bankName', e.target.value)} placeholder="Nama Bank" className="p-1 border rounded w-1/4"/>
+                                    <input value={acc.accountNumber} onChange={e => handleBankAccountChange(index, 'accountNumber', e.target.value)} placeholder="Nomor Rekening" className="p-1 border rounded w-1/3"/>
+                                    <input value={acc.accountHolder} onChange={e => handleBankAccountChange(index, 'accountHolder', e.target.value)} placeholder="Atas Nama" className="p-1 border rounded flex-grow"/>
+                                    <button onClick={() => handleRemoveBankAccount(index)} className="p-1 text-red-500"><Trash2 size={16}/></button>
                                 </div>
+                            ))}
+                            <button onClick={handleAddBankAccount} className="text-sm font-semibold text-primary"><PlusCircle size={16} className="inline-block mr-1"/> Tambah Rekening</button>
+                        </div>
+                    </div>
+                )}
+                 {(settings.paymentMethods.dana || settings.paymentMethods.shopeepay) && (
+                     <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
+                        {settings.paymentMethods.dana && (
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Nomor DANA</label>
+                                <input type="text" value={settings.paymentMethods.danaNumber || ''} onChange={e => handlePaymentContactChange('danaNumber', e.target.value)} className="w-full p-2 border rounded mt-1"/>
+                            </div>
+                        )}
+                         {settings.paymentMethods.shopeepay && (
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Nomor ShopeePay</label>
+                                <input type="text" value={settings.paymentMethods.shopeepayNumber || ''} onChange={e => handlePaymentContactChange('shopeepayNumber', e.target.value)} className="w-full p-2 border rounded mt-1"/>
                             </div>
                         )}
                     </div>
-                ))}
-             </div>
-             <div className="flex justify-end mt-6 border-t pt-4">
-                <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold">
-                    <Save size={16}/> Simpan Pengaturan Pembayaran
+                 )}
+             </SettingsCard>
+              <div className="flex justify-end">
+                <button onClick={handleSave} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold">
+                    <Save size={16}/> Simpan Perubahan
                 </button>
-            </div>
-        </SettingsCard>
-    );
-};
-
-const UsersSettingsTab = () => (
-    <Card>
-        <div className="flex items-center gap-6">
-            <div className="p-4 bg-primary/10 rounded-xl text-primary"><Shield size={32}/></div>
-            <div>
-                <h3 className="text-xl font-bold">Manajemen Akun Staff & Peran</h3>
-                <p className="text-muted mt-1 max-w-md">Tambah, edit, atau hapus akun untuk staff dan atur peran mereka di halaman khusus manajemen staf.</p>
-                <Link to="/admin/users" className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold">
-                    Buka Manajemen Staf <ArrowRight size={16}/>
-                </Link>
             </div>
         </div>
-    </Card>
-);
-
-const InventorySettingsTab = () => {
-    const { user: currentUser } = useAuth();
-    const [inventory, setInventory] = useState<InventoryItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'inventory' });
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ name: '', category: 'Kamera', status: InventoryStatus.Available });
-
-    const fetchData = async () => {
-        setLoading(true);
-        const data = await getInventoryItems();
-        setInventory(data);
-        setLoading(false);
-    };
-
-    useEffect(() => { fetchData(); }, []);
-
-    const openModal = (mode: ModalMode, itemData?: InventoryItem) => {
-        setModalState({ isOpen: true, mode, type: 'inventory', itemData });
-        if (mode === 'edit' && itemData) {
-            setFormData({ name: itemData.name, category: itemData.category, status: itemData.status });
-        } else {
-            setFormData({ name: '', category: 'Kamera', status: InventoryStatus.Available });
-        }
-    };
-
-    const handleFormSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!currentUser) return;
-        const { mode, itemData } = modalState;
-        if (mode === 'add') {
-            await addInventoryItem({ ...formData, lastChecked: null }, currentUser.id);
-        } else if (itemData) {
-            await updateInventoryItem(itemData.id, formData, currentUser.id);
-        }
-        setModalState({ ...modalState, isOpen: false });
-        fetchData();
-    };
-
-    const handleDelete = async () => {
-        if (isConfirmModalOpen && modalState.itemData && currentUser) {
-            await deleteInventoryItem(modalState.itemData.id, currentUser.id);
-            setIsConfirmModalOpen(false);
-            fetchData();
-        }
-    };
-
-    if (loading) return <p>Loading inventory...</p>;
-
-    return (
-        <Card>
-             <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h3 className="text-xl font-bold text-primary">Manajemen Inventaris</h3>
-                    <p className="text-muted mt-1">Kelola semua peralatan dan properti studio.</p>
-                </div>
-                <button onClick={() => openModal('add')} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold">
-                    <PlusCircle size={16}/> Tambah Item
-                </button>
-            </div>
-            <div className="border rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y">
-                    <thead className="bg-base-200/50">
-                        <tr>
-                            <th className="px-4 py-2 text-left text-sm font-semibold">Nama Item</th>
-                            <th className="px-4 py-2 text-left text-sm font-semibold">Kategori</th>
-                            <th className="px-4 py-2 text-center text-sm font-semibold">Status</th>
-                            <th className="px-4 py-2 text-center text-sm font-semibold">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {inventory.map(item => (
-                            <tr key={item.id}>
-                                <td className="px-4 py-2 font-medium">{item.name}</td>
-                                <td className="px-4 py-2 text-sm text-gray-600">{item.category}</td>
-                                <td className="px-4 py-2 text-center text-sm">{item.status}</td>
-                                <td className="px-4 py-2 text-center">
-                                    <button onClick={() => openModal('edit', item)} className="p-2 text-gray-400 hover:text-blue-600"><Edit size={16}/></button>
-                                    <button onClick={() => { setModalState({ ...modalState, itemData: item }); setIsConfirmModalOpen(true); }} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16}/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-             <Modal isOpen={modalState.isOpen} onClose={() => setModalState({...modalState, isOpen: false})} title={modalState.mode === 'add' ? 'Tambah Item' : 'Edit Item'}>
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                    <div><label>Nama Item</label><input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="w-full p-2 border rounded" /></div>
-                    <div><label>Kategori</label><select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full p-2 border rounded"><option>Kamera</option><option>Lensa</option><option>Lighting</option><option>Aksesoris</option><option>Properti</option><option>Lainnya</option></select></div>
-                    <div><label>Status</label><select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as InventoryStatus})} className="w-full p-2 border rounded">{Object.values(InventoryStatus).map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-                    <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalState({...modalState, isOpen: false})} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">Batal</button><button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Simpan</button></div>
-                </form>
-            </Modal>
-            <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleDelete} title="Hapus Item" message={`Yakin ingin menghapus item "${modalState.itemData?.name}"?`} />
-        </Card>
-    )
+    );
 };
 
 const LoyaltySettingsTab = () => {
     const { user: currentUser } = useAuth();
+    const { settings: initialSettings, loading: initialLoading } = useSystemSettings();
     const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [loading, setLoading] = useState(true);
-    const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'loyaltyTier' });
-    const [tierFormData, setTierFormData] = useState({ id: '', name: '', bookingThreshold: '', discountPercentage: '' });
-    const [tierToDelete, setTierToDelete] = useState<LoyaltyTier | null>(null);
+    const [modalState, setModalState] = useState<{ isOpen: boolean, mode: ModalMode, tier?: LoyaltyTier }>({ isOpen: false, mode: 'add' });
 
     useEffect(() => {
-        getSystemSettings().then(data => {
-            setSettings(data);
+        if (initialSettings) {
+            setSettings(JSON.parse(JSON.stringify(initialSettings)));
             setLoading(false);
-        });
-    }, []);
+        }
+    }, [initialSettings]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSettingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!settings) return;
         const { name, value } = e.target;
-        const keys = name.split('.');
-        
-        setSettings(prev => {
-            if (!prev) return null;
-            const newSettings = JSON.parse(JSON.stringify(prev));
-            let current = newSettings;
-            for (let i = 0; i < keys.length - 1; i++) {
-                current = current[keys[i]];
-            }
-            current[keys[keys.length - 1]] = value;
-            return newSettings;
+        setSettings({
+            ...settings,
+            loyaltySettings: { ...settings.loyaltySettings, [name]: Number(value) }
         });
     };
 
-    const openTierModal = (mode: ModalMode, tier?: LoyaltyTier) => {
-        setModalState({ isOpen: true, mode, type: 'loyaltyTier', itemData: tier });
-        setTierFormData(tier ? { ...tier, bookingThreshold: String(tier.bookingThreshold), discountPercentage: String(tier.discountPercentage) } : { id: '', name: '', bookingThreshold: '', discountPercentage: '' });
+    const handleTierChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+         if (!settings) return;
+         const { name, value } = e.target;
+         const newTiers = [...settings.loyaltySettings.loyaltyTiers];
+         (newTiers[index] as any)[name] = Number(value);
+         setSettings({...settings, loyaltySettings: {...settings.loyaltySettings, loyaltyTiers: newTiers }});
     };
-
-    const handleTierSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!settings) return;
-
-        const updatedTiers = [...settings.loyaltySettings.loyaltyTiers];
-        const tierData = {
-            ...tierFormData,
-            bookingThreshold: Number(tierFormData.bookingThreshold),
-            discountPercentage: Number(tierFormData.discountPercentage),
-        };
-
-        if (modalState.mode === 'add') {
-            updatedTiers.push({ ...tierData, id: String(Date.now()) });
-        } else {
-            const index = updatedTiers.findIndex(t => t.id === tierData.id);
-            if (index > -1) updatedTiers[index] = tierData;
-        }
-
-        setSettings({ ...settings, loyaltySettings: { ...settings.loyaltySettings, loyaltyTiers: updatedTiers } });
-        setModalState({ ...modalState, isOpen: false });
+    
+    const handleAddTier = () => {
+         if (!settings) return;
+         const newTiers = [...settings.loyaltySettings.loyaltyTiers, { id: `tier-${Date.now()}`, name: 'New Tier', bookingThreshold: 0, discountPercentage: 0 }];
+         setSettings({...settings, loyaltySettings: {...settings.loyaltySettings, loyaltyTiers: newTiers }});
     };
-
-    const handleDeleteTier = () => {
-        if (!settings || !tierToDelete) return;
-        const updatedTiers = settings.loyaltySettings.loyaltyTiers.filter(t => t.id !== tierToDelete.id);
-        setSettings({ ...settings, loyaltySettings: { ...settings.loyaltySettings, loyaltyTiers: updatedTiers } });
-        setTierToDelete(null);
+    
+    const handleRemoveTier = (id: string) => {
+         if (!settings) return;
+         const newTiers = settings.loyaltySettings.loyaltyTiers.filter(t => t.id !== id);
+         setSettings({...settings, loyaltySettings: {...settings.loyaltySettings, loyaltyTiers: newTiers }});
     };
-
-    const handleSave = async () => {
+    
+     const handleSave = async () => {
         if (settings && currentUser) {
             await updateSystemSettings(settings, currentUser.id);
             alert('Pengaturan loyalitas berhasil disimpan!');
         }
     };
-    
-    if (loading || !settings) return <p>Loading loyalty settings...</p>;
+
+    if (loading || initialLoading || !settings) return <p>Loading loyalty settings...</p>;
 
     return (
         <div className="space-y-6">
-            <SettingsCard title="Sistem Poin & Referral" description="Atur bagaimana klien mendapatkan poin, bonus referral, dan diskon.">
+            <SettingsCard title="Konversi Poin" description="Atur bagaimana poin didapat dan digunakan oleh klien.">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-medium">Poin per Rupiah</label>
-                        <input type="number" name="loyaltySettings.pointsPerRupiah" value={settings.loyaltySettings.pointsPerRupiah} onChange={handleChange} className="mt-1 w-full p-2 border rounded" step="0.001"/>
-                        <p className="text-xs text-muted mt-1">Contoh: 0.001 berarti 1 poin per Rp 1.000</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">Nilai Rupiah per Poin (untuk ditukar)</label>
-                        <input type="number" name="loyaltySettings.rupiahPerPoint" value={settings.loyaltySettings.rupiahPerPoint} onChange={handleChange} className="mt-1 w-full p-2 border rounded"/>
-                         <p className="text-xs text-muted mt-1">Contoh: 100 berarti 1 poin = diskon Rp 100</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">Bonus Poin Referral</label>
-                        <input type="number" name="loyaltySettings.referralBonusPoints" value={settings.loyaltySettings.referralBonusPoints} onChange={handleChange} className="mt-1 w-full p-2 border rounded"/>
-                        <p className="text-xs text-muted mt-1">Poin untuk pereferensi & klien baru setelah booking selesai.</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium">Diskon Referral Booking Pertama (Rp)</label>
-                        <input type="number" name="loyaltySettings.firstBookingReferralDiscount" value={settings.loyaltySettings.firstBookingReferralDiscount} onChange={handleChange} className="mt-1 w-full p-2 border rounded"/>
-                        <p className="text-xs text-muted mt-1">Potongan harga langsung untuk klien baru yang memakai kode.</p>
-                    </div>
+                    <div><label className="text-sm font-medium">Poin per Rupiah</label><input type="number" name="pointsPerRupiah" value={settings.loyaltySettings.pointsPerRupiah} onChange={handleSettingChange} className="w-full p-2 border rounded mt-1" /></div>
+                    <div><label className="text-sm font-medium">Rupiah per Poin (untuk redeem)</label><input type="number" name="rupiahPerPoint" value={settings.loyaltySettings.rupiahPerPoint} onChange={handleSettingChange} className="w-full p-2 border rounded mt-1" /></div>
                 </div>
             </SettingsCard>
-
-            <SettingsCard title="Tier Loyalitas Pelanggan" description="Buat tingkatan untuk memberikan diskon otomatis bagi klien setia.">
-                <div className="space-y-3">
-                    {settings.loyaltySettings.loyaltyTiers.sort((a,b) => a.bookingThreshold - b.bookingThreshold).map(tier => (
-                        <div key={tier.id} className="flex items-center justify-between p-3 bg-base-100 rounded-lg">
-                            <div>
-                                <p className="font-semibold text-primary">{tier.name}</p>
-                                <p className="text-sm text-muted">Syarat: {tier.bookingThreshold} booking | Diskon: {tier.discountPercentage}%</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => openTierModal('edit', tier)} className="p-2 text-muted hover:text-accent"><Edit size={16} /></button>
-                                <button onClick={() => setTierToDelete(tier)} className="p-2 text-muted hover:text-error"><Trash2 size={16} /></button>
-                            </div>
+            <SettingsCard title="Bonus Referral" description="Atur bonus untuk program referral klien.">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div><label className="text-sm font-medium">Bonus Poin (untuk referrer & referred)</label><input type="number" name="referralBonusPoints" value={settings.loyaltySettings.referralBonusPoints} onChange={handleSettingChange} className="w-full p-2 border rounded mt-1" /></div>
+                    <div><label className="text-sm font-medium">Diskon Booking Pertama (Rupiah)</label><input type="number" name="firstBookingReferralDiscount" value={settings.loyaltySettings.firstBookingReferralDiscount} onChange={handleSettingChange} className="w-full p-2 border rounded mt-1" /></div>
+                </div>
+            </SettingsCard>
+            <SettingsCard title="Tier Loyalitas" description="Buat tingkatan loyalitas berdasarkan jumlah booking.">
+                 <div className="space-y-4">
+                    {settings.loyaltySettings.loyaltyTiers.map((tier, index) => (
+                        <div key={tier.id} className="flex items-center gap-2 p-2 bg-base-100 rounded-md">
+                            <input value={tier.name} onChange={e => handleTierChange(index, { target: {name: 'name', value: e.target.value}} as any)} placeholder="Nama Tier" className="p-1 border rounded w-1/3"/>
+                            <input type="number" name="bookingThreshold" value={tier.bookingThreshold} onChange={e => handleTierChange(index, e)} placeholder="Min. Bookings" className="p-1 border rounded w-1/3"/>
+                            <input type="number" name="discountPercentage" value={tier.discountPercentage} onChange={e => handleTierChange(index, e)} placeholder="Diskon (%)" className="p-1 border rounded w-1/3"/>
+                            <button onClick={() => handleRemoveTier(tier.id)} className="p-1 text-red-500"><Trash2 size={16}/></button>
                         </div>
                     ))}
-                </div>
-                <button onClick={() => openTierModal('add')} className="mt-4 w-full flex items-center justify-center gap-2 text-sm p-2 text-accent bg-accent/10 hover:bg-accent/20 rounded-md transition-colors font-semibold">
-                    <Plus size={14}/> Tambah Tier Baru
-                </button>
+                    <button onClick={handleAddTier} className="text-sm font-semibold text-primary"><PlusCircle size={16} className="inline-block mr-1"/> Tambah Tier</button>
+                 </div>
             </SettingsCard>
-
-            <div className="flex justify-end">
-                <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 transition-colors font-semibold">
-                    <Save size={16}/> Simpan Perubahan
-                </button>
-            </div>
-            
-            <Modal isOpen={modalState.isOpen && modalState.type === 'loyaltyTier'} onClose={() => setModalState({...modalState, isOpen: false})} title={modalState.mode === 'add' ? 'Tambah Tier' : 'Edit Tier'}>
-                <form onSubmit={handleTierSubmit} className="space-y-4">
-                    <div><label className="block text-sm font-medium">Nama Tier</label><input type="text" value={tierFormData.name} onChange={e => setTierFormData({...tierFormData, name: e.target.value})} required className="mt-1 w-full p-2 border rounded" placeholder="Contoh: Silver"/></div>
-                    <div><label className="block text-sm font-medium">Syarat Minimum Booking</label><input type="number" value={tierFormData.bookingThreshold} onChange={e => setTierFormData({...tierFormData, bookingThreshold: e.target.value})} required className="mt-1 w-full p-2 border rounded" placeholder="Contoh: 10"/></div>
-                    <div><label className="block text-sm font-medium">Persentase Diskon (%)</label><input type="number" value={tierFormData.discountPercentage} onChange={e => setTierFormData({...tierFormData, discountPercentage: e.target.value})} required className="mt-1 w-full p-2 border rounded" placeholder="Contoh: 7"/></div>
-                    <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setModalState({...modalState, isOpen: false})} className="px-4 py-2 rounded bg-gray-100">Batal</button><button type="submit" className="px-4 py-2 rounded bg-primary text-white">Simpan</button></div>
-                </form>
-            </Modal>
-            <ConfirmationModal isOpen={!!tierToDelete} onClose={() => setTierToDelete(null)} onConfirm={handleDeleteTier} title="Hapus Tier" message={`Yakin ingin menghapus tier "${tierToDelete?.name}"?`} />
+            <div className="flex justify-end"><button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"><Save size={16}/> Simpan Perubahan</button></div>
         </div>
     );
 };
 
-const PartnersSettingsTab = () => {
+const PartnershipSettingsTab = () => {
     const { user: currentUser } = useAuth();
+    const { settings: initialSettings, loading: initialLoading } = useSystemSettings();
     const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [loading, setLoading] = useState(true);
-    const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: 'add', type: 'partner' });
-    const [formData, setFormData] = useState({ id: '', name: '' });
+    const [newPartner, setNewPartner] = useState({ name: '', logoUrl: '' });
     const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
 
     useEffect(() => {
-        getSystemSettings().then(data => {
-            setSettings(data);
+        if (initialSettings) {
+            setSettings(JSON.parse(JSON.stringify(initialSettings)));
             setLoading(false);
-        });
-    }, []);
+        }
+    }, [initialSettings]);
+
+    const handleAddPartner = async () => {
+        if (!settings || !newPartner.name || (!newPartner.logoUrl && !logoFile)) return;
+        setIsSaving(true);
+        let finalLogoUrl = newPartner.logoUrl;
+        if (logoFile) {
+            const base64 = await fileToBase64(logoFile, { maxWidth: 400, maxHeight: 400, quality: 0.8 });
+            const response = await fetch('/api/assets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'upload', imageBase64: base64, folder: 'partners' })
+            });
+            if (!response.ok) { alert('Upload logo gagal.'); setIsSaving(false); return; }
+            const result = await response.json();
+            finalLogoUrl = result.secure_url;
+        }
+
+        const updatedPartners = [...(settings.partners || []), { id: `partner-${Date.now()}`, name: newPartner.name, logoUrl: finalLogoUrl }];
+        setSettings({ ...settings, partners: updatedPartners });
+        setNewPartner({ name: '', logoUrl: '' });
+        setLogoFile(null);
+        setIsSaving(false);
+    };
+
+    const handleRemovePartner = (id: string) => {
+        if (!settings) return;
+        setSettings({ ...settings, partners: settings.partners?.filter(p => p.id !== id) });
+    };
 
     const handleSave = async () => {
         if (settings && currentUser) {
+            setIsSaving(true);
             await updateSystemSettings(settings, currentUser.id);
-            alert('Perubahan partner berhasil disimpan!');
-        }
-    };
-
-    const openModal = (mode: ModalMode, partner?: Partner) => {
-        setModalState({ isOpen: true, mode, type: 'partner', itemData: partner });
-        setFormData(partner ? { id: partner.id, name: partner.name } : { id: '', name: '' });
-        setLogoPreview(partner ? partner.logoUrl : null);
-        setLogoFile(null);
-    };
-
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setLogoFile(file);
-            setLogoPreview(URL.createObjectURL(file));
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!settings) return;
-        setIsSaving(true);
-        try {
-            let logoUrl = modalState.itemData?.logoUrl || '';
-            if (logoFile) {
-                const base64 = await fileToBase64(logoFile);
-                const response = await fetch('/api/uploadImage', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ imageBase64: base64, folder: 'partners_logos' })
-                });
-                if (!response.ok) throw new Error('Gagal mengunggah logo.');
-                const result = await response.json();
-                logoUrl = result.secure_url;
-            }
-            if (!logoUrl) throw new Error('Logo wajib diunggah.');
-
-            const currentPartners = settings.partners || [];
-            if (modalState.mode === 'add') {
-                const newPartner: Partner = { id: String(Date.now()), name: formData.name, logoUrl };
-                setSettings({ ...settings, partners: [...currentPartners, newPartner] });
-            } else {
-                const updatedPartners = currentPartners.map(p =>
-                    p.id === modalState.itemData.id ? { ...p, name: formData.name, logoUrl } : p
-                );
-                setSettings({ ...settings, partners: updatedPartners });
-            }
-            setModalState({ ...modalState, isOpen: false });
-        } catch (error) {
-            alert((error as Error).message);
-        } finally {
             setIsSaving(false);
+            alert('Data partner berhasil disimpan!');
         }
     };
-
-    const handleDelete = () => {
-        if (!settings || !partnerToDelete) return;
-        const updatedPartners = (settings.partners || []).filter(p => p.id !== partnerToDelete.id);
-        setSettings({ ...settings, partners: updatedPartners });
-        setPartnerToDelete(null);
-    };
-
-    if (loading) return <p>Loading...</p>;
+    
+    if (loading || initialLoading || !settings) return <Loader2 className="animate-spin" />;
 
     return (
-        <SettingsCard title="Partner Kolaborasi" description="Kelola logo partner yang ditampilkan di halaman depan.">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {(settings?.partners || []).map(partner => (
-                    <div key={partner.id} className="relative group p-4 border rounded-lg flex flex-col items-center justify-center">
-                        <img src={partner.logoUrl} alt={partner.name} className="h-16 object-contain" />
-                        <p className="text-sm font-semibold mt-2">{partner.name}</p>
-                        <div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openModal('edit', partner)} className="p-1.5 bg-base-200 rounded-md hover:bg-base-300"><Edit size={14}/></button>
-                            <button onClick={() => setPartnerToDelete(partner)} className="p-1.5 bg-base-200 rounded-md hover:bg-base-300"><Trash2 size={14}/></button>
+        <div className="space-y-6">
+             <SettingsCard title="Manajemen Partner Kolaborasi" description="Kelola logo partner yang akan ditampilkan di landing page.">
+                <div className="space-y-3 mb-4">
+                    {settings.partners?.map(partner => (
+                        <div key={partner.id} className="flex items-center justify-between p-2 bg-base-100 rounded-md">
+                            <div className="flex items-center gap-3">
+                                <img src={partner.logoUrl} alt={partner.name} className="h-10 w-24 object-contain bg-white p-1 rounded"/>
+                                <span className="font-semibold">{partner.name}</span>
+                            </div>
+                            <button onClick={() => handleRemovePartner(partner.id)} className="p-2 text-muted hover:text-error"><Trash2 size={16}/></button>
                         </div>
-                    </div>
-                ))}
-                <button onClick={() => openModal('add')} className="p-4 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted hover:bg-base-100 hover:text-primary">
-                    <PlusCircle size={24} />
-                    <span className="text-sm font-semibold mt-2">Tambah Baru</span>
-                </button>
-            </div>
-             <div className="flex justify-end mt-6 border-t pt-4">
-                <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-content rounded-lg hover:bg-primary/90 font-semibold">
-                    <Save size={16}/> Simpan Perubahan Partner
-                </button>
-            </div>
-            <Modal isOpen={modalState.isOpen && modalState.type === 'partner'} onClose={() => setModalState({ ...modalState, isOpen: false })} title={modalState.mode === 'add' ? 'Tambah Partner' : 'Edit Partner'}>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div><label>Nama Partner</label><input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="w-full p-2 border rounded" /></div>
-                    <div><label>Logo</label><input type="file" accept="image/*" onChange={handleLogoChange} className="w-full text-sm" /></div>
-                    {logoPreview && <img src={logoPreview} alt="Preview" className="h-20 object-contain border rounded p-2" />}
-                    <div className="flex justify-end gap-2 pt-4"><button type="submit" disabled={isSaving} className="px-4 py-2 bg-primary text-white rounded w-24">{isSaving ? <Loader2 className="animate-spin mx-auto"/> : 'Simpan'}</button></div>
-                </form>
-            </Modal>
-             <ConfirmationModal isOpen={!!partnerToDelete} onClose={() => setPartnerToDelete(null)} onConfirm={handleDelete} title="Hapus Partner" message={`Yakin ingin menghapus partner "${partnerToDelete?.name}"?`} />
-        </SettingsCard>
+                    ))}
+                </div>
+                <div className="flex items-end gap-2 p-3 border-t">
+                    <input type="text" value={newPartner.name} onChange={e => setNewPartner({...newPartner, name: e.target.value})} placeholder="Nama Partner" className="p-2 border rounded flex-grow"/>
+                    <input type="file" onChange={e => setLogoFile(e.target.files?.[0] || null)} className="p-1 border rounded text-sm"/>
+                    <button onClick={handleAddPartner} disabled={isSaving} className="px-4 py-2 bg-primary/20 text-primary font-semibold rounded-md">{isSaving ? <Loader2 className="animate-spin"/> : 'Tambah'}</button>
+                </div>
+             </SettingsCard>
+              <div className="flex justify-end"><button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"><Save size={16}/> Simpan Perubahan</button></div>
+        </div>
     );
 };
 
 
-// --- MAIN COMPONENT ---
+// --- MAIN PAGE COMPONENT ---
 const AdminSettingsPage = () => {
-    const [activeTab, setActiveTab] = useState('general');
+    const [activeTab, setActiveTab] = useState('services');
 
     const tabs = [
-        { id: 'general', label: 'Umum', icon: SlidersHorizontal },
-        { id: 'services', label: 'Layanan & Harga', icon: Box },
-        { id: 'partners', label: 'Partner Kolaborasi', icon: Handshake },
-        { id: 'inventory', label: 'Inventaris', icon: Archive },
-        { id: 'promos', label: 'Promosi', icon: Tag },
-        { id: 'loyalty', label: 'Loyalitas & Referral', icon: Award },
-        { id: 'payments', label: 'Pembayaran', icon: CreditCard },
-        { id: 'users', label: 'Akun & Peran', icon: Users },
+        { id: 'services', label: 'Layanan & Paket', icon: <Box size={16} /> },
+        { id: 'general', label: 'Umum & Kontak', icon: <Settings size={16} /> },
+        { id: 'appearance', label: 'Tampilan', icon: <ImageIcon size={16} /> },
+        { id: 'payment', label: 'Pembayaran', icon: <CreditCard size={16} /> },
+        { id: 'loyalty', label: 'Loyalitas & Referral', icon: <Award size={16} /> },
+        { id: 'partners', label: 'Partner', icon: <Handshake size={16} /> },
     ];
     
     const renderContent = () => {
         switch (activeTab) {
-            case 'general': return <GeneralSettingsTab />;
             case 'services': return <ServicesSettingsTab />;
-            case 'promos': return <PromosSettingsTab />;
+            case 'general': return <GeneralSettingsTab />;
+            case 'appearance': return <AppearanceSettingsTab />;
+            case 'payment': return <PaymentSettingsTab />;
             case 'loyalty': return <LoyaltySettingsTab />;
-            case 'payments': return <PaymentsSettingsTab />;
-            case 'users': return <UsersSettingsTab />;
-            case 'inventory': return <InventorySettingsTab />;
-            case 'partners': return <PartnersSettingsTab />;
+            case 'partners': return <PartnershipSettingsTab />;
             default: return null;
         }
     }
 
     return (
         <div>
-            <div className="flex items-center gap-4 mb-6">
-                 <div className="p-3 bg-primary/10 text-primary rounded-xl">
-                    <Settings size={28} />
-                 </div>
-                 <div>
-                    <h1 className="text-3xl font-bold text-primary">System Settings Panel</h1>
-                    <p className="text-muted">Pusat kendali untuk mengelola semua aspek operasional Studio 8.</p>
-                 </div>
-            </div>
-            
-            <div className="flex border-b border-base-200 mb-6 overflow-x-auto">
-                {tabs.map(tab => (
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                        className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors ${activeTab === tab.id ? 'border-b-2 border-primary text-primary' : 'text-muted hover:text-base-content'}`}>
-                        <tab.icon size={16} />
-                        {tab.label}
-                    </button>
-                ))}
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold">Pengaturan Sistem</h1>
+                <p className="text-muted mt-1">Kelola semua aspek operasional dan tampilan dari satu tempat.</p>
             </div>
 
-            <div>
-                {renderContent()}
+            <div className="border-b mb-6">
+                <div className="flex items-center gap-1 overflow-x-auto">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors rounded-t-lg ${activeTab === tab.id ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-primary'}`}
+                        >
+                            {tab.icon} {tab.label}
+                        </button>
+                    ))}
+                </div>
             </div>
+            
+            <div>{renderContent()}</div>
         </div>
     );
 };

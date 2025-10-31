@@ -4,7 +4,7 @@ import { JobPost, UserRole } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, PlusCircle, MapPin, Clock, Briefcase as BriefcaseIcon } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import id from 'date-fns/locale/id';
 import CreateJobModal from './CreateJobModal';
 

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Award, Briefcase, User, Phone, FileText, UploadCloud, CheckCircle, Loader2, AlertTriangle, Send } from 'lucide-react';
@@ -40,9 +41,9 @@ const SponsorshipForm = () => {
 
         try {
             const proposalBase64 = await fileToBase64(proposalFile);
-            const payload = { ...formData, proposalBase64 };
+            const payload = { action: 'createPublic', ...formData, proposalBase64 };
             
-            const response = await fetch('/api/publicCreateSponsorship', {
+            const response = await fetch('/api/sponsorships', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

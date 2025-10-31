@@ -1,5 +1,5 @@
 import { Booking } from '../types';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 
 /**
  * Generates a Google Calendar event creation link from a booking object.

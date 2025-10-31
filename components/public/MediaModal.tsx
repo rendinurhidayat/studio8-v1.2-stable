@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HighlightWork } from '../../types';
 import { X, User, Briefcase, Award, Calendar, Instagram } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 
 interface MediaModalProps {

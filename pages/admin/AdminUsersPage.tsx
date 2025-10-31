@@ -1,11 +1,15 @@
+
+
+
 import React, { useState, useEffect } from 'react';
-import { getUsers, addUser, updateUser, deleteUser, getTasksForUser, createTask, deleteTask, addMentorFeedback, getMentorFeedbackForIntern } from '../../services/api';
+import { getUsers, addUser, updateUser, deleteUser, getTasksForUser, createTask, deleteTask, addMentorFeedback, getMentorFeedbackForIntern, updateTask } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, UserRole, Task, MentorFeedback } from '../../types';
 import { PlusCircle, Edit, Trash2, ClipboardList, Loader2, Send, MessageSquare, Star, Eye, Image as ImageIcon } from 'lucide-react';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
+import addDays from 'date-fns/addDays';
 import id from 'date-fns/locale/id';
 import StarRating from '../../components/feedback/StarRating';
 import { fileToBase64 } from '../../utils/fileUtils';
@@ -114,6 +118,8 @@ const TaskManagementModal: React.FC<{
         e.preventDefault();
         if (!newTaskText.trim() || !currentUser) return;
         
+        const creationDate = new Date();
+
         const newTask: Omit<Task, 'id'> = {
             text: newTaskText,
             description: newTaskDescription,
@@ -122,8 +128,8 @@ const TaskManagementModal: React.FC<{
             assigneeName: user.name,
             creatorId: currentUser.id,
             creatorName: currentUser.name,
-            createdAt: new Date(),
-            dueDate: dueDate ? new Date(dueDate) : undefined,
+            createdAt: creationDate,
+            dueDate: dueDate ? new Date(dueDate) : addDays(creationDate, 3),
             progress: 0,
         };
 
@@ -138,6 +144,12 @@ const TaskManagementModal: React.FC<{
         if (!currentUser) return;
         await deleteTask(taskId, currentUser.id);
         fetchTasksAndFeedback(); // Refresh list
+    };
+
+    const handleToggleTaskCompletion = async (task: Task) => {
+        if (!currentUser) return;
+        await updateTask(task.id, { completed: !task.completed }, currentUser.id);
+        fetchTasksAndFeedback();
     };
 
     return (
@@ -166,12 +178,20 @@ const TaskManagementModal: React.FC<{
                                     const feedback = mentorFeedbacks.find(f => f.taskId === task.id);
                                     return (
                                     <li key={task.id} className={`p-3 rounded-lg flex justify-between items-start ${task.completed ? 'bg-green-50' : 'bg-gray-50'}`}>
-                                        <div>
-                                            <p className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>{task.text}</p>
-                                            {task.description && <p className="text-sm text-gray-500 mt-1">{task.description}</p>}
-                                            <div className="text-xs text-gray-400 mt-1 space-x-2">
-                                                <span>Dibuat: {format(task.createdAt, 'd MMM yyyy', { locale: id })}</span>
-                                                {task.dueDate && <span>Tenggat: {format(task.dueDate, 'd MMM yyyy', { locale: id })}</span>}
+                                        <div className="flex items-start gap-3 flex-grow">
+                                            <input
+                                                type="checkbox"
+                                                checked={task.completed}
+                                                onChange={() => handleToggleTaskCompletion(task)}
+                                                className="mt-1 h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer flex-shrink-0"
+                                            />
+                                            <div>
+                                                <p className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>{task.text}</p>
+                                                {task.description && <p className="text-sm text-gray-500 mt-1">{task.description}</p>}
+                                                <div className="text-xs text-gray-400 mt-1 space-x-2">
+                                                    <span>Dibuat: {format(task.createdAt, 'd MMM yyyy', { locale: id })}</span>
+                                                    {task.dueDate && <span>Tenggat: {format(task.dueDate, 'd MMM yyyy', { locale: id })}</span>}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
@@ -306,11 +326,11 @@ const AdminUsersPage = () => {
     try {
         let finalPhotoUrl = isEditing ? selectedUser?.photoURL || '' : '';
         if (photoFile) {
-            const base64 = await fileToBase64(photoFile);
-            const response = await fetch('/api/uploadImage', {
+            const base64 = await fileToBase64(photoFile, { maxWidth: 512, maxHeight: 512 });
+            const response = await fetch('/api/assets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageBase64: base64, folder: 'profile_pictures' })
+                body: JSON.stringify({ action: 'upload', imageBase64: base64, folder: 'profile_pictures' })
             });
             if (!response.ok) throw new Error('Gagal mengunggah foto profil.');
             const result = await response.json();
@@ -354,10 +374,12 @@ const AdminUsersPage = () => {
   
   const handleDeleteConfirm = async () => {
       if (selectedUser && currentUser) {
-          await deleteUser(selectedUser.id, currentUser.id);
-          setIsConfirmModalOpen(false);
-          setSelectedUser(null);
-          fetchUsers();
+          const success = await deleteUser(selectedUser.id, currentUser.id);
+          if (success) {
+              setIsConfirmModalOpen(false);
+              setSelectedUser(null);
+              fetchUsers();
+          }
       }
   }
 
@@ -510,8 +532,8 @@ const AdminUsersPage = () => {
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}
         onConfirm={handleDeleteConfirm}
-        title="Hapus User"
-        message={`Apakah Anda yakin ingin menghapus user ${selectedUser?.name}? Akun autentikasi user harus dihapus manual dari Firebase Console.`}
+        title="Hapus Pengguna"
+        message={`Apakah Anda yakin ingin menghapus pengguna ${selectedUser?.name}? Akun dan data pengguna akan dihapus secara permanen.`}
       />
     </div>
   );

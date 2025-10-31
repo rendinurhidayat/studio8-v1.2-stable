@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getUsers, getAttendanceForUser, getDailyReportsForUser, getTasksForUser } from '../../services/api';
 import { User, UserRole, Attendance, DailyReport, Task, AttendanceStatus } from '../../types';
-import { format, differenceInDays } from 'date-fns';
+import format from 'date-fns/format';
+import differenceInDays from 'date-fns/differenceInDays';
 import id from 'date-fns/locale/id';
 import Modal from '../../components/common/Modal';
 import { Loader2, Calendar, ClipboardList, CheckSquare, FileText, CalendarCheck, ClipboardCheck } from 'lucide-react';
@@ -93,9 +94,9 @@ const InternDetailModal: React.FC<{
                         <h3 className="font-bold text-lg flex items-center gap-2"><Calendar size={20}/> Riwayat Absensi</h3>
                         <ul className="space-y-2 mt-2">
                             {attendance.map(att => (
-                                <li key={att.id} className="text-sm p-2 bg-gray-50 rounded flex justify-between">
-                                    <span>{format(att.checkInTime, 'd MMMM yyyy', { locale: id })}</span>
-                                    <span>{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span>
+                                <li key={att.id} className="text-sm p-3 bg-base-100 rounded-lg flex justify-between items-center">
+                                    <span className="font-semibold">{format(att.checkInTime, 'eeee, d MMMM yyyy', { locale: id })}</span>
+                                    <span className="text-muted">{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span>
                                 </li>
                             ))}
                         </ul>

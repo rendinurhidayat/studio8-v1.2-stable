@@ -1,22 +1,14 @@
 // --- Global Type Declarations ---
-// These types support the configuration objects injected via index.html,
-// allowing for type-safe access across the application.
+// These types support globally available libraries.
 declare global {
     interface Window {
-        firebaseConfig?: {
-            apiKey: string;
-            authDomain: string;
-            projectId: string;
-            storageBucket: string;
-            messagingSenderId: string;
-            appId: string;
-            measurementId: string;
-        };
-        appConfig?: {
-            googleMapsReviewUrl: string;
-        };
         jspdf: any;
         html2canvas: any;
+        firebaseConfig?: any;
+        appConfig?: {
+            googleMapsReviewUrl: string;
+            vapidPublicKey: string;
+        };
     }
 }
 
@@ -331,8 +323,15 @@ export interface PaymentMethods {
     qris: boolean;
     qrisImage?: string;
     bankTransfer: boolean;
+    bankAccounts?: {
+        bankName: string;
+        accountNumber: string;
+        accountHolder: string;
+    }[];
     dana: boolean;
+    danaNumber?: string;
     shopeepay: boolean;
+    shopeepayNumber?: string;
 }
 
 export interface LoyaltyTier {
@@ -366,6 +365,10 @@ export interface SystemSettings {
     };
     loyaltySettings: LoyaltySettings;
     partners?: Partner[];
+    landingPageImages?: {
+        hero: string[];
+        about: string;
+    };
 }
 
 export interface ActivityLog {
@@ -572,7 +575,6 @@ export interface PracticalClass {
     description: string;
     classDate: Date;
     mentorName: string;
-    // FIX: Added missing properties to support class registration features.
     maxParticipants: number;
     registeredInternIds: string[];
 }
@@ -635,4 +637,12 @@ export interface CommunityEvent {
     createdById: string;
     createdByName: string;
     createdAt: Date;
+}
+
+export interface ImageUpload {
+    id: string;
+    file: File;
+    preview: string;
+    status: 'pending' | 'uploading' | 'success' | 'error';
+    error?: string;
 }

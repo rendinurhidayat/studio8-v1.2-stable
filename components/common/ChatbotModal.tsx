@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Modal from './Modal';
 import { Bot, Send, User, Loader2, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { faqs } from '../../data/faqs';
 
 // Gemini-formatted message
 interface GeminiMessage {
@@ -16,20 +17,22 @@ interface UIMessage {
     sender: 'bot' | 'user';
 }
 
-const faqQuestions = [
-    "Berapa DP yang harus dibayar?",
-    "Bagaimana cara reschedule?",
-    "Metode pembayaran apa saja yang ada?",
-    "Di mana lokasi studionya?"
-];
+interface ChatbotModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pageContext?: string;
+  pageKey?: keyof typeof faqs;
+}
 
-const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void; pageContext?: string; }> = ({ isOpen, onClose, pageContext }) => {
+const ChatbotModal: React.FC<ChatbotModalProps> = ({ isOpen, onClose, pageContext, pageKey = 'default' }) => {
     const [messages, setMessages] = useState<UIMessage[]>([]);
     const [history, setHistory] = useState<GeminiMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
+    
+    const suggestedQuestions = faqs[pageKey] || faqs.default;
 
     useEffect(() => {
         if (isOpen) {
@@ -158,13 +161,13 @@ const ChatbotModal: React.FC<{ isOpen: boolean; onClose: () => void; pageContext
                         <h4 className="font-semibold">Saran Pertanyaan</h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {faqQuestions.map((q, i) => (
+                        {suggestedQuestions.map((q, i) => (
                             <button 
                                 key={i} 
-                                onClick={() => handleFaqClick(q)}
+                                onClick={() => handleFaqClick(q.question)}
                                 className="w-full text-left text-sm p-3 bg-white border rounded-lg hover:bg-slate-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50"
                             >
-                                {q}
+                                {q.question}
                             </button>
                         ))}
                     </div>

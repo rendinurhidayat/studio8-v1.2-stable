@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getSponsorships, getInstitutionalBookings, getPackages, updateSponsorship, deleteSponsorship, updateBooking, logCollaborationActivity, getCollaborationActivity, generateMouContent } from '../../services/api';
@@ -7,7 +8,7 @@ import ConfirmationModal from '../../components/common/ConfirmationModal';
 import InvoiceModal from '../../components/admin/InvoiceModal';
 import Modal from '../../components/common/Modal';
 import { Loader2, FileText, Download, Trash2, MessageCircle, Edit, Award, Briefcase, History, Clock, Sparkles, Copy } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 import { AnimatePresence, motion } from 'framer-motion';
 

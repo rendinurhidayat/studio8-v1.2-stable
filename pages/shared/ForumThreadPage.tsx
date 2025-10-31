@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getForumThreadById, getRepliesForThread, addReplyToThread } from '../../services/api';
 import { ForumThread, ForumReply } from '../../types';
 import { Loader2, ArrowLeft, Send } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 import { motion, AnimatePresence } from 'framer-motion';
 

@@ -4,7 +4,7 @@ import { Booking, BookingStatus, Client } from '../../types';
 import StatCard from '../../components/admin/StatCard';
 import { Link } from 'react-router-dom';
 import { BookOpen, UserCheck, Clock, ArrowRight, Calendar, User, Package as PackageIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 
 const IconWrapper: React.FC<{ children: React.ReactNode, className?: string }> = ({ children, className }) => (
     <div className={`p-3 rounded-full ${className}`}>

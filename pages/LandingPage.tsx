@@ -47,6 +47,20 @@ const cardVariants: Variants = {
 
 // --- New Components for Landing Page Structure ---
 
+const getOptimizedImageUrl = (url: string, width: number): string => {
+    if (!url || !url.includes('res.cloudinary.com')) {
+        return url;
+    }
+    const parts = url.split('/upload/');
+    if (parts.length !== 2) {
+        return url;
+    }
+    // c_limit prevents upscaling. q_auto optimizes quality. f_auto selects modern format (like WebP).
+    const transformations = `w_${width},c_limit,q_auto,f_auto`;
+    return `${parts[0]}/upload/${transformations}/${parts[1]}`;
+};
+
+
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
 
@@ -109,7 +123,19 @@ const Header = () => {
   );
 }
 
-const HeroSection = () => {
+const HeroSection: React.FC<{ images: string[] }> = ({ images }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    // Auto-play effect for the carousel
+    useEffect(() => {
+        if (images.length === 0) return;
+        const timer = setTimeout(() => {
+            const nextIndex = (currentIndex + 1) % images.length;
+            setCurrentIndex(nextIndex);
+        }, 4000); // Change image every 4 seconds
+        return () => clearTimeout(timer);
+    }, [currentIndex, images.length]);
+
     const container = {
         hidden: { opacity: 0 },
         visible: {
@@ -125,11 +151,13 @@ const HeroSection = () => {
         hidden: { opacity: 0, y: 20 },
         visible: { opacity: 1, y: 0 },
     };
+    
+    const currentImageUrl = images[currentIndex];
 
     return (
         <section className="relative bg-[#0a0a0a] text-white overflow-hidden">
             <div className="container mx-auto px-6 md:px-12 min-h-screen flex items-center justify-center">
-                <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-20">
+                <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-32 lg:py-20">
                     {/* Left Section (Text) */}
                     <motion.div 
                         className="space-y-6 text-center lg:text-left z-10"
@@ -139,7 +167,7 @@ const HeroSection = () => {
                     >
                         <motion.p variants={item} className="uppercase tracking-[0.2em] text-gray-400 text-sm">STUDIO 8</motion.p>
                         <motion.h1 variants={item} className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
-                        Abadikan Momen,<br/>Ciptakan Kenangan.
+                        Ekspresikan Waktumu,<br/>Ciptakan Bahagiamu.
                         </motion.h1>
                         <motion.p variants={item} className="text-base md:text-lg text-gray-400 leading-relaxed max-w-lg mx-auto lg:mx-0">
                         Self Photo, Couple Session, atau Pemotretan Profesional — semua bisa diatur lewat sistem booking yang nyaman.
@@ -166,37 +194,39 @@ const HeroSection = () => {
                         </motion.div>
                     </motion.div>
 
-                    {/* Right Section (Image Collage) */}
-                     <motion.div 
-                        className="relative w-full h-[500px] lg:h-[600px] flex items-center justify-center"
-                        initial="hidden"
-                        animate="visible"
-                        variants={container}
-                    >
-                        {/* Image 1 - Background */}
-                        <motion.div 
-                            variants={item}
-                            className="absolute w-48 h-64 sm:w-64 sm:h-80 lg:w-80 lg:h-96 rounded-2xl overflow-hidden shadow-2xl transform rotate-[-8deg] left-0 top-1/2 -translate-y-1/2"
-                        >
-                            <img src="/images/hero-3.jpg" alt="Couple Session" className="w-full h-full object-cover"/>
-                        </motion.div>
-
-                        {/* Image 2 - Middle */}
-                        <motion.div 
-                             variants={item}
-                            className="relative z-10 w-64 h-80 sm:w-72 sm:h-96 lg:w-96 lg:h-[480px] rounded-2xl overflow-hidden shadow-2xl"
-                        >
-                            <img src="/images/hero-1.jpg" alt="Main Showcase" className="w-full h-full object-cover"/>
-                        </motion.div>
-
-                        {/* Image 3 - Foreground */}
-                        <motion.div 
-                             variants={item}
-                            className="absolute w-40 h-56 sm:w-48 sm:h-64 lg:w-64 lg:h-80 rounded-2xl overflow-hidden shadow-2xl transform rotate-[10deg] right-0 bottom-0 lg:bottom-1/4"
-                        >
-                            <img src="/images/hero-5.jpg" alt="Portrait" className="w-full h-full object-cover"/>
-                        </motion.div>
-                    </motion.div>
+                    {/* Right Section (Image Carousel) */}
+                     <div className="relative w-full max-w-md mx-auto lg:max-w-lg lg:mx-0">
+                        <div className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden shadow-2xl shadow-black/50">
+                            <AnimatePresence initial={false}>
+                                <motion.img
+                                    key={currentIndex}
+                                    alt={`Showcase image ${currentIndex + 1}`}
+                                    src={getOptimizedImageUrl(currentImageUrl, 800)}
+                                    srcSet={`${getOptimizedImageUrl(currentImageUrl, 400)} 400w, ${getOptimizedImageUrl(currentImageUrl, 800)} 800w, ${getOptimizedImageUrl(currentImageUrl, 1200)} 1200w`}
+                                    sizes="(max-width: 1023px) 100vw, 50vw"
+                                    loading="lazy"
+                                    decoding="async"
+                                    initial={{ opacity: 0.5, scale: 1.05 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0.5, scale: 1.05 }}
+                                    transition={{ duration: 0.8, ease: "easeInOut" }}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                />
+                            </AnimatePresence>
+                        </div>
+                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
+                            {images.map((_, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setCurrentIndex(index)}
+                                    aria-label={`Go to slide ${index + 1}`}
+                                    className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                                        currentIndex === index ? 'bg-white scale-125' : 'bg-white/50'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -204,7 +234,7 @@ const HeroSection = () => {
 };
 
 
-const AboutSection = () => (
+const AboutSection: React.FC<{ image: string }> = ({ image }) => (
     <motion.section 
       id="about" 
       className="w-full py-16 md:py-24 bg-base-100 text-base-content"
@@ -220,8 +250,10 @@ const AboutSection = () => (
                     initial={{ scale: 1 }}
                     whileHover={{ scale: 1.05 }}
                     transition={{ type: 'spring', stiffness: 300 }}
-                    src="/images/about-1.jpg"
+                    src={getOptimizedImageUrl(image, 800)}
                     alt="Interior Studio 8"
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover rounded-2xl shadow-xl border-8 border-white"
                 />
             </div>
@@ -354,7 +386,7 @@ const CollaborationSection: React.FC<{ settings: SystemSettings | null }> = ({ s
                             <img 
                                 src={partner.logoUrl} 
                                 alt={partner.name}
-                                className="h-12 object-contain filter grayscale hover:grayscale-0 opacity-60 hover:opacity-100 transition-all duration-300"
+                                className="h-12 object-contain transition-all duration-300"
                             />
                         </div>
                     ))}
@@ -434,7 +466,7 @@ const LocationSection = () => (
             <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden md:flex border border-base-200">
                 <div className="md:w-1/2">
                     <iframe 
-                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3955.626258909673!2d108.5442853153649!3d-7.41133719458992!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e6589ce547d9d87%3A0x904e0ac822cbe54a!2sSTUDIO%208!5e0!3m2!1sen!2sid" 
+                        src="https://www.google.com/maps/embed?pb=!1m18!m12!m3!1d3955.626258909673!2d108.5442853153649!3d-7.41133719458992!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!2s0x2e6589ce547d9d87%3A0x904e0ac822cbe54a!2sSTUDIO%208!5e0!3m2!1sen!2sid" 
                         className="w-full h-64 md:h-full"
                         style={{ border:0 }} 
                         allowFullScreen={false}
@@ -556,12 +588,22 @@ const LandingPage: React.FC = () => {
     loadData();
   }, []);
 
+  const heroImages = settings?.landingPageImages?.hero || [
+        '/images/hero-1.jpg',
+        '/images/hero-2.jpg',
+        '/images/hero-3.jpg',
+        '/images/hero-4.jpg',
+        '/images/hero-5.jpg',
+    ];
+  const aboutImage = settings?.landingPageImages?.about || '/images/about-1.jpg';
+
+
   return (
     <div className="bg-base-100">
       <Header />
       <main>
-        <HeroSection />
-        <AboutSection />
+        <HeroSection images={heroImages} />
+        <AboutSection image={aboutImage} />
         <HowItWorksSection />
         <CollaborationSection settings={settings} />
         <TestimonialsSection feedbacks={publicFeedbacks} />
@@ -571,7 +613,11 @@ const LandingPage: React.FC = () => {
 
       
           <>
-            <ChatbotModal isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} />
+            <ChatbotModal 
+                isOpen={isChatbotOpen} 
+                onClose={() => setIsChatbotOpen(false)}
+                pageKey="landing"
+            />
             <button
                 onClick={() => setIsChatbotOpen(true)}
                 className="fixed bottom-6 right-6 bg-accent text-accent-content p-4 rounded-full shadow-lg hover:bg-accent/90 transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent z-40"

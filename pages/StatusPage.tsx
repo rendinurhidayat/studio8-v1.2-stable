@@ -1,30 +1,58 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Booking, BookingStatus, Client, SystemSettings } from '../types';
-import { findBookingByCode, requestReschedule, isSlotAvailable, getClientDetails, getSystemSettings } from '../services/api';
-import { Home, Calendar, Clock, CheckCircle, AlertCircle, Loader2, Download, Star, MapPin, Award, Copy, ChevronRight } from 'lucide-react';
+import { findBookingByCode, requestReschedule, isSlotAvailable, getClientDetails } from '../services/api';
+// FIX: Add missing 'User' icon import from 'lucide-react' to resolve reference error in BookingSummaryCard.
+import { Home, Calendar, Clock, CheckCircle, AlertCircle, Loader2, Download, Star, Award, Copy, Search, X, ClipboardList, CalendarCheck, Sparkles, MessageSquare, Check, MapPin, Lightbulb, Repeat, BookOpen, User } from 'lucide-react';
 import Modal from '../components/common/Modal';
+import ChatbotModal from '../components/common/ChatbotModal';
+import { useSystemSettings } from '../App';
+import { motion, AnimatePresence } from 'framer-motion';
+import format from 'date-fns/format';
+import id from 'date-fns/locale/id';
+import isBefore from 'date-fns/isBefore';
+import startOfToday from 'date-fns/startOfToday';
+
 
 const RescheduleModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (newDate: Date) => void;
   booking: Booking;
-}> = ({ isOpen, onClose, onSubmit, booking }) => {
+  settings: SystemSettings | null;
+}> = ({ isOpen, onClose, onSubmit, booking, settings }) => {
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(false);
-  const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
+
+  const { minTime, maxTime } = useMemo(() => {
+    if (!settings || !newDate) return { minTime: '09:00', maxTime: '17:00' };
+    
+    const selectedDate = new Date(newDate);
+    const day = selectedDate.getDay(); // 0 for Sunday, 6 for Saturday
+    const isWeekend = day === 0 || day === 6;
+    
+    const hours = isWeekend ? settings.operationalHours.weekend : settings.operationalHours.weekday;
+    return { minTime: hours.open, maxTime: hours.close };
+  }, [settings, newDate]);
+
 
   const handleSubmit = async () => {
+    setError('');
     if (!newDate || !newTime) {
       setError('Tanggal dan waktu baru harus diisi.');
       return;
     }
-    setError('');
-    setIsChecking(true);
+
     const combinedDateTime = new Date(`${newDate}T${newTime}`);
+    if (isBefore(combinedDateTime, new Date())) {
+        setError('Tanggal dan waktu tidak boleh di masa lalu.');
+        return;
+    }
+
+    setIsChecking(true);
     
     const available = await isSlotAvailable(combinedDateTime, booking.id);
     if (!available) {
@@ -47,22 +75,22 @@ const RescheduleModal: React.FC<{
             type="date"
             value={newDate}
             onChange={(e) => setNewDate(e.target.value)}
-            min={new Date().toISOString().split('T')[0]}
+            min={format(startOfToday(), 'yyyy-MM-dd')}
             className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Waktu Baru</label>
-           <select
+           <input
+            type="time"
             value={newTime}
             onChange={(e) => setNewTime(e.target.value)}
             className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"
-          >
-            <option value="" disabled>Pilih Jam</option>
-            {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+            min={minTime}
+            max={maxTime}
+          />
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-red-500 flex items-center gap-1 mt-2"><AlertCircle size={14}/>{error}</p>}
       </div>
       <div className="mt-6 flex justify-end gap-3">
         <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Batal</button>
@@ -74,33 +102,191 @@ const RescheduleModal: React.FC<{
   );
 };
 
+const RECENT_SEARCHES_KEY = 'studio8_recent_booking_searches';
+
+const TrackingTimeline: React.FC<{ booking: Booking }> = ({ booking }) => {
+    const getStageIndex = (status: BookingStatus) => {
+        switch (status) {
+            case BookingStatus.Pending: return 0;
+            case BookingStatus.RescheduleRequested: return 1;
+            case BookingStatus.Confirmed: return 1;
+            case BookingStatus.InProgress: return 2;
+            case BookingStatus.Completed: return 3;
+            case BookingStatus.Cancelled: return -1;
+            default: return 0;
+        }
+    };
+
+    const stageIndex = getStageIndex(booking.bookingStatus);
+    
+    const steps = [
+        { icon: <ClipboardList size={20}/>, title: "Booking Diterima", description: "Permintaan booking Anda telah kami terima dan sedang menunggu konfirmasi pembayaran DP.", timestamp: booking.createdAt },
+        { icon: <CalendarCheck size={20}/>, title: "Jadwal Terkonfirmasi", description: `Pembayaran DP berhasil! Sesi foto Anda sudah kami amankan. Sampai jumpa!` },
+        { icon: <Sparkles size={20}/>, title: "Sesi & Proses Editing", description: "Sesi foto Anda sedang berlangsung atau dalam proses editing oleh tim profesional kami." },
+        { icon: <CheckCircle size={20}/>, title: "Selesai & Siap Diunduh", description: "Hore! Hasil foto Anda sudah siap diunduh melalui bagian 'Akses Cepat'." },
+    ];
+    
+    if (booking.bookingStatus === BookingStatus.Cancelled) {
+        return <div className="p-4 bg-error/10 text-error rounded-lg text-center font-semibold">Booking ini telah dibatalkan.</div>
+    }
+
+    return (
+        <div className="bg-white rounded-2xl shadow-lg border p-6">
+             <h4 className="font-bold text-lg text-primary mb-4">Progres Booking</h4>
+            <ol className="relative border-l-2 border-base-200 ml-4">
+                {steps.map((step, index) => {
+                    const isActive = index === stageIndex;
+                    const isCompleted = index < stageIndex;
+                    
+                    return (
+                        <li key={index} className="mb-10 ml-8">
+                            <span className={`absolute flex items-center justify-center w-8 h-8 rounded-full -left-4 ring-4 ring-white transition-colors
+                                ${isActive ? 'bg-primary text-primary-content animate-pulse' : isCompleted ? 'bg-success text-white' : 'bg-base-200 text-muted'}`}
+                            >
+                                {step.icon}
+                            </span>
+                            <div className="p-4 bg-base-100 rounded-lg border">
+                                <h3 className="font-semibold text-primary">{step.title}</h3>
+                                {step.timestamp && !isCompleted && <time className="block mb-2 text-xs font-normal leading-none text-muted">Dibuat pada {format(step.timestamp, 'd MMM yyyy, HH:mm', { locale: id })}</time>}
+                                <p className="text-sm text-muted">{step.description}</p>
+                            </div>
+                        </li>
+                    )
+                })}
+            </ol>
+        </div>
+    );
+};
+
+// --- NEW COMPONENTS ---
+
+const BookingSummaryCard: React.FC<{ booking: Booking }> = ({ booking }) => (
+    <div className="bg-white rounded-2xl shadow-lg border p-6 space-y-4">
+        <div className="text-center pb-4 border-b">
+            <h3 className="font-bold text-lg text-primary">Ringkasan Booking</h3>
+            <p className="font-mono text-accent">{booking.bookingCode}</p>
+        </div>
+        <div className="flex items-center gap-3"><User size={18} className="text-muted"/> <span className="font-semibold">{booking.clientName}</span></div>
+        <div className="flex items-center gap-3"><BookOpen size={18} className="text-muted"/> <span className="font-semibold">{booking.package.name} ({booking.selectedSubPackage.name})</span></div>
+        <div className="flex items-center gap-3"><Calendar size={18} className="text-muted"/> <span className="font-semibold">{format(booking.bookingDate, 'eeee, d MMMM yyyy', { locale: id })}</span></div>
+        <div className="flex items-center gap-3"><Clock size={18} className="text-muted"/> <span className="font-semibold">{format(booking.bookingDate, 'HH:mm')} WIB</span></div>
+    </div>
+);
+
+const PaymentDetailsCard: React.FC<{ booking: Booking }> = ({ booking }) => {
+    const dpPaid = booking.totalPrice - booking.remainingBalance;
+    return (
+        <div className="bg-white rounded-2xl shadow-lg border p-6">
+            <h4 className="font-bold text-lg text-primary mb-4">Detail Pembayaran</h4>
+            <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span>Total Harga</span> <span className="font-semibold">Rp {booking.totalPrice.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between text-success"><span>DP Dibayar</span> <span className="font-semibold">- Rp {dpPaid.toLocaleString('id-ID')}</span></div>
+                <hr className="my-2 border-dashed" />
+                <div className="flex justify-between font-bold text-lg text-error"><span>Sisa Bayar</span> <span>Rp {booking.remainingBalance.toLocaleString('id-ID')}</span></div>
+            </div>
+        </div>
+    );
+};
+
+const QuickActionsCard: React.FC<{ booking: Booking, onRescheduleClick: () => void }> = ({ booking, onRescheduleClick }) => {
+    const canReschedule = booking.bookingStatus === BookingStatus.Confirmed && (new Date(booking.bookingDate).getTime() - new Date().getTime()) > 7 * 24 * 60 * 60 * 1000;
+
+    return (
+        <div className="bg-white rounded-2xl shadow-lg border p-6">
+            <h4 className="font-bold text-lg text-primary mb-4">Akses Cepat</h4>
+            <div className="space-y-2">
+                {canReschedule && (
+                    <button onClick={onRescheduleClick} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-warning bg-warning/10 rounded-lg hover:bg-warning/20 transition-colors"><Repeat size={16}/> Ajukan Jadwal Ulang</button>
+                )}
+                 {booking.bookingStatus === BookingStatus.Completed && booking.googleDriveLink && (
+                    <a href={booking.googleDriveLink} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-primary-content bg-primary rounded-lg hover:bg-primary/90">
+                        <Download size={16} /> Unduh Hasil Foto
+                    </a>
+                )}
+                {booking.bookingStatus === BookingStatus.Completed && (
+                     <Link to={`/feedback?bookingId=${booking.bookingCode}`} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-accent-content bg-accent rounded-lg hover:bg-accent/90">
+                        <Star size={16} /> Beri Ulasan
+                    </Link>
+                )}
+                 {booking.bookingStatus === BookingStatus.Completed && (
+                     <Link to="/pesan-sesi" className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-success bg-success/10 rounded-lg hover:bg-success/20">
+                        <CalendarCheck size={16} /> Booking Lagi
+                    </Link>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const PreparationTipsCard: React.FC = () => (
+    <div className="bg-white rounded-2xl shadow-lg border p-6">
+        <h4 className="font-bold text-lg text-primary mb-4 flex items-center gap-2"><Lightbulb size={20} className="text-yellow-400"/> Tips Persiapan Sesi</h4>
+        <ul className="space-y-2 text-sm text-muted list-disc list-inside">
+            <li>Datang 10-15 menit lebih awal untuk persiapan.</li>
+            <li>Siapkan beberapa referensi pose yang kamu suka.</li>
+            <li>Kenakan pakaian yang nyaman dan kamu percaya diri.</li>
+            <li>Yang terpenting, bersenang-senanglah!</li>
+        </ul>
+    </div>
+);
+
+const LocationCard: React.FC = () => (
+    <div className="bg-white rounded-2xl shadow-lg border p-6">
+         <h4 className="font-bold text-lg text-primary mb-4 flex items-center gap-2"><MapPin size={20}/> Lokasi Kami</h4>
+         <p className="text-sm text-muted">Jl. Banjar - Pangandaran (Depan SMK 4 Banjar), Sukamukti, Kec. Pataruman, Kota Banjar</p>
+         <a href="https://maps.app.goo.gl/3RLxGUn5isbUd3UeA" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-accent hover:underline mt-2 inline-block">Buka di Google Maps</a>
+    </div>
+);
+
+
 const StatusPage = () => {
   const [bookingCode, setBookingCode] = useState('');
   const [booking, setBooking] = useState<Booking | null | undefined>(undefined);
   const [client, setClient] = useState<Client | null>(null);
-  const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const { settings, loading: settingsLoading } = useSystemSettings();
   const [isLoading, setIsLoading] = useState(false);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
-  
-  useEffect(() => {
-    getSystemSettings().then(setSettings);
-  }, []);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bookingCode) return;
+  useEffect(() => {
+    const storedSearches = localStorage.getItem(RECENT_SEARCHES_KEY);
+    if (storedSearches) {
+        setRecentSearches(JSON.parse(storedSearches));
+    }
+  }, []);
+  
+  const handleSearch = async (e: React.FormEvent | null, codeToSearch?: string) => {
+    e?.preventDefault();
+    const code = (codeToSearch || bookingCode).trim().toUpperCase();
+    if (!code) return;
+
     setIsLoading(true);
     setBooking(undefined);
     setClient(null);
     setNotification(null);
-    const foundBooking = await findBookingByCode(bookingCode.toUpperCase());
-    setBooking(foundBooking);
-    if (foundBooking) {
-        const clientData = await getClientDetails(foundBooking.bookingCode);
-        setClient(clientData);
+    
+    try {
+        const foundBooking = await findBookingByCode(code);
+        setBooking(foundBooking);
+
+        if (foundBooking) {
+            const clientData = await getClientDetails(foundBooking.bookingCode);
+            setClient(clientData);
+            
+            const updatedSearches = [code, ...recentSearches.filter(s => s !== code)].slice(0, 5);
+            setRecentSearches(updatedSearches);
+            localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updatedSearches));
+        } else {
+            setNotification({ type: 'error', message: 'Kode booking tidak ditemukan. Mohon periksa kembali.' });
+        }
+    } catch (err) {
+        setNotification({ type: 'error', message: 'Gagal mencari data. Periksa koneksi Anda.' });
+    } finally {
+        setIsLoading(false);
+        setBookingCode('');
     }
-    setIsLoading(false);
   };
 
   const handleRescheduleSubmit = async (newDate: Date) => {
@@ -121,73 +307,37 @@ const StatusPage = () => {
     if (client?.referralCode) {
         navigator.clipboard.writeText(client.referralCode);
         setNotification({type: 'success', message: 'Kode referral disalin!'});
+        setTimeout(() => setNotification(null), 2000);
     }
   };
 
-  const canReschedule = booking?.bookingStatus === BookingStatus.Confirmed && (new Date(booking.bookingDate).getTime() - new Date().getTime()) > 7 * 24 * 60 * 60 * 1000;
-  
-  const GOOGLE_MAPS_REVIEW_URL = window.appConfig?.googleMapsReviewUrl || "https://maps.app.goo.gl/3RLxGUn5isbUd3UeA";
-
-  const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const colorClasses: { [key: string]: string } = {
-        'Pending': 'bg-yellow-100 text-yellow-800',
-        'Confirmed': 'bg-blue-100 text-blue-800',
-        'In Progress': 'bg-indigo-100 text-indigo-800',
-        'Completed': 'bg-green-100 text-green-800',
-        'Cancelled': 'bg-gray-600 text-white',
-        'Paid': 'bg-green-100 text-green-800',
-        'Failed': 'bg-red-100 text-red-800',
-        'Reschedule Requested': 'bg-orange-100 text-orange-800',
-    };
-    return (
-        <span className={`px-3 py-1 text-sm font-medium rounded-full ${colorClasses[status] || 'bg-gray-100 text-gray-800'}`}>
-            {status}
-        </span>
-    );
+  const removeSearchHistory = (code: string) => {
+    const updatedSearches = recentSearches.filter(s => s !== code);
+    setRecentSearches(updatedSearches);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updatedSearches));
   };
   
-  const ClientPortal = () => {
+  const ClientPortal: React.FC = () => {
     if (!client || !settings) return null;
-    
-    const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => a.bookingThreshold - b.bookingThreshold);
-    const currentTierIndex = sortedTiers.findIndex(t => t.name === client.loyaltyTier);
-    const nextTier = currentTierIndex > -1 && currentTierIndex < sortedTiers.length - 1 ? sortedTiers[currentTierIndex + 1] : null;
-
-    const progressPercentage = nextTier ? (client.totalBookings / nextTier.bookingThreshold) * 100 : 100;
-    const bookingsToNextTier = nextTier ? nextTier.bookingThreshold - client.totalBookings : 0;
-    
+    const pointValue = settings.loyaltySettings.rupiahPerPoint;
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in mt-6 border-t-4 border-blue-500">
-        <h3 className="text-xl font-bold text-gray-900 mb-1">Portal Klien: {client.name}</h3>
-        {client.loyaltyTier && <span className="inline-block bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full mb-4">{client.loyaltyTier} Member</span>}
+      <div className="bg-white rounded-2xl shadow-lg border p-6">
+        <h4 className="font-bold text-lg text-primary mb-1 flex items-center gap-2"><Award /> Portal Loyalitas Anda</h4>
+        {client.loyaltyTier && <span className="inline-block bg-accent/10 text-accent text-xs font-bold px-2 py-1 rounded-full mb-4">{client.loyaltyTier} Member</span>}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h4 className="font-semibold text-blue-900 mb-2">Status Loyalitas</h4>
-            <div className="flex justify-between items-end">
-                <div>
-                    <p className="text-sm text-blue-800">Poin Anda</p>
-                    <p className="text-3xl font-bold text-blue-900">{client.loyaltyPoints.toLocaleString('id-ID')}</p>
-                </div>
-                <Award className="h-10 w-10 text-blue-500"/>
-            </div>
-            {nextTier && (
-              <div className="mt-3">
-                <div className="w-full bg-blue-200 rounded-full h-2.5">
-                  <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
-                </div>
-                <p className="text-xs text-blue-800 mt-1 text-center">{bookingsToNextTier} booking lagi untuk mencapai tier {nextTier.name}!</p>
-              </div>
-            )}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="bg-base-100 p-4 rounded-lg flex-1 text-center">
+            <p className="text-sm text-muted">Poin Anda</p>
+            <p className="text-3xl font-bold text-primary">{client.loyaltyPoints.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-muted">(Setara Rp {(client.loyaltyPoints * pointValue).toLocaleString('id-ID')})</p>
           </div>
 
-          <div className="bg-green-50 p-4 rounded-lg">
-            <h4 className="font-semibold text-green-900 mb-2 text-center">Program Referral</h4>
-            <p className="text-xs text-center text-green-700 mb-2">Bagikan kode di bawah & dapatkan poin bonus untukmu dan temanmu!</p>
+          <div className="bg-base-100 p-4 rounded-lg flex-1">
+            <h4 className="font-semibold text-primary/80 mb-2 text-center">Kode Referral</h4>
             <div className="flex items-center gap-2 p-2 bg-white border-2 border-dashed rounded-lg">
-              <span className="font-mono text-green-900 flex-grow text-center">{client.referralCode}</span>
-              <button onClick={handleCopyReferral} title="Salin Kode" className="p-2 bg-green-100 text-green-700 rounded-md hover:bg-green-200">
-                <Copy size={16}/>
+              <span className="font-mono text-primary flex-grow text-center">{client.referralCode}</span>
+              <button onClick={handleCopyReferral} className="p-2 text-muted hover:text-primary rounded-md transition-colors text-sm flex items-center gap-1">
+                  <Copy size={16}/> Salin
               </button>
             </div>
           </div>
@@ -196,102 +346,99 @@ const StatusPage = () => {
     );
   };
 
-
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center py-12 px-4">
-      <div className="w-full max-w-2xl text-center">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Cek Status Pesanan Anda</h1>
-        <p className="mt-2 text-gray-600">Masukkan kode booking unik Anda di bawah ini.</p>
-      </div>
+    <div className="min-h-screen bg-base-100">
+      <header className="p-4 border-b bg-white/80 backdrop-blur-sm sticky top-0 z-20">
+        <div className="max-w-5xl mx-auto flex justify-between items-center">
+          <Link to="/" className="text-xl font-bold text-primary">STUDIO <span className="text-accent">8</span></Link>
+          <Link to="/" className="inline-flex items-center text-sm text-muted hover:text-base-content transition-colors">
+            <Home className="w-4 h-4 mr-2" />
+            Kembali ke Beranda
+          </Link>
+        </div>
+      </header>
       
-      <div className="w-full max-w-md mt-8">
-        <form onSubmit={handleSearch} className="flex gap-2">
+      <main className="max-w-5xl mx-auto p-4 md:p-8">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+          <h1 className="text-3xl md:text-4xl font-bold text-primary text-center">Lacak Status Booking Anda</h1>
+          <p className="text-muted text-center mt-2">Masukkan kode booking untuk melihat progres, mengajukan jadwal ulang, atau mengunduh hasil foto.</p>
+        </motion.div>
+        
+        <form onSubmit={handleSearch} className="mt-8 max-w-2xl mx-auto flex items-center gap-2 bg-white p-2 rounded-full shadow-lg border">
           <input
             type="text"
             value={bookingCode}
             onChange={(e) => setBookingCode(e.target.value)}
-            placeholder="Contoh: S8-ABCDE"
-            className="flex-grow px-4 py-2 text-gray-900 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Masukkan kode booking (cth: S8-ABCDEF)"
+            className="w-full bg-transparent p-3 rounded-full focus:outline-none text-base-content"
           />
-          <button type="submit" disabled={isLoading} className="px-6 py-2 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-blue-400">
-            {isLoading ? 'Mencari...' : 'Cari'}
+          <button type="submit" disabled={isLoading} className="bg-primary text-primary-content rounded-full p-3 hover:bg-primary/90 disabled:opacity-50 transition-colors">
+            {isLoading ? <Loader2 className="animate-spin"/> : <Search />}
           </button>
         </form>
-      </div>
 
-      <div className="w-full max-w-2xl mt-8">
-        {notification && (
-            <div className={`mb-4 p-4 rounded-lg flex items-center gap-3 ${notification.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                {notification.type === 'success' ? <CheckCircle size={20}/> : <AlertCircle size={20}/>}
-                <span>{notification.message}</span>
+        {recentSearches.length > 0 && !booking && (
+            <div className="mt-4 max-w-2xl mx-auto">
+                <p className="text-xs text-center text-muted">Pencarian terakhir:</p>
+                <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
+                    {recentSearches.map(code => (
+                        <div key={code} className="flex items-center gap-1 bg-base-200 rounded-full text-sm">
+                            <button onClick={(e) => handleSearch(e, code)} className="px-3 py-1 hover:bg-base-300 rounded-l-full">{code}</button>
+                            <button onClick={() => removeSearchHistory(code)} className="px-2 py-1 hover:bg-base-300 rounded-r-full"><X size={14}/></button>
+                        </div>
+                    ))}
+                </div>
             </div>
         )}
-        {booking === null && <p className="text-center text-red-500">Kode booking tidak ditemukan. Mohon periksa kembali.</p>}
-        {booking && (
-          <div className="bg-white rounded-lg shadow-lg p-8 animate-fade-in">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Detail Pesanan</h2>
-            <div className="mt-6 space-y-4">
-              <div className="flex justify-between"><span className="font-medium text-gray-500">Kode Booking:</span> <span className="font-mono text-gray-800">{booking.bookingCode}</span></div>
-              <div className="flex justify-between"><span className="font-medium text-gray-500">Nama Klien:</span> <span className="text-gray-800">{booking.clientName}</span></div>
-              <div className="flex justify-between"><span className="font-medium text-gray-500">Tanggal:</span> <span className="text-gray-800">{booking.bookingDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' })}</span></div>
-               <div className="flex justify-between"><span className="font-medium text-gray-500">Waktu:</span> <span className="text-gray-800">{booking.bookingDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}</span></div>
-              <div className="flex justify-between items-center"><span className="font-medium text-gray-500">Status Booking:</span> <StatusBadge status={booking.bookingStatus} /></div>
-              <div className="flex justify-between items-center"><span className="font-medium text-gray-500">Status Pembayaran:</span> <StatusBadge status={booking.paymentStatus} /></div>
-            </div>
-            
-            {booking.bookingStatus === BookingStatus.Completed && (
-              <div className="mt-6 border-t pt-6 bg-green-50 p-6 rounded-lg">
-                <h3 className="text-lg sm:text-xl font-bold text-center text-green-800">Sesi Selesai! 🎉</h3>
-                <p className="text-center text-sm text-green-700 mt-1">Terima kasih telah mempercayakan momen Anda pada kami. Ulasan Anda sangat berarti untuk kami.</p>
-                <div className="mt-4 space-y-4">
-                  {booking.googleDriveLink && (
-                    <a href={booking.googleDriveLink} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gray-800 rounded-lg hover:bg-gray-900 transition-colors">
-                      <Download className="w-4 h-4" />
-                      Buka Folder Hasil Foto
-                    </a>
-                  )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Link to={`/feedback?bookingId=${booking.bookingCode}`} className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-blue-800 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors">
-                      <Star className="w-4 h-4" />
-                      Beri Ulasan di Website
-                    </Link>
-                    <a href={GOOGLE_MAPS_REVIEW_URL} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-red-800 bg-red-100 rounded-lg hover:bg-red-200 transition-colors">
-                      <MapPin className="w-4 h-4" />
-                      Beri Rating di Google Maps
-                    </a>
-                  </div>
-                </div>
+
+        <AnimatePresence>
+            {notification && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className={`mt-4 max-w-2xl mx-auto p-3 text-sm rounded-lg flex items-center gap-2 ${notification.type === 'success' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
+                    {notification.type === 'success' ? <CheckCircle size={16}/> : <AlertCircle size={16}/>}
+                    {notification.message}
+                </motion.div>
+            )}
+        </AnimatePresence>
+
+        <div className="mt-8">
+          {booking === undefined && !isLoading && <div />}
+          
+          {booking && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1 space-y-6">
+                 <BookingSummaryCard booking={booking} />
+                 <PaymentDetailsCard booking={booking} />
+                 <QuickActionsCard booking={booking} onRescheduleClick={() => setIsRescheduleModalOpen(true)} />
               </div>
-            )}
+              <div className="lg:col-span-2 space-y-6">
+                <ClientPortal />
+                <TrackingTimeline booking={booking} />
+                {booking.bookingStatus === BookingStatus.Confirmed && isBefore(new Date(), booking.bookingDate) && <PreparationTipsCard />}
+                <LocationCard />
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </main>
 
-            {canReschedule && (
-                 <div className="mt-6 border-t pt-6 text-center">
-                    <p className="text-sm text-gray-600 mb-3">Butuh mengubah jadwal sesi Anda?</p>
-                    <button onClick={() => setIsRescheduleModalOpen(true)} className="flex items-center justify-center mx-auto px-6 py-2 text-sm font-semibold text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors">
-                        <Calendar className="w-4 h-4 mr-2"/>
-                        Ajukan Jadwal Ulang
-                    </button>
-                    <p className="text-xs text-gray-500 mt-2">(Maksimal H-7 sebelum sesi)</p>
-                </div>
-            )}
-            {booking.bookingStatus === BookingStatus.RescheduleRequested && (
-                <div className="mt-6 border-t pt-6 text-center bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm text-blue-800">Anda telah mengajukan penjadwalan ulang. Mohon tunggu konfirmasi dari admin kami melalui WhatsApp.</p>
-                </div>
-            )}
-          </div>
-        )}
-        
-        <ClientPortal />
-      </div>
+      {booking && (
+        <RescheduleModal 
+            isOpen={isRescheduleModalOpen} 
+            onClose={() => setIsRescheduleModalOpen(false)} 
+            onSubmit={handleRescheduleSubmit}
+            booking={booking}
+            settings={settings}
+        />
+      )}
       
-      <div className="mt-8">
-          <Link to="/" className="flex items-center justify-center px-6 py-3 text-sm font-semibold text-gray-700 bg-gray-200 rounded-2xl hover:bg-gray-300 transition-colors">
-              <Home className="w-4 h-4 mr-2"/>
-              Kembali ke Beranda
-          </Link>
-      </div>
-       {booking && <RescheduleModal isOpen={isRescheduleModalOpen} onClose={() => setIsRescheduleModalOpen(false)} onSubmit={handleRescheduleSubmit} booking={booking} />}
+      {settings?.featureToggles.chatbot && (
+        <>
+            <ChatbotModal isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} pageKey="status" />
+            <button onClick={() => setIsChatbotOpen(true)} className="fixed bottom-6 right-6 bg-accent text-accent-content p-4 rounded-full shadow-lg hover:scale-110 transition-transform">
+                <MessageSquare />
+            </button>
+        </>
+      )}
     </div>
   );
 };

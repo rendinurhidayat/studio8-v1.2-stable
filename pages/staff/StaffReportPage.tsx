@@ -1,11 +1,12 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUsers, getInternReports, generateInternReportContent, getAttendanceForUser, getTasksForUser, getDailyReportsForUser } from '../../services/api';
 import { User, UserRole, InternReport, Attendance, Task, DailyReport } from '../../types';
 import { Loader2, FileText, Download, Briefcase, Sparkles, Copy } from 'lucide-react';
 import Modal from '../../components/common/Modal';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 
 const GeneratedReportModal: React.FC<{

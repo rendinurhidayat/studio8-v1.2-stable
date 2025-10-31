@@ -1,3 +1,5 @@
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, Menu, ShoppingCart, Shield } from 'lucide-react';

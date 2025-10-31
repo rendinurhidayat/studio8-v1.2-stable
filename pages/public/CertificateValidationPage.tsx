@@ -3,8 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getCertificateById } from '../../services/api';
 import { Certificate } from '../../types';
 import { Loader2, CheckCircle, XCircle, Home, Award, User, Calendar, UserCheck } from 'lucide-react';
-import { format } from 'date-fns';
-// FIX: Correct `date-fns` locale import from `date-fns/locale` to `date-fns/locale/id`.
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 
 const CertificateValidationPage = () => {
@@ -65,6 +64,13 @@ const CertificateValidationPage = () => {
                             <div>
                                 <p className="text-sm text-muted">Periode</p>
                                 <p className="font-semibold text-primary">{certificate.period}</p>
+                            </div>
+                        </div>
+                         <div className="flex items-center gap-4">
+                            <Calendar className="w-6 h-6 text-primary" />
+                            <div>
+                                <p className="text-sm text-muted">Tanggal Terbit</p>
+                                <p className="font-semibold text-primary">{format(new Date(certificate.issuedDate), 'd MMMM yyyy', { locale: id })}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">

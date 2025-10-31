@@ -1,34 +1,26 @@
 
+
 {
     "functions": {
         "api/ai.ts": {
             "maxDuration": 60
         },
-        "api/generateCertificate.ts": {
+        "api/bookings.ts": {
+            "maxDuration": 30
+        },
+        "api/sponsorships.ts": {
+            "maxDuration": 30
+        },
+        "api/assets.ts": {
+            "maxDuration": 30
+        },
+        "api/certificates.ts": {
             "maxDuration": 60
         },
-        "api/createPublicBooking.ts": {
-            "maxDuration": 30
-        },
-        "api/createInstitutionalBooking.ts": {
-            "maxDuration": 30
-        },
-        "api/publicCreateInstitutionalBooking.ts": {
-            "maxDuration": 30
-        },
-        "api/createSponsorship.ts": {
-            "maxDuration": 30
-        },
-        "api/publicCreateSponsorship.ts": {
-            "maxDuration": 30
-        },
-        "api/uploadImage.ts": {
-            "maxDuration": 30
-        },
-        "api/saveSubscription.ts": {
+        "api/subscriptions.ts": {
             "maxDuration": 15
         },
-        "api/deleteAsset.ts": {
+        "api/users.ts": {
             "maxDuration": 30
         }
     }

@@ -5,7 +5,7 @@ import { HighlightWork, User, UserRole } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { PlusCircle, Edit, Trash2, Loader2, Upload, Box } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 
 const fileToBase64 = (file: File): Promise<string> => {
@@ -94,10 +94,10 @@ const AdminHighlightManagerPage = () => {
 
     const uploadFile = async (file: File, folder: string, publicId?: string): Promise<string> => {
         const imageBase64 = await fileToBase64(file);
-        const response = await fetch('/api/uploadImage', {
+        const response = await fetch('/api/assets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageBase64, folder, publicId })
+            body: JSON.stringify({ action: 'upload', imageBase64, folder, publicId })
         });
         if (!response.ok) throw new Error('File upload failed');
         const result = await response.json();

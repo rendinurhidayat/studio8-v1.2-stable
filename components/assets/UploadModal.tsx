@@ -4,6 +4,7 @@ import { addAsset } from '../../services/api';
 import Modal from '../common/Modal';
 import { UploadCloud, Loader2, CheckCircle, AlertCircle, X, Send } from 'lucide-react';
 import { Asset } from '../../types';
+import { fileToBase64 } from '../../utils/fileUtils';
 
 interface FileToUpload {
     id: string;
@@ -60,19 +61,14 @@ const UploadModal: React.FC<{ isOpen: boolean; onClose: () => void; onUploadComp
             updateFileState(fileWrapper.id, { status: 'uploading' });
             
             try {
-                // 1. Convert to base64
-                const base64 = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(fileWrapper.file);
-                    reader.onload = () => resolve(reader.result as string);
-                    reader.onerror = error => reject(error);
-                });
+                // 1. Convert to base64 with optimization
+                const base64 = await fileToBase64(fileWrapper.file, { maxWidth: 1920, maxHeight: 1920, quality: 0.8 });
 
                 // 2. Upload to Cloudinary via API route
-                const uploadResponse = await fetch('/api/uploadImage', {
+                const uploadResponse = await fetch('/api/assets', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ imageBase64: base64, folder: 'studio_assets' })
+                    body: JSON.stringify({ action: 'upload', imageBase64: base64, folder: 'studio_assets' })
                 });
 
                 if (!uploadResponse.ok) {

@@ -1,173 +1,133 @@
+
+
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+// FIX: Split imports to fetch functions from 'api' and types from 'types', resolving an export error and aligning with project convention.
+import { getPackages, getAddOns } from '../services/api';
+import { Package, AddOn } from '../types';
 import BookingForm from '../components/client/BookingForm';
 import InstitutionalBookingForm from '../components/client/InstitutionalBookingForm';
 import SponsorshipForm from '../components/client/SponsorshipForm';
-import { Camera, HelpCircle, User, Briefcase, Award } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Modal from '../components/common/Modal';
-import { useCart } from '../contexts/CartContext';
+import { Camera, Briefcase, Award, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-type FormType = 'individual' | 'institutional' | 'sponsorship';
-
-const faqs = [
-    {
-        q: "Berapa DP (Uang Muka) yang harus saya bayar?",
-        a: "Untuk sesi individual, Anda hanya perlu membayar DP sebesar Rp 35.000 untuk mengamankan jadwal. Untuk booking institusi, skema pembayaran (DP/Lunas/Termin) akan didiskusikan lebih lanjut setelah permintaan Anda kami terima."
-    },
-    {
-        q: "Bagaimana jika saya ingin membatalkan booking?",
-        a: "Pembatalan yang dilakukan lebih dari 24 jam (H-1) sebelum sesi akan mendapatkan pengembalian DP penuh. Pembatalan dalam 24 jam terakhir akan menyebabkan DP hangus."
-    },
-    {
-        q: "Bisakah saya mengubah jadwal (reschedule) sesi saya?",
-        a: "Tentu! Anda bisa mengajukan reschedule maksimal 7 hari (H-7) sebelum jadwal sesi melalui halaman 'Cek Status' menggunakan kode booking Anda."
-    },
-    {
-        q: "Metode pembayaran apa saja yang tersedia?",
-        a: "Kami menerima pembayaran melalui QRIS, Transfer Bank (BNI & BRI), Dana, dan Shopeepay."
-    }
-];
-
-const FAQModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, onClose }) => {
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Frequently Asked Questions (FAQ)">
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-            {faqs.map((faq, index) => (
-                <div key={index} className="border-b border-base-200 pb-3 last:border-b-0">
-                    <h4 className="font-semibold text-base-content">{faq.q}</h4>
-                    <p className="text-sm text-muted mt-1">{faq.a}</p>
-                </div>
-            ))}
+const PackageSidebar: React.FC<{
+    packages: Package[];
+    selectedPackageId: string | null;
+    onSelect: (id: string) => void;
+}> = ({ packages, selectedPackageId, onSelect }) => (
+    <aside className="w-full md:w-72 flex-shrink-0 bg-white border-r border-base-200">
+        <div className="p-4 border-b">
+            <h2 className="text-lg font-bold text-primary">Pilih Paket Foto</h2>
         </div>
-    </Modal>
-  );
-};
-
-const BookingTypeSelector: React.FC<{ selected: FormType, onSelect: (type: FormType) => void }> = ({ selected, onSelect }) => {
-    const types = [
-        { id: 'individual', label: 'Sesi Individu', icon: <User size={20}/> },
-        { id: 'institutional', label: 'Grup / Instansi', icon: <Briefcase size={20}/> },
-        { id: 'sponsorship', label: 'Sponsor / Partner', icon: <Award size={20}/> }
-    ] as const;
-
-    return (
-        <div className="bg-base-200 p-2 rounded-xl flex items-center gap-2 max-w-lg mx-auto">
-            {types.map(type => (
+        <nav className="p-2 space-y-1">
+            {packages.map(pkg => (
                 <button
-                    key={type.id}
-                    onClick={() => onSelect(type.id)}
-                    className={`flex-1 px-4 py-3 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 ${selected === type.id ? 'bg-white text-primary shadow-md' : 'text-muted hover:bg-white/50'}`}
+                    key={pkg.id}
+                    onClick={() => onSelect(pkg.id)}
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors text-sm font-medium flex items-center gap-3 ${
+                        selectedPackageId === pkg.id ? 'bg-accent/10 text-accent' : 'text-base-content hover:bg-base-100'
+                    }`}
                 >
-                    {type.icon}
-                    <span className="hidden sm:inline">{type.label}</span>
+                    {pkg.imageUrls && pkg.imageUrls[0] ? (
+                        <img src={pkg.imageUrls[0]} alt={pkg.name} className="w-8 h-8 object-cover rounded-md flex-shrink-0" />
+                    ) : (
+                        <div className="w-8 h-8 bg-base-200 rounded-md flex-shrink-0" />
+                    )}
+                    <span className="flex-grow">{pkg.name}</span>
                 </button>
             ))}
+        </nav>
+    </aside>
+);
+
+const BookingPage = () => {
+    const [packages, setPackages] = useState<Package[]>([]);
+    const [addOns, setAddOns] = useState<AddOn[]>([]);
+    const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [activeForm, setActiveForm] = useState<'package' | 'institutional' | 'sponsorship'>('package');
+
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                const [packagesData, addOnsData] = await Promise.all([getPackages(), getAddOns()]);
+                setPackages(packagesData);
+                setAddOns(addOnsData);
+                if (packagesData.length > 0 && !selectedPackageId) {
+                    setSelectedPackageId(packagesData[0].id);
+                }
+            } catch (error) {
+                console.error("Failed to load booking data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, []);
+
+    const selectedPackage = packages.find(p => p.id === selectedPackageId);
+
+    const renderContent = () => {
+        if (loading) {
+            return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-primary" size={32}/></div>;
+        }
+
+        switch (activeForm) {
+            case 'package':
+                if (selectedPackage) {
+                    return <BookingForm key={selectedPackage.id} pkg={selectedPackage} addOns={addOns} />;
+                }
+                return <div className="p-8 text-center text-muted">Pilih paket dari daftar di samping untuk memulai.</div>;
+            case 'institutional':
+                return <InstitutionalBookingForm />;
+            case 'sponsorship':
+                return <SponsorshipForm />;
+            default:
+                return null;
+        }
+    };
+    
+    return (
+        <div className="min-h-screen bg-base-100 flex flex-col">
+            <header className="p-4 border-b bg-white/80 backdrop-blur-sm sticky top-0 z-20">
+                 <div className="max-w-7xl mx-auto flex justify-between items-center">
+                    <Link to="/" className="text-xl font-bold text-primary">STUDIO <span className="text-accent">8</span></Link>
+                    <div className="flex items-center gap-1 p-1 bg-base-200 rounded-lg">
+                        <TabButton active={activeForm === 'package'} onClick={() => setActiveForm('package')} icon={<Camera size={16}/>}>Paket Foto</TabButton>
+                        <TabButton active={activeForm === 'institutional'} onClick={() => setActiveForm('institutional')} icon={<Briefcase size={16}/>}>Instansi</TabButton>
+                        <TabButton active={activeForm === 'sponsorship'} onClick={() => setActiveForm('sponsorship')} icon={<Award size={16}/>}>Sponsor</TabButton>
+                    </div>
+                </div>
+            </header>
+            <div className="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full">
+                {activeForm === 'package' && (
+                    <PackageSidebar packages={packages} selectedPackageId={selectedPackageId} onSelect={setSelectedPackageId} />
+                )}
+                <main className="flex-grow p-4 md:p-8 overflow-y-auto">
+                    <motion.div
+                        key={activeForm + (selectedPackageId || '')}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        {renderContent()}
+                    </motion.div>
+                </main>
+            </div>
         </div>
     );
 };
 
-const BookingPage = () => {
-  const [isFaqOpen, setIsFaqOpen] = useState(false);
-  const { cart } = useCart();
-  const [searchParams] = useSearchParams();
-  
-  const getInitialFormType = (): FormType => {
-    const fromCart = searchParams.get('fromCart') === 'true' && cart.length > 0;
-    if (fromCart) {
-      return 'individual';
-    }
-    const typeFromUrl = searchParams.get('type');
-    if (typeFromUrl === 'institutional' || typeFromUrl === 'sponsorship') {
-      return typeFromUrl;
-    }
-    return 'individual';
-  };
+const TabButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; icon: React.ReactNode; }> = ({ active, onClick, children, icon }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${active ? 'bg-white text-primary shadow-sm' : 'text-muted hover:bg-white/50'}`}
+    >
+        {icon}{children}
+    </button>
+);
 
-  const [formType, setFormType] = useState<FormType>(getInitialFormType());
-  const isFromCart = searchParams.get('fromCart') === 'true' && cart.length > 0;
-
-  const formContent = {
-      individual: {
-          title: "Booking Sesi di Studio 8",
-          description: isFromCart ? "Selesaikan detail pemesanan untuk item di keranjangmu." : "Selangkah lagi menuju momen tak terlupakan. Isi data di bawah ya!",
-          component: <BookingForm />
-      },
-      institutional: {
-          title: "Booking untuk Grup & Instansi",
-          description: "Ajukan pemesanan untuk acara sekolah, kampus, atau perusahaan Anda.",
-          component: <InstitutionalBookingForm />
-      },
-      sponsorship: {
-          title: "Ajukan Kerjasama & Sponsorship",
-          description: "Mari berkolaborasi! Kirimkan proposal kerjasama atau sponsorship Anda.",
-          component: <SponsorshipForm />
-      }
-  };
-
-  return (
-    <div className="min-h-screen bg-base-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl w-full mx-auto">
-            <div className="text-center">
-                <Link to="/" className="inline-block">
-                    <Camera className="mx-auto h-12 w-12 text-accent hover:text-accent/80 transition-colors" />
-                </Link>
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={formType}
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        transition={{ duration: 0.3 }}
-                    >
-                        <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold text-primary">
-                           {formContent[formType].title}
-                        </h1>
-                        <p className="mt-2 text-md text-muted max-w-xl mx-auto">
-                           {formContent[formType].description}
-                        </p>
-                    </motion.div>
-                </AnimatePresence>
-            </div>
-
-            { !isFromCart &&
-                <div className="mt-8">
-                    <BookingTypeSelector selected={formType} onSelect={setFormType} />
-                </div>
-            }
-
-            <AnimatePresence mode="wait">
-                 <motion.div
-                    key={formType}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.4, ease: "easeInOut" }}
-                 >
-                    {formContent[formType].component}
-                </motion.div>
-            </AnimatePresence>
-
-            <footer className="text-center mt-8">
-                <p className="text-sm text-muted">
-                    Ingin memeriksa status pesanan Anda?{' '}
-                    <Link to="/cek-status" className="font-medium text-accent hover:underline">
-                        Cek Status
-                    </Link>
-                </p>
-            </footer>
-        </div>
-
-        <button
-            onClick={() => setIsFaqOpen(true)}
-            className="fixed bottom-6 right-6 bg-primary text-primary-content p-4 rounded-full shadow-xl hover:bg-primary/90 transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-            title="Butuh Bantuan? (FAQ)"
-        >
-            <HelpCircle size={24} />
-        </button>
-        <FAQModal isOpen={isFaqOpen} onClose={() => setIsFaqOpen(false)} />
-    </div>
-  );
-};
 
 export default BookingPage;

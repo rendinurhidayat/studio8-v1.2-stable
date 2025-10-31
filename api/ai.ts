@@ -2,36 +2,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
-import { ActivityLog } from '../types';
-
-// --- Firebase Admin Initialization (only for actions that need it) ---
-function initializeFirebaseAdmin(): admin.app.App {
-    if (admin.apps.length > 0) {
-        return admin.apps[0]!;
-    }
-    
-    // Vercel populates this automatically. It's a good check.
-    const projectId = process.env.GCP_PROJECT_ID || process.env.VERCEL_PROJECT_ID;
-
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-        throw new Error('Server configuration error: FIREBASE_SERVICE_ACCOUNT_JSON is not set.');
-    }
-
-    try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-
-        if (projectId && serviceAccount.project_id !== projectId) {
-            console.warn(`Project ID mismatch. Vercel Project ID: ${projectId}, Service Account Project ID: ${serviceAccount.project_id}. This may cause issues.`);
-        }
-        
-        return admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-        });
-    } catch (e: any) {
-        console.error("Failed to initialize Firebase Admin:", e.message);
-        throw new Error("Server configuration error: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Ensure it's a valid, single-line JSON string.");
-    }
-}
+import type { ActivityLog } from '../types';
+import { initializeFirebaseAdmin } from './_lib/services';
 
 // --- Main Handler ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -47,11 +19,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        return res.status(500).json({ message: 'API key is not configured on the server.' });
+        return res.status(500).json({ message: 'GEMINI_API_KEY is not configured on the server.' });
     }
     const ai = new GoogleGenAI({ apiKey });
 
-    // Conditionally initialize Firebase Admin SDK for actions that need it.
     const actionsRequiringDb = ['analyzeInternReport', 'generateAiFeedback', 'analyzeQuizResult'];
     if (actionsRequiringDb.includes(action)) {
         try {
@@ -69,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             case 'generateForecast':
                 return await handleGenerateForecast(ai, payload, res);
             case 'chat':
-                return await handleChat(ai, payload, res); // This is a streaming function
+                return await handleChat(ai, payload, res);
             case 'analyzeInternReport':
                 return await handleAnalyzeInternReport(ai, payload, res);
             case 'generateAiFeedback':
@@ -99,6 +70,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     } catch (error: any) {
         console.error(`API Error in action '${action}':`, error);
+        if (error instanceof SyntaxError) {
+             return res.status(500).json({ message: 'Failed to parse AI response as JSON.', error: error.message });
+        }
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 }
@@ -169,8 +143,13 @@ async function handleGenerateSocialMediaCaption(ai: GoogleGenAI, payload: any, r
         }
     });
 
-    const result = JSON.parse(response.text);
-    return res.status(200).json(result);
+    try {
+        const result = JSON.parse(response.text);
+        return res.status(200).json(result);
+    } catch (e) {
+        console.error("Failed to parse JSON from AI for social media caption:", response.text);
+        throw new SyntaxError("AI returned a malformed JSON response for social media captions.");
+    }
 }
 
 
@@ -294,9 +273,14 @@ async function handleRecommendPackage(ai: GoogleGenAI, payload: any, res: Vercel
             responseSchema: schema,
         }
     });
-
-    const result = JSON.parse(response.text);
-    return res.status(200).json(result);
+    
+    try {
+        const result = JSON.parse(response.text);
+        return res.status(200).json(result);
+    } catch(e) {
+        console.error("Failed to parse JSON from AI for package recommendation:", response.text);
+        throw new SyntaxError("AI returned a malformed JSON response for package recommendation.");
+    }
 }
 
 
@@ -338,8 +322,14 @@ async function handleAnalyzeFeedback(ai: GoogleGenAI, payload: any, res: VercelR
         contents: `Analisis kumpulan feedback pelanggan untuk studio foto bernama "Studio 8" berikut ini.\nFeedback:\n${feedbackText}\n\nBerikan analisis terstruktur dalam format JSON. Analisis harus mencakup:\n1. 'overallSentiment': Satu kalimat ringkas tentang sentimen umum dalam Bahasa Indonesia (misal: "Sangat Positif", "Cukup Baik dengan beberapa masukan", "Negatif").\n2. 'positivePoints': Array string berisi poin-poin positif utama yang sering disebut pelanggan.\n3. 'areasForImprovement': Array string berisi kritik atau area utama untuk perbaikan.\n4. 'actionableSuggestions': Array string berisi 2-3 saran konkret yang bisa ditindaklanjuti oleh pemilik studio.\n\nSeluruh respons harus dalam Bahasa Indonesia.`,
         config: { responseMimeType: 'application/json', responseSchema: schema }
     });
-    const result = JSON.parse(response.text);
-    return res.status(200).json(result);
+    
+    try {
+        const result = JSON.parse(response.text);
+        return res.status(200).json(result);
+    } catch(e) {
+        console.error("Failed to parse JSON from AI for feedback analysis:", response.text);
+        throw new SyntaxError("AI returned a malformed JSON response for feedback analysis.");
+    }
 }
 
 async function handleGenerateForecast(ai: GoogleGenAI, payload: any, res: VercelResponse) {
@@ -365,8 +355,14 @@ async function handleGenerateForecast(ai: GoogleGenAI, payload: any, res: Vercel
         contents: `Anda adalah seorang analis keuangan ahli untuk sebuah studio foto bernama Studio 8.\nBerdasarkan data pendapatan historis berikut, berikan analisis dan peramalan keuangan.\nData historis (hingga 6 bulan terakhir):\n${historicalDataString}\n\nTugas Anda:\n1.  predictedRevenue: Prediksi pendapatan untuk bulan berikutnya dalam bentuk angka (integer, tanpa format Rupiah atau desimal).\n2.  budgetRecommendation: Berikan rekomendasi alokasi anggaran berdasarkan pendapatan yang diprediksi. Alokasikan ke dalam kategori berikut: 'marketing', 'equipment', 'maintenance', 'savings', 'operation'. Total alokasi harus sama dengan predictedRevenue. Kembalikan dalam bentuk objek dengan nilai numerik (integer).\n3.  aiAlert: Berikan satu insight atau peringatan singkat (maksimal 2 kalimat, dalam Bahasa Indonesia) berdasarkan tren data historis. Misalnya, jika ada penurunan, sarankan sesuatu. Jika ada kenaikan, berikan dorongan.\n\nBerikan output HANYA dalam format JSON yang valid dan terstruktur sesuai skema.`,
         config: { responseMimeType: 'application/json', responseSchema: schema }
     });
-    const result = JSON.parse(response.text);
-    return res.status(200).json(result);
+    
+    try {
+        const result = JSON.parse(response.text);
+        return res.status(200).json(result);
+    } catch(e) {
+        console.error("Failed to parse JSON from AI for forecast:", response.text);
+        throw new SyntaxError("AI returned a malformed JSON response for forecast.");
+    }
 }
 
 async function handleChat(ai: GoogleGenAI, payload: any, res: VercelResponse) {
@@ -443,12 +439,17 @@ async function handleAnalyzeInternReport(ai: GoogleGenAI, payload: any, res: Ver
             contents: `Analisis laporan harian ini: "${reportContent}". Kategorikan sebagai: produktif / santai / tidak fokus. Berikan satu kalimat motivasi singkat dalam Bahasa Indonesia yang relevan dan positif.`,
             config: { responseMimeType: 'application/json', responseSchema: schema }
         });
+        
         const result = JSON.parse(response.text);
         const insightData = { ...result, date: admin.firestore.FieldValue.serverTimestamp() };
         await db.collection('users').doc(userId).collection('aiInsights').add(insightData);
         return res.status(200).json({ success: true, insight: insightData });
-    } catch (aiError) {
+    } catch (aiError: any) {
         console.error("AI analysis failed during handleAnalyzeInternReport:", aiError);
+        // Fallback to default insight on AI error to maintain functionality
+        if (aiError instanceof SyntaxError) {
+             console.error("Malformed JSON from AI in handleAnalyzeInternReport:", (aiError as any).response?.text);
+        }
         const defaultInsight = { type: 'default', insight: 'Tetap semangat hari ini 💪', date: admin.firestore.FieldValue.serverTimestamp() };
         await db.collection('users').doc(userId).collection('aiInsights').add(defaultInsight);
         return res.status(200).json({ success: true, insight: defaultInsight, note: 'AI analysis failed, used default.' });
@@ -515,8 +516,14 @@ async function handleGenerateQuizQuestions(ai: GoogleGenAI, payload: any, res: V
         contents: `Buat ${numQuestions} soal kuis pilihan ganda (4 pilihan) tentang "${topic}" dengan kategori "${category}". Pastikan ada satu jawaban yang benar. Berikan penjelasan singkat untuk setiap jawaban yang benar. Untuk setiap pertanyaan, berikan juga "imagePrompt", yaitu deskripsi singkat dalam Bahasa Indonesia untuk membuat gambar yang relevan secara visual dengan pertanyaan tersebut. Jika tidak ada gambar yang relevan, berikan string kosong untuk imagePrompt.\n\nFormat output harus berupa array JSON dari objek, sesuai dengan skema berikut.`,
         config: { responseMimeType: 'application/json', responseSchema: schema }
     });
-    const questions = JSON.parse(response.text);
-    return res.status(200).json(questions);
+    
+    try {
+        const questions = JSON.parse(response.text);
+        return res.status(200).json(questions);
+    } catch(e) {
+        console.error("Failed to parse JSON from AI for quiz questions:", response.text);
+        throw new SyntaxError("AI returned a malformed JSON response for quiz questions.");
+    }
 }
 
 async function handleAnalyzeQuizResult(ai: GoogleGenAI, payload: any, res: VercelResponse) {

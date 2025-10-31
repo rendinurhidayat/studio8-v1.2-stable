@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { User, UserRole, ChatRoom, ChatMessage } from '../../types';
 import { getUsers, getChatRoomsForUser, getMessagesStream, sendMessage, findOrCreateChatRoom } from '../../services/api';
 import { Loader2, Send, User as UserIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { motion } from 'framer-motion';

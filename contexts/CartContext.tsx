@@ -11,20 +11,28 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const ANONYMOUS_ID_KEY = 'studio8-anonymous-uid';
+// A unique key to store the anonymous user's session ID in localStorage.
+const ANONYMOUS_ID_KEY = 'studio8-anonymous-session-id';
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // 1. Get or create a unique ID for the anonymous user session.
+    // useMemo ensures this only runs once per component lifecycle.
     const anonymousUserId = useMemo(() => {
-        let userId = localStorage.getItem(ANONYMOUS_ID_KEY);
-        if (!userId) {
-            userId = crypto.randomUUID();
-            localStorage.setItem(ANONYMOUS_ID_KEY, userId);
+        try {
+            let userId = localStorage.getItem(ANONYMOUS_ID_KEY);
+            if (!userId) {
+                userId = crypto.randomUUID();
+                localStorage.setItem(ANONYMOUS_ID_KEY, userId);
+            }
+            return userId;
+        } catch (error) {
+            console.error("Failed to access localStorage for session ID, generating temporary ID:", error);
+            // Fallback for environments where localStorage is not available (e.g., private browsing)
+            return crypto.randomUUID();
         }
-        return userId;
     }, []);
 
-    // 2. Create a dynamic key for the cart based on the user ID.
+    // 2. Create a dynamic key for the cart based on the session ID.
     const CART_STORAGE_KEY = `studio8-cart-${anonymousUserId}`;
 
     // 3. Initialize state from localStorage using the dynamic key.
@@ -34,13 +42,18 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return storedCart ? JSON.parse(storedCart) : [];
         } catch (error) {
             console.error("Failed to parse cart from localStorage", error);
+            localStorage.removeItem(CART_STORAGE_KEY); // Clear corrupted data
             return [];
         }
     });
 
     // 4. Save to localStorage using the dynamic key whenever the cart changes.
     useEffect(() => {
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+        try {
+            localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+        } catch (error) {
+            console.error("Failed to save cart to localStorage:", error);
+        }
     }, [cart, CART_STORAGE_KEY]);
 
     const addToCart = (item: CartItem) => {

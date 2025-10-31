@@ -1,10 +1,13 @@
 export const fileToBase64 = (
   file: File,
-  options: { maxWidth: number; maxHeight: number; quality: number } = { maxWidth: 1280, maxHeight: 1280, quality: 0.8 }
+  options: { maxWidth?: number; maxHeight?: number; quality?: number; skipResizing?: boolean } = {}
 ): Promise<string> => {
+  const defaultOptions = { maxWidth: 1280, maxHeight: 1280, quality: 0.75, skipResizing: false };
+  const finalOptions = { ...defaultOptions, ...options };
+
   return new Promise((resolve, reject) => {
-    // Hanya proses file gambar untuk pengubahan ukuran
-    if (!file.type.startsWith('image/')) {
+    // Skip resizing for non-images or if explicitly told to
+    if (!file.type.startsWith('image/') || finalOptions.skipResizing) {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
@@ -30,17 +33,19 @@ export const fileToBase64 = (
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let { width, height } = img;
-        const { maxWidth, maxHeight } = options;
+        const { maxWidth, maxHeight } = finalOptions;
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height *= maxWidth / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width *= maxHeight / height;
-            height = maxHeight;
+        if (width > maxWidth! || height > maxHeight!) {
+          if (width > height) {
+            if (width > maxWidth!) {
+              height *= maxWidth! / width;
+              width = maxWidth!;
+            }
+          } else {
+            if (height > maxHeight!) {
+              width *= maxHeight! / height;
+              height = maxHeight!;
+            }
           }
         }
 
@@ -55,7 +60,7 @@ export const fileToBase64 = (
         ctx.drawImage(img, 0, 0, width, height);
         
         // Paksa ke JPEG untuk kompresi yang lebih baik
-        const dataUrl = canvas.toDataURL('image/jpeg', options.quality);
+        const dataUrl = canvas.toDataURL('image/jpeg', finalOptions.quality);
         resolve(dataUrl);
       };
       img.onerror = error => reject(error);

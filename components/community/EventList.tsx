@@ -4,7 +4,7 @@ import { CommunityEvent, UserRole } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Loader2, PlusCircle, MapPin, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 import CreateEventModal from './CreateEventModal';
 

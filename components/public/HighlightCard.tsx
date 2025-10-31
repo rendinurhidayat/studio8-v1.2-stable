@@ -1,6 +1,7 @@
+
 import React from 'react';
 // FIX: Import Variants type from framer-motion to resolve type inference issues.
-import { motion, Variants } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { HighlightWork } from '../../types';
 
 interface HighlightCardProps {

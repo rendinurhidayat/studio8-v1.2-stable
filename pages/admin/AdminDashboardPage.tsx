@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getBookings, getFinancialData, getExpenses, getActivityLogs } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Booking, Transaction, BookingStatus, Expense, ActivityLog } from '../../types';
@@ -8,14 +8,13 @@ import ChartCard from '../../components/admin/ChartCard';
 import { DollarSign, BookOpen, Clock, TrendingUp, History, ArrowRight, UserCheck, CheckCircle, Loader2, Lightbulb, Sparkles, PlusCircle, Shield, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
-// FIX: Use subpath imports for `subDays` and `formatDistanceToNow` from `date-fns` to resolve module export errors and type issues.
-// FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
-// FIX: Switched to a subpath import for `formatDistanceToNow` to resolve a TypeScript type error with the `locale` option.
-import { format, isSameDay, eachDayOfInterval, formatDistanceToNow } from 'date-fns';
+import format from 'date-fns/format';
+import isSameDay from 'date-fns/isSameDay';
+import eachDayOfInterval from 'date-fns/eachDayOfInterval';
 import subDays from 'date-fns/subDays';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import id from 'date-fns/locale/id';
-// FIX: Import Variants type from framer-motion to resolve type inference issues.
-import { motion, Variants } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 
 const containerVariants: Variants = {
@@ -134,7 +133,9 @@ const AdminDashboardPage: React.FC = () => {
         return { dailyData, packagePopularity };
     }, [transactions, expenses, bookings]);
 
-    const fetchMarketingInsight = async () => {
+    const fetchMarketingInsight = useCallback(async () => {
+        if (bookings.length === 0 && transactions.length === 0) return;
+
         setIsGeneratingInsight(true);
         setMarketingInsight('');
         setInsightError(null);
@@ -158,13 +159,13 @@ const AdminDashboardPage: React.FC = () => {
         } finally {
             setIsGeneratingInsight(false);
         }
-    };
+    }, [chartData, recentActivity, bookings.length, transactions.length]);
     
     useEffect(() => {
-        if (!loading && (bookings.length > 0 || transactions.length > 0)) {
+        if (!loading) {
             fetchMarketingInsight();
         }
-    }, [loading]); // Only depends on loading to run once after initial data fetch
+    }, [loading, fetchMarketingInsight]);
 
 
     const upcomingBookings = useMemo(() => bookings
@@ -269,8 +270,7 @@ const AdminDashboardPage: React.FC = () => {
                                         <div className="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0"><UserCheck size={16} className="text-muted"/></div>
                                         <div>
                                             <p className="text-sm text-base-content leading-tight"><span className="font-semibold">{log.userName}</span> {log.action.toLowerCase()}</p>
-                                            {/* FIX: Use formatDistanceToNow from date-fns to resolve type error and ensure proper function call. */}
-                                            <p className="text-xs text-muted">{formatDistanceToNow(log.timestamp, { addSuffix: true, locale: (id as any).default ?? id })}</p>
+                                            <p className="text-xs text-muted">{formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id })}</p>
                                         </div>
                                     </motion.li>
                                 ))}

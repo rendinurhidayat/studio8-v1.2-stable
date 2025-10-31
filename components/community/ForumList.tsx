@@ -4,10 +4,7 @@ import { getForumThreads } from '../../services/api';
 import { ForumThread } from '../../types';
 import { motion } from 'framer-motion';
 import { Loader2, PlusCircle, MessageSquare } from 'lucide-react';
-// FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
-// FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
-// FIX: Switched 'formatDistanceToNow' to a named import from 'date-fns' to fix the "not callable" type error.
-import { formatDistanceToNow } from 'date-fns';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import id from 'date-fns/locale/id';
 import CreateThreadModal from './CreateThreadModal';
 
@@ -66,8 +63,7 @@ const ForumList = () => {
                                 <div>
                                     <p className="font-semibold text-primary">{thread.title}</p>
                                     <p className="text-xs text-muted">
-                                        {/* FIX: Use formatDistanceToNow from date-fns to resolve type error and ensure proper function call. */}
-                                        oleh {thread.authorName} &bull; {formatDistanceToNow(thread.lastReplyAt || thread.createdAt, { locale: (id as any).default ?? id, addSuffix: true })}
+                                        oleh {thread.authorName} &bull; {formatDistanceToNow(thread.lastReplyAt || thread.createdAt, { locale: id, addSuffix: true })}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3 text-sm text-muted flex-shrink-0 ml-4">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getTodaysAttendance, checkIn, checkOut, updateUserPoints } from '../../services/api';
 import { Attendance } from '../../types';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 import { Calendar, LogIn, LogOut, Loader2, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';

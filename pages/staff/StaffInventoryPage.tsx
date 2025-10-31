@@ -4,10 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { InventoryItem, InventoryStatus } from '../../types';
 import { Check, AlertTriangle, MessageSquare, Loader2 } from 'lucide-react';
 import Modal from '../../components/common/Modal';
-// FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
-// FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
-// FIX: Changed the import for `formatDistanceToNow` to a named import from `date-fns` to fix a "not callable" error.
-import { formatDistanceToNow } from 'date-fns';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import id from 'date-fns/locale/id';
 
 const StatusBadge: React.FC<{ status: InventoryStatus }> = ({ status }) => {
@@ -149,8 +146,7 @@ const StaffInventoryPage = () => {
                                                 <StatusBadge status={item.status} />
                                             </div>
                                             <p className="text-xs text-muted mt-1">
-                                                {/* FIX: Use formatDistanceToNow from date-fns to resolve type error and ensure proper function call. */}
-                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(item.lastChecked, { addSuffix: true, locale: (id as any).default ?? id }) : 'Belum pernah'}
+                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(item.lastChecked, { addSuffix: true, locale: id }) : 'Belum pernah'}
                                             </p>
                                             {item.notes && item.status !== InventoryStatus.Available && (
                                                 <div className="mt-2 p-2 bg-yellow-50 text-yellow-800 text-xs rounded flex items-start gap-2">

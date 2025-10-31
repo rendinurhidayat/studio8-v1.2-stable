@@ -1,3 +1,6 @@
+
+
+
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -11,6 +14,35 @@ import OfflineBanner from './components/common/OfflineBanner';
 import { AnimatePresence } from 'framer-motion';
 import CartModal from './components/common/CartModal';
 
+// --- Cached Hook for System Settings ---
+// This hook ensures that system settings are fetched only once per application lifecycle,
+// improving performance by avoiding redundant API calls across different components.
+let settingsPromise: Promise<SystemSettings> | null = null;
+const fetchSettings = () => {
+    if (!settingsPromise) {
+        settingsPromise = getSystemSettings();
+    }
+    return settingsPromise;
+};
+
+export const useSystemSettings = () => {
+    const [settings, setSettings] = useState<SystemSettings | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchSettings().then(data => {
+            setSettings(data);
+            setLoading(false);
+        }).catch(err => {
+            console.error("Failed to fetch cached system settings:", err);
+            setLoading(false);
+        });
+    }, []);
+
+    return { settings, loading };
+};
+
+
 // Fallback component for lazy loading
 const SuspenseFallback = () => (
     <div className="flex h-screen w-full items-center justify-center bg-base-100">
@@ -22,7 +54,7 @@ const SuspenseFallback = () => (
 );
 
 // Lazy load all page components
-const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RoleSelectorPage = lazy(() => import('./pages/RoleSelectorPage'));
 const BookingPage = lazy(() => import('./pages/BookingPage'));
 const PackagesPage = lazy(() => import('./pages/PackagesPage'));
 const StatusPage = lazy(() => import('./pages/StatusPage'));
@@ -31,7 +63,6 @@ const AdminBookingsPage = lazy(() => import('./pages/admin/AdminBookingsPage'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const StaffDashboardPage = lazy(() => import('./pages/staff/StaffDashboardPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
-const RoleSelectorPage = lazy(() => import('./pages/RoleSelectorPage'));
 const AdminFinancePage = lazy(() => import('./pages/admin/AdminFinancePage'));
 const AdminClientsPage = lazy(() => import('./pages/admin/AdminClientsPage'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
@@ -46,7 +77,6 @@ const AdminActivityLogPage = lazy(() => import('./pages/admin/AdminActivityLogPa
 const StaffInventoryPage = lazy(() => import('./pages/staff/StaffInventoryPage'));
 const InternDashboardPage = lazy(() => import('./pages/intern/InternDashboardPage'));
 const AdminInternsPage = lazy(() => import('./pages/admin/AdminInternsPage'));
-const InternLoginPage = lazy(() => import('./pages/intern/InternLoginPage'));
 const InternAttendancePage = lazy(() => import('./pages/intern/InternAttendancePage'));
 const InternReportPage = lazy(() => import('./pages/intern/InternReportPage'));
 const InternTasksPage = lazy(() => import('./pages/intern/InternTasksPage'));
@@ -100,15 +130,7 @@ const PrivateRoute: React.FC<{ children: React.ReactElement; roles: UserRole[] }
 };
 
 const FeatureRoute: React.FC<{ children: React.ReactNode; feature: keyof FeatureToggles }> = ({ children, feature }) => {
-    const [settings, setSettings] = useState<SystemSettings | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        getSystemSettings().then(data => {
-            setSettings(data);
-            setLoading(false);
-        });
-    }, []);
+    const { settings, loading } = useSystemSettings();
 
     if (loading) {
         return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
@@ -159,8 +181,6 @@ const AppRoutes = () => {
           <Route path="/pesan-sesi" element={<BookingPage />} />
           <Route path="/cek-status" element={<StatusPage />} />
           <Route path="/auth" element={<RoleSelectorPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/intern-login" element={<InternLoginPage />} />
           <Route path="/feedback" element={<FeatureRoute feature="publicFeedback"><FeedbackPage /></FeatureRoute>} />
 
           {/* Admin Routes */}
@@ -253,7 +273,7 @@ const AppRoutes = () => {
                 path="/community/forum/:threadId"
                 element={
                     <PrivateRoute roles={[UserRole.Admin, UserRole.Staff, UserRole.AnakMagang, UserRole.AnakPKL]}>
-                        <ForumThreadPage />
+                        <AdminLayout><ForumThreadPage /></AdminLayout>
                     </PrivateRoute>
                 }
             />

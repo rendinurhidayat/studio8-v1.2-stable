@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getTasksForUser, getMentorFeedbackForIntern, updateTask, updateUserPoints } from '../../services/api';
 import { Task, MentorFeedback } from '../../types';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
-import { Loader2, CheckSquare, Calendar, MessageSquare, Star } from 'lucide-react';
+import { Loader2, CheckSquare, Calendar, MessageSquare, Star, AlertTriangle } from 'lucide-react';
 import StarRating from '../../components/feedback/StarRating';
 
 const TaskCard: React.FC<{
@@ -31,7 +31,8 @@ const TaskCard: React.FC<{
                 <div className="flex items-center gap-4 text-xs text-muted mt-3 pt-3 border-t border-base-200">
                     <span>Dibuat oleh: {task.creatorName}</span>
                     {task.dueDate && (
-                        <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-error' : ''}`}>
+                        <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-error font-semibold' : ''}`}>
+                            {isOverdue && <AlertTriangle size={14} />}
                             <Calendar size={14} />
                             <span>Tenggat: {format(task.dueDate, 'd MMM yyyy', { locale: id })}</span>
                         </div>

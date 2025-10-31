@@ -7,7 +7,7 @@ import { Loader2, Camera, Video, TrendingUp, Library, CheckCircle, ArrowRight, P
 import { motion } from 'framer-motion';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 
 // Manager View for Admin/Staff
@@ -21,7 +21,6 @@ const PracticalClassManager: React.FC<{
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [selectedClass, setSelectedClass] = useState<PracticalClass | null>(null);
 
-    // FIX: Add maxParticipants to form state.
     const [formData, setFormData] = useState({
         topic: '',
         description: '',
@@ -54,7 +53,6 @@ const PracticalClassManager: React.FC<{
         if (!currentUser) return;
         setLoading(p => ({ ...p, modal: true }));
         try {
-            // FIX: Add missing properties `maxParticipants` and `registeredInternIds` to the payload.
             await createPracticalClass({
                 topic: formData.topic,
                 description: formData.description,
@@ -83,7 +81,6 @@ const PracticalClassManager: React.FC<{
         <div className="bg-white p-6 rounded-2xl shadow-lg border border-base-200">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-primary flex items-center gap-3"><BookOpen /> Kelas Praktek Wajib</h2>
-                {/* FIX: Reset maxParticipants in form state when opening modal. */}
                 <button onClick={() => { setFormData({ topic: '', description: '', classDate: '', mentorName: currentUser?.name || '', maxParticipants: 10 }); setIsModalOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
                     <PlusCircle size={18} /> Buat Kelas Baru
                 </button>
@@ -100,7 +97,6 @@ const PracticalClassManager: React.FC<{
                             <div className="text-xs text-muted mt-3 pt-3 border-t space-y-1">
                                 <div className="flex items-center gap-2"><Clock size={14}/> {format(cls.classDate, 'd MMM yyyy, HH:mm', { locale: id })}</div>
                                 <div className="flex items-center gap-2"><UserIcon size={14}/> Mentor: {cls.mentorName}</div>
-                                {/* FIX: Display participant count in the class list. */}
                                 <div className="flex items-center gap-2"><Users size={14}/> {cls.registeredInternIds.length} / {cls.maxParticipants} Peserta</div>
                             </div>
                         </div>
@@ -118,7 +114,6 @@ const PracticalClassManager: React.FC<{
                              <button type="button" onClick={handleGenerateDescription} disabled={loading.modal} className="p-2 bg-accent/10 text-accent rounded-full h-fit" title="Generate with AI"><Sparkles size={18}/></button>
                         </div>
                     </div>
-                    {/* FIX: Add input for maxParticipants. */}
                      <div className="grid grid-cols-2 gap-4">
                         <div><label className="font-semibold text-sm">Jadwal</label><input type="datetime-local" value={formData.classDate} onChange={e => setFormData(p => ({...p, classDate: e.target.value}))} required className="w-full p-2 border rounded mt-1"/></div>
                         <div><label className="font-semibold text-sm">Peserta (Max)</label><input type="number" value={formData.maxParticipants} onChange={e => setFormData(p => ({...p, maxParticipants: Number(e.target.value)}))} required className="w-full p-2 border rounded mt-1"/></div>

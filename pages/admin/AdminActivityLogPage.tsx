@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getActivityLogs, getUsers } from '../../services/api';
-import { ActivityLog, User } from '../../types';
-// FIX: Use subpath import for `formatDistanceToNow` to resolve type issue with `locale` option.
-// FIX: Switched to a named import for formatDistanceToNow to resolve a "not callable" error.
-// FIX: Switched 'formatDistanceToNow' to a named import from 'date-fns' to fix the "not callable" type error.
-import { formatDistanceToNow } from 'date-fns';
+import { ActivityLog, User, UserRole } from '../../types';
+import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import id from 'date-fns/locale/id';
 import { Edit, Trash2, PlusCircle, CheckCircle, Settings, Download, Filter, X, User as UserIcon } from 'lucide-react';
 import { exportToCSV } from '../../utils/export';
@@ -44,10 +41,7 @@ const AdminActivityLogPage = () => {
                 getUsers(),
             ]);
             setLogs(logsData);
-            // FIX: The UserRole enum does not include 'Client', causing a type error.
-            // Casting `u.role` to string allows the filter to work as intended in case
-            // the database contains user documents with a 'Client' role string.
-            setUsers(usersData.filter(u => (u.role as string) !== 'Client'));
+            setUsers(usersData.filter(u => Object.values(UserRole).includes(u.role)));
             setLoading(false);
         };
         fetchData();
@@ -122,8 +116,7 @@ const AdminActivityLogPage = () => {
                                                     {log.details && <span className="text-gray-600"> - {log.details}</span>}
                                                 </p>
                                                 <p className="mt-1 text-xs text-gray-500">
-                                                    {/* FIX: Use formatDistanceToNow from date-fns to resolve type error and ensure proper function call. */}
-                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: (id as any).default ?? id })}
+                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id })}
                                                 </p>
                                             </div>
                                         </div>

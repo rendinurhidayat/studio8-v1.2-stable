@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     getBookings, 
@@ -19,6 +20,7 @@ import Modal from '../../components/common/Modal';
 import BookingCalendar from '../../components/admin/BookingCalendar';
 import { generateGoogleCalendarLink } from '../../utils/calendar';
 import InvoiceModal from '../../components/admin/InvoiceModal';
+import format from 'date-fns/format';
 
 
 const StatusBadge: React.FC<{ status: string, type: 'booking' | 'payment' }> = ({ status, type }) => {
@@ -59,7 +61,7 @@ const EditBookingModal: React.FC<{
             const dateToSet = booking.bookingStatus === BookingStatus.RescheduleRequested && booking.rescheduleRequestDate ? booking.rescheduleRequestDate : booking.bookingDate;
             setFormData({
                 ...booking,
-                bookingDate: new Date(dateToSet.getTime() - (dateToSet.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) // Format for datetime-local
+                bookingDate: format(dateToSet, "yyyy-MM-dd'T'HH:mm") // Format for datetime-local
             });
             setSelectedPackage(booking.package);
         }

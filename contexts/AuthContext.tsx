@@ -1,130 +1,189 @@
-
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User } from '../types';
-import { auth, db } from '../firebase'; // Import dari file firebase.ts
-// FIX: Switched to Firebase v8 compatibility syntax to resolve module export errors.
-// FIX: Use 'compat' imports for Firebase v9 compatibility mode.
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/auth';
-import 'firebase/compat/firestore';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { auth, db, GoogleAuthProvider } from '../firebase';
+import { 
+    onAuthStateChanged, 
+    signOut, 
+    signInWithEmailAndPassword, 
+    signInWithPopup,
+    User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, query, collection, where, getDocs, limit } from 'firebase/firestore';
+import { User, UserRole } from '../types';
 
 interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  error: string | null;
-  login: (username: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  logout: () => void;
-  clearError: () => void;
+    user: User | null;
+    isLoading: boolean;
+    error: string | null;
+    login: (emailOrUsername: string, password: string, role?: UserRole | string | null) => Promise<void>;
+    loginWithGoogle: (allowedRoles?: UserRole[]) => Promise<void>;
+    logout: () => Promise<void>;
+    clearError: () => void;
+    setError: (error: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
-  
-  const clearError = () => setError(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser: firebase.User | null) => {
-      try {
-        if (firebaseUser) {
-            let userDocSnap = await db.collection("users").doc(firebaseUser.uid).get();
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            setIsLoading(true);
+            
+            if (firebaseUser) {
+                try {
+                    const userDocRef = doc(db, 'users', firebaseUser.uid);
+                    const userDoc = await getDoc(userDocRef);
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        
+                        const mappedUserData: any = {};
+                        for (const key in userData) {
+                            const value = (userData as any)[key];
+                            if (value && typeof value.toDate === 'function') {
+                                mappedUserData[key] = value.toDate();
+                            } else {
+                                mappedUserData[key] = value;
+                            }
+                        }
 
-            if (!userDocSnap.exists && firebaseUser.email) {
-                console.log(`User not found by UID (${firebaseUser.uid}), attempting lookup by email: ${firebaseUser.email}`);
-                const usersQuery = await db.collection("users").where('email', '==', firebaseUser.email).limit(1).get();
-                if (!usersQuery.empty) {
-                    userDocSnap = usersQuery.docs[0];
+                        const appUser: User = {
+                            id: firebaseUser.uid,
+                            email: firebaseUser.email!,
+                            photoURL: firebaseUser.photoURL || undefined,
+                            ...mappedUserData,
+                        } as User;
+                        setUser(appUser);
+                        setError(null);
+                    } else {
+                        await signOut(auth);
+                        setUser(null);
+                        setError('Akun Anda tidak ditemukan di database kami.');
+                    }
+                } catch (e: any) {
+                    await signOut(auth);
+                    setUser(null);
+                    setError('Gagal memuat data pengguna.');
+                }
+            } else {
+                setUser(null);
+            }
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const login = async (emailOrUsername: string, password: string, role?: UserRole | string | null) => {
+        setError(null);
+        setIsLoading(true);
+        try {
+            let email = emailOrUsername.trim();
+            if (!email.includes('@')) {
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, where('username', '==', email.toLowerCase()), limit(1));
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    throw { code: 'auth/user-not-found' };
+                }
+                email = snapshot.docs[0].data().email;
+            }
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const firebaseUser = userCredential.user;
+            if (firebaseUser && role) {
+                const userDocRef = doc(db, 'users', firebaseUser.uid);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    const userData = userDoc.data() as Omit<User, 'id'>;
+                    if (userData.role !== role) {
+                        await signOut(auth);
+                        throw new Error(`Akun ini terdaftar sebagai ${userData.role}, bukan ${role}.`);
+                    }
                 }
             }
-            
-            if (userDocSnap.exists) {
-              const userData = { id: userDocSnap.id, ...userDocSnap.data() } as User;
-              setUser(userData);
-              localStorage.setItem('studio8-user', JSON.stringify(userData));
-              setError(null);
-            } else {
-              console.warn("User authenticated but not found in Firestore by UID or email. Preventing login. Email:", firebaseUser.email);
-              setError("Akun Google Anda berhasil diautentikasi, namun profil tidak ditemukan di sistem kami. Mohon pastikan admin telah mendaftarkan email Anda.");
-              setUser(null);
-              localStorage.removeItem('studio8-user');
+        } catch (err: any) {
+            let errorMessage = err.message || 'Terjadi kesalahan saat mencoba masuk.';
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+                errorMessage = 'Username atau password salah.';
             }
-        } else {
-          setUser(null);
-          localStorage.removeItem('studio8-user');
-          setError(null); // Clear error on successful sign out
+            setError(errorMessage);
+            setIsLoading(false);
         }
-      } catch (dbError: any) {
-          console.error("Error fetching user profile from Firestore:", dbError);
-          setError("Gagal memverifikasi profil pengguna dari database. Coba lagi nanti.");
-          setUser(null);
-          localStorage.removeItem('studio8-user');
-      } finally {
-          setIsLoading(false);
-      }
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    const loginWithGoogle = async (allowedRoles?: UserRole[]) => {
+        setError(null);
+        setIsLoading(true);
+        const provider = new GoogleAuthProvider();
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const firebaseUser = result.user;
+            if (!firebaseUser) {
+                throw new Error("Gagal mendapatkan informasi user dari Google.");
+            }
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (!userDoc.exists()) {
+                await signOut(auth);
+                throw { code: 'auth/user-not-found', message: 'Akun Google Anda tidak terdaftar. Silakan hubungi admin.' };
+            }
 
-  const login = async (username: string, password: string): Promise<void> => {
-    setError(null);
-    const usersRef = db.collection('users');
-    const querySnapshot = await usersRef.where('username', '==', username.toLowerCase()).limit(1).get();
-
-    if (querySnapshot.empty) {
-      const error = new Error("User not found with this username.");
-      (error as any).code = 'auth/user-not-found';
-      throw error;
-    }
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-    const email = userData.email;
-
-    if (!email) {
-      console.error(`User document for username '${username}' is missing an email field.`);
-      const error = new Error("Configuration error for user account.");
-      (error as any).code = 'auth/internal-error';
-      throw error;
-    }
+            if (allowedRoles && allowedRoles.length > 0) {
+                 const userData = userDoc.data() as Omit<User, 'id'>;
+                 if (!allowedRoles.includes(userData.role)) {
+                    await signOut(auth);
+                    throw new Error(`Akun ini terdaftar sebagai ${userData.role}. Hanya peran ${allowedRoles.join(' atau ')} yang diizinkan.`);
+                 }
+            }
+        } catch (err: any) {
+            let errorMessage = err.message || 'Gagal masuk dengan Google.';
+            if (err.code === 'auth/popup-closed-by-user') {
+                errorMessage = 'Jendela login Google ditutup. Silakan coba lagi.';
+            }
+            setError(errorMessage);
+            setIsLoading(false);
+        }
+    };
     
-    await auth.signInWithEmailAndPassword(email, password);
-  };
+    const logout = async () => {
+        try {
+            await signOut(auth);
+            setUser(null);
+            setError(null);
+        } catch (err: any) {
+            setError('Gagal untuk logout.');
+        }
+    };
 
-  const loginWithGoogle = async (): Promise<void> => {
-    setError(null);
-    const provider = new firebase.auth.GoogleAuthProvider();
-    try {
-      await auth.signInWithPopup(provider);
-    } catch (error) {
-      console.error("Google Sign-In Error:", error);
-      throw error;
-    }
-  };
+    const clearError = useCallback(() => {
+        setError(null);
+    }, []);
 
-  const logout = async () => {
-    await auth.signOut();
-    setError(null);
-    navigate('/auth');
-  };
+    const value = {
+        user,
+        isLoading,
+        error,
+        login,
+        loginWithGoogle,
+        logout,
+        clearError,
+        setError,
+    };
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading, error, login, loginWithGoogle, logout, clearError }}>
-      {children}
-    </AuthContext.Provider>
-  );
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
 };

@@ -4,7 +4,8 @@ import { getUsers, getWeeklyEvaluationsForStudent, addWeeklyEvaluation } from '.
 import { User, UserRole, WeeklyEvaluation } from '../../types';
 import { Loader2, Star, User as UserIcon, Send, X } from 'lucide-react';
 import Modal from '../../components/common/Modal';
-import { getWeek, format } from 'date-fns';
+import getWeek from 'date-fns/getWeek';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 
 const EvaluationModal: React.FC<{

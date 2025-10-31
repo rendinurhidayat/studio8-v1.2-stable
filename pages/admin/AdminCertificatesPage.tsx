@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getCertificates, getUsers, deleteCertificate } from '../../services/api';
@@ -5,7 +7,7 @@ import { Certificate, User, UserRole } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { Award, PlusCircle, Download, QrCode, Loader2, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 import { fileToBase64 } from '../../utils/fileUtils';
 
@@ -67,7 +69,7 @@ const AdminCertificatesPage = () => {
         try {
             const pdfBase64 = await fileToBase64(pdfFile);
 
-            const response = await fetch('/api/generateCertificate', {
+            const response = await fetch('/api/certificates', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

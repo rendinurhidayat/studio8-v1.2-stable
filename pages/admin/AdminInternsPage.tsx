@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getUsers, getAttendanceForUser, getDailyReportsForUser, getTasksForUser } from '../../services/api';
 import { User, UserRole, Attendance, DailyReport, Task, AttendanceStatus } from '../../types';
-import { format, differenceInDays } from 'date-fns';
+import format from 'date-fns/format';
+import differenceInDays from 'date-fns/differenceInDays';
 import id from 'date-fns/locale/id';
 import Modal from '../../components/common/Modal';
 import { Loader2, Calendar, ClipboardList, CheckSquare, FileText, CalendarCheck, ClipboardCheck } from 'lucide-react';

@@ -5,7 +5,7 @@ import { Quiz, QuizCategory, QuizQuestion } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { PlusCircle, Edit, Trash2, Loader2, BookOpenCheck, Send, X, Plus, Sparkles, Image as ImageIcon, Check } from 'lucide-react';
-import { format } from 'date-fns';
+import format from 'date-fns/format';
 import id from 'date-fns/locale/id';
 
 const fileToBase64 = (file: File): Promise<string> => {

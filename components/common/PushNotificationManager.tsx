@@ -20,102 +20,81 @@ const PushNotificationManager: React.FC = () => {
     const { user } = useAuth();
     const [showPermissionBanner, setShowPermissionBanner] = useState(false);
     const [isSubscribed, setIsSubscribed] = useState(false);
-    
+
+    const VAPID_PUBLIC_KEY = window.appConfig?.vapidPublicKey;
+
     useEffect(() => {
-        if (!user || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        if ('Notification' in window && 'serviceWorker' in navigator && Notification.permission === 'default') {
+            setShowPermissionBanner(true);
+        }
+        
+        navigator.serviceWorker.ready.then(registration => {
+            registration.pushManager.getSubscription().then(subscription => {
+                if (subscription) {
+                    setIsSubscribed(true);
+                }
+            });
+        });
+
+    }, []);
+
+    const subscribeUser = async () => {
+        if (!VAPID_PUBLIC_KEY) {
+            console.error('VAPID public key is not defined in window.appConfig.');
             return;
         }
 
-        const checkSubscription = async () => {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
-            
-            if (subscription) {
-                setIsSubscribed(true);
-            } else {
-                // FIX: Notification.permission can be 'default', 'granted', or 'denied'. The 'prompt' state is represented by 'default'.
-                if (Notification.permission === 'default') {
-                    setShowPermissionBanner(true);
-                }
-            }
-        };
-        
-        // Service worker is now registered in App.tsx, we just wait for it to be ready
-        checkSubscription().catch(error => {
-            console.error('Error checking push subscription status:', error);
-        });
-
-    }, [user]);
-
-    const subscribeUser = async () => {
-        if (!user) return;
-        
         try {
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') {
-                console.log('Permission for notifications was denied.');
-                setShowPermissionBanner(false);
-                return;
-            }
-
             const registration = await navigator.serviceWorker.ready;
-            // FIX: Cast `import.meta` to `unknown` first to handle TypeScript error where `env` is not a known property on `ImportMeta`. This is a common workaround for Vite env variables.
-            const vapidPublicKey = (import.meta as unknown as { env: Record<string, string> }).env.VITE_VAPID_PUBLIC_KEY;
-
-            if (!vapidPublicKey) {
-                console.error("VITE_VAPID_PUBLIC_KEY is not set in environment variables.");
-                return;
-            }
-
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
             });
-
-            // Send subscription to the server
-            await fetch('/api/saveSubscription', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ subscription, userId: user.id, role: user.role }),
-            });
+            
+            // Send subscription to backend
+            if (user) {
+                await fetch('/api/subscriptions', {
+                    method: 'POST',
+                    body: JSON.stringify({ subscription, userId: user.id, role: user.role }),
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            }
 
             setIsSubscribed(true);
             setShowPermissionBanner(false);
-            console.log('User is subscribed.');
-
         } catch (error) {
             console.error('Failed to subscribe the user: ', error);
         }
     };
-
-    if (!showPermissionBanner || isSubscribed) {
+    
+    const handleRequestPermission = () => {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                subscribeUser();
+            } else {
+                // User denied permission, hide the banner
+                setShowPermissionBanner(false);
+            }
+        });
+    };
+    
+    // We only want to show the banner to logged-in Admins and Staff
+    if (!user || (user.role !== 'Admin' && user.role !== 'Staff') || !showPermissionBanner) {
         return null;
     }
 
     return (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-full max-w-md p-4 bg-primary text-primary-content rounded-xl shadow-2xl z-50 animate-fade-in-up">
-            <div className="flex items-start">
-                <div className="flex-shrink-0 pt-0.5">
-                    <Bell size={20} />
-                </div>
-                <div className="ml-3 w-0 flex-1">
-                    <p className="text-sm font-semibold">Aktifkan Notifikasi</p>
-                    <p className="mt-1 text-sm">Dapatkan pemberitahuan instan saat ada booking baru masuk.</p>
-                </div>
-                <div className="ml-4 flex flex-shrink-0">
-                     <button
-                        onClick={subscribeUser}
-                        className="text-sm font-bold bg-accent text-accent-content px-3 py-1.5 rounded-lg hover:bg-accent/90"
-                    >
-                        Aktifkan
-                    </button>
-                    <button
-                        onClick={() => setShowPermissionBanner(false)}
-                        className="ml-2 p-1.5 rounded-full hover:bg-white/10"
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
+        <div className="fixed bottom-4 left-4 z-50 bg-white shadow-lg rounded-lg p-4 flex items-center gap-4 max-w-sm">
+            <div className="p-2 bg-blue-100 rounded-full">
+                <Bell className="text-blue-600" />
+            </div>
+            <div>
+                <p className="font-semibold">Aktifkan notifikasi</p>
+                <p className="text-sm text-gray-600">Dapatkan pemberitahuan untuk booking baru & aktivitas penting.</p>
+            </div>
+            <div className="flex flex-col gap-2">
+                 <button onClick={handleRequestPermission} className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md">Aktifkan</button>
+                 <button onClick={() => setShowPermissionBanner(false)} className="px-3 py-1 text-sm text-gray-500">Nanti Saja</button>
             </div>
         </div>
     );

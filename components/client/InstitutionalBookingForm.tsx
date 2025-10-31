@@ -1,4 +1,4 @@
-// FIX: Added import for React and useState to resolve multiple 'cannot find name' errors.
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Briefcase, User, Phone, Users, Calendar, MessageSquare, UploadCloud, CheckCircle, Loader2, AlertTriangle, Send, Tag } from 'lucide-react';
@@ -38,12 +38,12 @@ const InstitutionalBookingForm = () => {
         setIsSubmitting(true);
 
         try {
-            const payload: any = { ...formData };
+            const payload: any = { action: 'createPublicInstitutional', ...formData };
             if (requestLetterFile) {
                 payload.requestLetterBase64 = await fileToBase64(requestLetterFile);
             }
             
-            const response = await fetch('/api/publicCreateInstitutionalBooking', {
+            const response = await fetch('/api/bookings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

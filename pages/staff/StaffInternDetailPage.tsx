@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUsers, getAttendanceForUser, getDailyReportsForUser, getTasksForUser, getMentorFeedbackForIntern, addMentorFeedback, generateAiFeedbackForReport } from '../../services/api';
 import { User, Attendance, DailyReport, Task, MentorFeedback, UserRole, AttendanceStatus } from '../../types';
-import { format, differenceInDays } from 'date-fns';
+import format from 'date-fns/format';
+import differenceInDays from 'date-fns/differenceInDays';
 import id from 'date-fns/locale/id';
 import { Loader2, Calendar, ClipboardList, CheckSquare, MessageSquare, ArrowLeft, Star, Send, Sparkles } from 'lucide-react';
 import Modal from '../../components/common/Modal';
@@ -124,7 +125,6 @@ const StaffInternDetailPage = () => {
         if (!report.content) return;
         setGeneratingFeedbackId(report.id);
         try {
-            // FIX: Refactored to use the imported service function for consistency.
             const updatedReport = await generateAiFeedbackForReport(report.id, report.content);
             setReports(prevReports => 
                 prevReports.map(r => r.id === updatedReport.id ? updatedReport : r)
@@ -147,12 +147,12 @@ const StaffInternDetailPage = () => {
     const renderTabContent = () => {
         switch(activeTab) {
             case 'attendance':
-                return <ul className="space-y-2 mt-2">{attendance.map(att => <li key={att.id} className="text-sm p-3 bg-base-100 rounded-lg flex justify-between"><span>{format(att.checkInTime, 'eeee, d MMMM yyyy', {locale: (id as any).default ?? id})}</span><span className="font-semibold">{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span></li>)}</ul>;
+                return <ul className="space-y-2 mt-2">{attendance.map(att => <li key={att.id} className="text-sm p-3 bg-base-100 rounded-lg flex justify-between"><span>{format(att.checkInTime, 'eeee, d MMMM yyyy', {locale: id})}</span><span className="font-semibold">{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span></li>)}</ul>;
             case 'reports':
                 return <ul className="space-y-3 mt-2">{reports.map(rep => (
                     <li key={rep.id} className="p-4 bg-base-100 rounded-lg">
                         <div className="flex justify-between items-center">
-                            <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', {locale: (id as any).default ?? id})}</p>
+                            <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', {locale: id})}</p>
                             <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{rep.mood}</span>
                         </div>
                         <p className="text-sm text-gray-700 mt-2">{rep.content}</p>
@@ -190,7 +190,7 @@ const StaffInternDetailPage = () => {
                             <div key={fb.id} className="p-3 bg-base-100 rounded-lg">
                                 <div className="flex justify-between items-center">
                                     <StarRating value={fb.rating} isEditable={false} size={16}/>
-                                    <span className="text-xs text-muted">{format(fb.date, 'd MMM yyyy', {locale: (id as any).default ?? id})}</span>
+                                    <span className="text-xs text-muted">{format(fb.date, 'd MMM yyyy', {locale: id})}</span>
                                 </div>
                                 <p className="text-sm italic my-1">"{fb.feedback}"</p>
                                 <p className="text-xs text-muted">Tugas: "{fb.taskTitle}"</p>
