@@ -1,6 +1,7 @@
 
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { initializeFirebaseAdmin, initializeCloudinary, sendPushNotification } from './_lib/services';
@@ -140,7 +141,7 @@ async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
             userId: currentUserId,
             userName: currentUserDoc.data()?.name || 'Unknown User',
             action: `Menyelesaikan sesi ${updatedBookingData.bookingCode}`,
-            details: `Pelunasan Rp ${(updatedBookingData.totalPrice - (updatedBookingData.totalPrice - updatedBookingData.remainingBalance)).toLocaleString('id-ID')} dicatat.`
+            details: `Pelunasan Rp ${(updatedBookingData.remainingBalance > 0 ? updatedBookingData.remainingBalance : 0).toLocaleString('id-ID')} dicatat.`
         });
         
         if (updatedBookingData) {
@@ -354,7 +355,7 @@ async function handleCreatePublicInstitutional(req: VercelRequest, res: VercelRe
 
     if (bookingData.requestLetterBase64) {
         publicId = `req_${newBookingCode}`;
-        const uploadResult = await cloudinary.uploader.upload(bookingData.requestLetterBase64, {
+        const uploadResult = await cloudinary.uploader.upload(`data:application/octet-stream;base64,${bookingData.requestLetterBase64}`, {
             folder: "studio8_requests", public_id: publicId, resource_type: "auto"
         });
         requestLetterUrl = uploadResult.secure_url;

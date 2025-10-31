@@ -1,5 +1,6 @@
 
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { initializeFirebaseAdmin } from './_lib/services';
@@ -112,6 +113,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             } catch (cleanupError) {
                  return res.status(500).json({ message: 'User not found in Auth, and also failed to clean up Firestore.', error: (cleanupError as Error).message });
             }
+        }
+        if (error.code === 'auth/email-already-exists') {
+            errorMessage = 'Email ini sudah digunakan oleh akun lain.';
         }
         
         return res.status(500).json({
