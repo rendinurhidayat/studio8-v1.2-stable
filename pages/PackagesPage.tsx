@@ -140,7 +140,6 @@ const PackageModal: React.FC<{ pkg: PackageWithDetails | null; addOns: AddOn[]; 
     const allSubAddOns = addOns.flatMap(a => a.subAddOns);
     const selectedAddOns = allSubAddOns.filter(sa => selectedAddOnIds.includes(sa.id));
 
-    // FIX: Add missing properties to CartItem object
     const cartItem: CartItem = {
       id: `${subPkg.id}-${Date.now()}`,
       pkg,
@@ -284,7 +283,7 @@ const CartSummary: React.FC = () => {
                         <span className="font-semibold text-base-content">Total</span>
                         <span className="font-poppins font-bold text-xl text-accent">Rp {total.toLocaleString('id-ID')}</span>
                     </div>
-                    <button onClick={() => navigate('/pesan-sesi')} className="w-full bg-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-primary/90 transition-colors shadow-lg">
+                    <button onClick={() => navigate('/pesan-sesi?fromCart=true')} className="w-full bg-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-primary/90 transition-colors shadow-lg">
                         Lanjut ke Pemesanan
                     </button>
                 </div>
