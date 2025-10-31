@@ -1,3 +1,7 @@
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -634,7 +638,11 @@ const ServicesSettingsTab = () => {
                                             <div className="absolute bottom-1 right-1 bg-black/50 text-white rounded-full p-0.5">
                                                 {upload.status === 'uploading' && <Loader2 size={12} className="animate-spin" />}
                                                 {upload.status === 'success' && <CheckCircle size={12} className="text-green-400" />}
-                                                {upload.status === 'error' && <span title={upload.error}><AlertCircle size={12} className="text-red-400"/></span>}
+                                                {upload.status === 'error' && (
+                                                    <span title={upload.error}>
+                                                        <AlertCircle size={12} className="text-red-400" />
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

@@ -121,13 +121,10 @@ export interface AddOn {
 }
 
 export interface CartItem {
-  id: string;
+  id: string; // Unique ID for the cart item, e.g., `${subPackage.id}-${timestamp}`
   pkg: Package;
   subPkg: SubPackage;
   addOns: SubAddOn[];
-  packageId: string;    // Add this
-  subPackageId: string; // Add this
-  subAddOnIds: string[]; // Add this
 }
 
 export interface Booking {
