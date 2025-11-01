@@ -4,7 +4,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
 import type { ActivityLog } from '../types';
 // Fix: Removed .ts extension for proper module resolution.
-import { initializeFirebaseAdmin } from './_lib/services';
+import { initializeFirebaseAdmin } from './lib/services';
 
 // --- Main Handler ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {

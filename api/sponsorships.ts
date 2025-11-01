@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 // Fix: Removed .ts extension for proper module resolution.
-import { initializeFirebaseAdmin, initializeCloudinary, sendPushNotification } from './_lib/services';
+import { initializeFirebaseAdmin, initializeCloudinary, sendPushNotification } from './lib/services';
 
 export const config = {
     api: {

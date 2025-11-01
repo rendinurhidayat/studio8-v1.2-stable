@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Modal from '../common/Modal';
 import { Crop, ZoomIn, ZoomOut, Move, Check, RotateCcw } from 'lucide-react';
@@ -177,7 +176,7 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
           />
           <ZoomIn size={20} className="text-muted" />
         </div>
-        <button onClick={resetAdjustments} className="p-2 text-muted hover:bg-base-200 rounded-full" title="Reset">
+        <button onClick={resetAdjustments} className="p-2 text-muted hover:bg-base-200 rounded-full" aria-label="Reset">
             <RotateCcw size={18} />
         </button>
       </div>
