@@ -31,6 +31,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@types/node": "^20.12.12",
     "@types/pdfkit": "^0.13.4",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.0",
