@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,7 +10,7 @@ import {
     getInventoryItems, addInventoryItem, updateInventoryItem, deleteInventoryItem,
     generatePackageDescription
 } from '../../services/api';
-import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, FeatureToggles, Promo, OperationalHours, PaymentMethods, InventoryItem, InventoryStatus, LoyaltyTier, Partner } from '../../types';
+import { Package, AddOn, SubPackage, SubAddOn, SystemSettings, FeatureToggles, Promo, OperationalHours, PaymentMethods, InventoryItem, InventoryStatus, LoyaltyTier, Partner, ImageUpload } from '../../types';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { PlusCircle, Edit, Trash2, Box, Puzzle, Plus, Settings, SlidersHorizontal, Tag, CreditCard, Users, Shield, Save, ToggleLeft, ToggleRight, Percent, Calendar, Key, ArrowRight, Archive, MessageCircle, Instagram as InstagramIcon, Award, UploadCloud, Loader2, CheckCircle, AlertCircle, Sparkles, Handshake, ImageIcon } from 'lucide-react';
@@ -31,15 +28,6 @@ interface ModalState {
     type: ItemType;
     itemData?: any;
     parentId?: string;
-}
-
-// FIX: Define the 'ImageUpload' interface to resolve type errors.
-interface ImageUpload {
-    id: string;
-    file: File;
-    preview: string;
-    status: 'pending' | 'uploading' | 'success' | 'error';
-    error?: string;
 }
 
 const ToggleSwitch: React.FC<{ enabled: boolean; onChange: () => void }> = ({ enabled, onChange }) => (
@@ -638,7 +626,7 @@ const ServicesSettingsTab = () => {
                                             <div className="absolute bottom-1 right-1 bg-black/50 text-white rounded-full p-0.5">
                                                 {upload.status === 'uploading' && <Loader2 size={12} className="animate-spin" />}
                                                 {upload.status === 'success' && <CheckCircle size={12} className="text-green-400" />}
-                                                {upload.status === 'error' && <AlertCircle size={12} className="text-red-400" title={upload.error}/>}
+                                                {upload.status === 'error' && <span title={upload.error}><AlertCircle size={12} className="text-red-400" /></span>}
                                             </div>
                                         </div>
                                     ))}
@@ -722,10 +710,13 @@ const PaymentSettingsTab = () => {
         });
     };
     
-    const handleBankAccountChange = (index: number, field: keyof (typeof settings.paymentMethods.bankAccounts)[0], value: string) => {
+    const handleBankAccountChange = (index: number, field: 'bankName' | 'accountNumber' | 'accountHolder', value: string) => {
         if (!settings) return;
         const newAccounts = [...(settings.paymentMethods.bankAccounts || [])];
-        (newAccounts[index] as any)[field] = value;
+        const accountToUpdate = newAccounts[index];
+        if (accountToUpdate) {
+            accountToUpdate[field] = value;
+        }
         setSettings({
             ...settings,
             paymentMethods: { ...settings.paymentMethods, bankAccounts: newAccounts }
