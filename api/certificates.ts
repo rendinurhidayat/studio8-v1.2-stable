@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
+// Fix: Removed .ts extension for proper module resolution.
 import { initializeFirebaseAdmin, initializeCloudinary } from './_lib/services';
 
 export const config = {

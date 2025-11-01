@@ -1,6 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
+// Fix: Removed .ts extension for proper module resolution.
 import { initializeFirebaseAdmin } from './_lib/services';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

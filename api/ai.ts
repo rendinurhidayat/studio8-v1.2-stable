@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type } from '@google/genai';
 import admin from 'firebase-admin';
 import type { ActivityLog } from '../types';
+// Fix: Removed .ts extension for proper module resolution.
 import { initializeFirebaseAdmin } from './_lib/services';
 
 // --- Main Handler ---
