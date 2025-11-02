@@ -11,9 +11,9 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-// FIX: The errors reported suggest this component was not being interpreted as a proper React Class Component.
-// An Error Boundary must be a class component with `getDerivedStateFromError` or `componentDidCatch`.
-// This implementation ensures it extends `React.Component` correctly, giving it access to `this.props`, `this.state`, and lifecycle methods.
+// FIX: An Error Boundary must be a class component that extends React.Component and implements either getDerivedStateFromError or componentDidCatch.
+// The previous implementation was likely a functional component or a plain class, causing the reported errors.
+// This corrected implementation ensures it functions as a proper React Error Boundary.
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -25,10 +25,12 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
+    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // You can also log the error to an error reporting service
     this.setState({ errorInfo });
     console.error("Uncaught error:", error, errorInfo);
   }

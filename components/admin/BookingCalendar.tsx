@@ -62,12 +62,16 @@ const eventStyleGetter = (event: CalendarEvent) => {
 
 const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, onSelectBooking }) => {
     const events = useMemo((): CalendarEvent[] => {
-        return bookings.map(booking => ({
-            title: `${booking.clientName} - ${booking.package.name}`,
-            start: booking.bookingDate,
-            end: new Date(booking.bookingDate.getTime() + 60 * 60 * 1000), // Assume 1 hour duration
-            resource: booking,
-        }));
+        return bookings.map(booking => {
+            const startDate = new Date(booking.bookingDate);
+            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Assume 1 hour duration
+            return {
+                title: `${booking.clientName} - ${booking.package.name}`,
+                start: startDate,
+                end: endDate,
+                resource: booking,
+            };
+        });
     }, [bookings]);
 
     const handleSelectEvent = (event: CalendarEvent) => {
