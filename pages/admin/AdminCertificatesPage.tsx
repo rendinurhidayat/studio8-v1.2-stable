@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getCertificates, getUsers, deleteCertificate } from '../../services/api';
@@ -125,4 +123,67 @@ const AdminCertificatesPage = () => {
                                 <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold">Nama Siswa</th>
                                 <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold">Periode</th>
                                 <th className="px-5 py-3 border-b-2 text-left text-xs font-semibold">Tanggal Terbit</th>
-                                <th className="px-5 py-3 border-b
+                                <th className="px-5 py-3 border-b-2 text-center text-xs font-semibold uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {certificates.map(cert => (
+                                <tr key={cert.id} className="hover:bg-gray-50">
+                                    <td className="px-5 py-4 border-b text-sm font-mono text-accent">{cert.id}</td>
+                                    <td className="px-5 py-4 border-b text-sm">{cert.studentName}</td>
+                                    <td className="px-5 py-4 border-b text-sm">{cert.period}</td>
+                                    <td className="px-5 py-4 border-b text-sm">{format(new Date(cert.issuedDate), 'd MMMM yyyy', { locale: id })}</td>
+                                    <td className="px-5 py-4 border-b text-sm text-center">
+                                        <a href={cert.certificateUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-muted hover:text-success" title="Download PDF"><Download size={16}/></a>
+                                        <a href={cert.qrValidationUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-muted hover:text-accent" title="Test Link Validasi"><QrCode size={16}/></a>
+                                        <button onClick={() => setCertToDelete(cert)} className="p-2 text-muted hover:text-error" title="Hapus"><Trash2 size={16}/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Buat Sertifikat Baru">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {error && <p className="text-sm text-red-500 bg-red-50 p-3 rounded-md">{error}</p>}
+                    <div>
+                        <label className="block text-sm font-medium">Pilih Intern</label>
+                        <select value={formData.studentId} onChange={e => setFormData({...formData, studentId: e.target.value})} required className="mt-1 w-full p-2 border rounded">
+                            <option value="">-- Pilih Nama Siswa --</option>
+                            {interns.map(i => <option key={i.id} value={i.id}>{i.name} ({i.jurusan})</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium">Periode</label>
+                        <input type="text" value={formData.period} onChange={e => setFormData({...formData, period: e.target.value})} required className="mt-1 w-full p-2 border rounded" placeholder="Contoh: 2 Feb 2026 - 30 Mei 2026"/>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium">Nama Mentor</label>
+                        <input type="text" value={formData.mentor} onChange={e => setFormData({...formData, mentor: e.target.value})} required className="mt-1 w-full p-2 border rounded"/>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium">Upload PDF Sertifikat</label>
+                        <input type="file" accept=".pdf" onChange={e => setPdfFile(e.target.files ? e.target.files[0] : null)} required className="mt-1 w-full text-sm"/>
+                    </div>
+                    <div className="flex justify-end pt-4">
+                        <button type="submit" disabled={loading.modal} className="flex items-center justify-center w-32 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50">
+                            {loading.modal ? <Loader2 className="animate-spin" /> : 'Generate & Simpan'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            <ConfirmationModal 
+                isOpen={!!certToDelete}
+                onClose={() => setCertToDelete(null)}
+                onConfirm={handleDeleteConfirm}
+                title="Hapus Sertifikat"
+                message={`Anda yakin ingin menghapus sertifikat untuk ${certToDelete?.studentName}? File PDF juga akan dihapus permanen.`}
+            />
+        </div>
+    );
+};
+
+export default AdminCertificatesPage;

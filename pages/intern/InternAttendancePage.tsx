@@ -118,7 +118,7 @@ const InternAttendancePage = () => {
                                     Check In Sekarang
                                 </>
                             )}
-                        </button>
+                        </motion.button>
                     </div>
                 )}
             </motion.div>
