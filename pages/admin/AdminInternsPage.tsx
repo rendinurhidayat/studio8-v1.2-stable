@@ -1,8 +1,8 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { getUsers, getAttendanceForUser, getDailyReportsForUser, getTasksForUser } from '../../services/api';
 import { User, UserRole, Attendance, DailyReport, Task, AttendanceStatus } from '../../types';
-import format from 'date-fns/format';
-import differenceInDays from 'date-fns/differenceInDays';
+import { format, differenceInDays } from 'date-fns';
 import id from 'date-fns/locale/id';
 import Modal from '../../components/common/Modal';
 import { Loader2, Calendar, ClipboardList, CheckSquare, FileText, CalendarCheck, ClipboardCheck } from 'lucide-react';
@@ -40,7 +40,7 @@ const InternDetailModal: React.FC<{
     const attendanceRate = useMemo(() => {
         if (!intern?.startDate) return 0;
         const today = new Date();
-        const start = intern.startDate;
+        const start = new Date(intern.startDate);
         let workingDays = 0;
         for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
             const dayOfWeek = d.getDay();
@@ -60,8 +60,8 @@ const InternDetailModal: React.FC<{
     
     if (!intern) return null;
 
-    const totalDays = intern.startDate && intern.endDate ? differenceInDays(intern.endDate, intern.startDate) + 1 : 0;
-    const daysPassed = intern.startDate ? differenceInDays(new Date(), intern.startDate) + 1 : 0;
+    const totalDays = intern.startDate && intern.endDate ? differenceInDays(new Date(intern.endDate), new Date(intern.startDate)) + 1 : 0;
+    const daysPassed = intern.startDate ? differenceInDays(new Date(), new Date(intern.startDate)) + 1 : 0;
     const progress = totalDays > 0 ? Math.min(Math.round((daysPassed / totalDays) * 100), 100) : 0;
 
 
@@ -92,8 +92,8 @@ const InternDetailModal: React.FC<{
                         <ul className="space-y-2 mt-2">
                             {attendance.map(att => (
                                 <li key={att.id} className="text-sm p-2 bg-gray-50 rounded flex justify-between">
-                                    <span>{format(att.checkInTime, 'd MMMM yyyy', { locale: id })}</span>
-                                    <span>{format(att.checkInTime, 'HH:mm')} - {att.checkOutTime ? format(att.checkOutTime, 'HH:mm') : '...'}</span>
+                                    <span>{format(new Date(att.checkInTime), 'd MMMM yyyy', { locale: id })}</span>
+                                    <span>{format(new Date(att.checkInTime), 'HH:mm')} - {att.checkOutTime ? format(new Date(att.checkOutTime), 'HH:mm') : '...'}</span>
                                 </li>
                             ))}
                         </ul>
@@ -104,7 +104,7 @@ const InternDetailModal: React.FC<{
                             {reports.map(rep => (
                                 <li key={rep.id} className="text-sm p-2 bg-gray-50 rounded">
                                     <div className="flex justify-between items-center">
-                                        <p className="font-semibold">{format(rep.submittedAt, 'd MMMM yyyy', { locale: id })}</p>
+                                        <p className="font-semibold">{format(new Date(rep.submittedAt), 'd MMMM yyyy', { locale: id })}</p>
                                         <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{rep.mood}</span>
                                     </div>
                                     <p className="text-gray-700 mt-1">{rep.content}</p>
@@ -201,7 +201,7 @@ const InternProfileCard: React.FC<{ intern: User; onSelect: (intern: User) => vo
         fetchInternData();
     }, [intern]);
 
-    const calculateProgress = (startDate?: Date, endDate?: Date) => {
+    const calculateProgress = (startDate?: string, endDate?: string) => {
         if (!startDate || !endDate) return 0;
         const totalDuration = differenceInDays(new Date(endDate), new Date(startDate));
         const daysPassed = differenceInDays(new Date(), new Date(startDate));

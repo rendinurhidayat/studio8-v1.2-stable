@@ -144,9 +144,9 @@ const StaffBookingsPage = () => {
                             {bookings.map((booking) => (
                                 <tr key={booking.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
-                                        {booking.bookingDate.toLocaleDateString('id-ID', {day: '2-digit', month:'short', year:'numeric', timeZone: 'Asia/Jakarta'})}
+                                        {new Date(booking.bookingDate).toLocaleDateString('id-ID', {day: '2-digit', month:'short', year:'numeric', timeZone: 'Asia/Jakarta'})}
                                         <span className="text-slate-500 block text-xs">
-                                            {booking.bookingDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}
+                                            {new Date(booking.bookingDate).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{booking.clientName}</td>

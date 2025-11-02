@@ -1,9 +1,2 @@
-import React from 'react';
-import AdminCertificatesPage from '../admin/AdminCertificatesPage';
-
-const StaffCertificatesPage = () => {
-  // Staff can reuse the same component as Admin for certificate management
-  return <AdminCertificatesPage />;
-};
-
-export default StaffCertificatesPage;
+// FIX: Re-exporting the default component from AdminCertificatesPage to resolve the module resolution error.
+export { default } from '../admin/AdminCertificatesPage';

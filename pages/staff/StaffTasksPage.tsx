@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { getDailyTasks, updateDailyTaskStatus, getTasksForUser, updateTask } from '../../services/api';
 import { Task } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import format from 'date-fns/format';
+import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 
 interface DailyTaskItem {
@@ -105,7 +106,7 @@ const StaffTasksPage = () => {
                                         <p className={`font-medium ${task.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{task.text}</p>
                                         <div className="text-xs text-gray-400 mt-1 space-x-2">
                                             <span>Dari: {task.creatorName}</span>
-                                            {task.dueDate && <span>Tenggat: {format(task.dueDate, 'd MMM yyyy', { locale: id })}</span>}
+                                            {task.dueDate && <span>Tenggat: {format(new Date(task.dueDate), 'd MMM yyyy', { locale: id })}</span>}
                                         </div>
                                      </div>
                                 </div>

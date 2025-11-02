@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { getClients } from '../../services/api';
 import { Client } from '../../types';
@@ -75,7 +76,7 @@ const StaffClientsPage = () => {
                     <p className="text-slate-600 whitespace-no-wrap text-xs">{client.phone}</p>
                 </td>
                 <td className="px-5 py-5 border-b border-slate-200 text-sm text-center font-semibold text-slate-700">{client.totalBookings}</td>
-                <td className="px-5 py-5 border-b border-slate-200 text-sm text-slate-600">{client.lastBooking.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' })}</td>
+                <td className="px-5 py-5 border-b border-slate-200 text-sm text-slate-600">{new Date(client.lastBooking).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' })}</td>
               </tr>
             ))}
           </tbody>

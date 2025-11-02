@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import Modal from '../common/Modal';
 import { Booking } from '../../types';
@@ -96,7 +97,7 @@ Terima kasih telah memesan sesi di Studio 8!
 Berikut adalah detail invoice untuk booking Anda:
 
 *Kode Booking:* ${booking.bookingCode}
-*Jadwal:* ${booking.bookingDate.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })} jam ${booking.bookingDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}
+*Jadwal:* ${new Date(booking.bookingDate).toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })} jam ${new Date(booking.bookingDate).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}
 
 *Rincian:*
 - Paket ${booking.package.name} (${booking.selectedSubPackage.name}): Rp ${booking.selectedSubPackage.price.toLocaleString('id-ID')}
@@ -148,7 +149,7 @@ Studio 8
                     </div>
                     <div className="text-right">
                         <p><span className="font-bold">Tanggal Invoice:</span> {new Date().toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</p>
-                        <p><span className="font-bold">Tanggal Sesi:</span> {booking.bookingDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</p>
+                        <p><span className="font-bold">Tanggal Sesi:</span> {new Date(booking.bookingDate).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</p>
                     </div>
                 </div>
                 <table className="w-full text-left mb-6">
@@ -162,7 +163,7 @@ Studio 8
                         <tr className="border-b">
                             <td className="p-2">
                                 <p className="font-semibold">{booking.package.name} ({booking.selectedSubPackage.name})</p>
-                                <p className="text-xs">{booking.bookingDate.toLocaleDateString('id-ID', { weekday: 'long', day:'numeric', month:'long', year:'numeric', timeZone: 'Asia/Jakarta' })}</p>
+                                <p className="text-xs">{new Date(booking.bookingDate).toLocaleDateString('id-ID', { weekday: 'long', day:'numeric', month:'long', year:'numeric', timeZone: 'Asia/Jakarta' })}</p>
                             </td>
                             <td className="p-2 text-right">Rp {booking.selectedSubPackage.price.toLocaleString('id-ID')}</td>
                         </tr>

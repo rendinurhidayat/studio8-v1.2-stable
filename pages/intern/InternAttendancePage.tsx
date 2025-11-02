@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getTodaysAttendance, checkIn, checkOut, updateUserPoints } from '../../services/api';
 import { Attendance } from '../../types';
-import format from 'date-fns/format';
+import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { Calendar, LogIn, LogOut, Loader2, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -75,16 +76,18 @@ const InternAttendancePage = () => {
                         <CheckCircle size={48} className="text-success mx-auto" />
                         <h2 className="text-xl font-bold text-primary">Sampai Jumpa Besok!</h2>
                         <p className="text-muted">Absensi hari ini telah selesai.</p>
-                        <div className="text-sm bg-base-100 p-3 rounded-lg">
-                            <p>Check-in: <span className="font-semibold">{format(attendance.checkInTime, 'HH:mm:ss')}</span></p>
-                            <p>Check-out: <span className="font-semibold">{format(attendance.checkOutTime!, 'HH:mm:ss')}</span></p>
-                        </div>
+                        {attendance && (
+                            <div className="text-sm bg-base-100 p-3 rounded-lg">
+                                <p>Check-in: <span className="font-semibold">{format(new Date(attendance.checkInTime), 'HH:mm:ss')}</span></p>
+                                <p>Check-out: <span className="font-semibold">{attendance.checkOutTime ? format(new Date(attendance.checkOutTime), 'HH:mm:ss') : ''}</span></p>
+                            </div>
+                        )}
                     </div>
                 ) : hasCheckedIn ? (
                      <div className="space-y-4">
                         <CheckCircle size={48} className="text-success mx-auto" />
                         <h2 className="text-xl font-bold text-primary">Anda Sudah Check-in!</h2>
-                        <p className="text-muted">Kehadiranmu tercatat pukul <span className="font-semibold text-base-content">{format(attendance.checkInTime, 'HH:mm:ss')}</span>.</p>
+                        <p className="text-muted">Kehadiranmu tercatat pukul <span className="font-semibold text-base-content">{attendance && format(new Date(attendance.checkInTime), 'HH:mm:ss')}</span>.</p>
                         <p className="text-muted">Silakan check-out di akhir jam kerja.</p>
                          <motion.button
                             whileHover={{ scale: 1.05 }}
@@ -115,7 +118,7 @@ const InternAttendancePage = () => {
                                     Check In Sekarang
                                 </>
                             )}
-                        </motion.button>
+                        </button>
                     </div>
                 )}
             </motion.div>

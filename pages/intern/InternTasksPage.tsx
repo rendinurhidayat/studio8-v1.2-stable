@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getTasksForUser, getMentorFeedbackForIntern, updateTask, updateUserPoints } from '../../services/api';
 import { Task, MentorFeedback } from '../../types';
-import format from 'date-fns/format';
+import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { Loader2, CheckSquare, Calendar, MessageSquare, Star, AlertTriangle } from 'lucide-react';
 import StarRating from '../../components/feedback/StarRating';
@@ -34,7 +35,7 @@ const TaskCard: React.FC<{
                         <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-error font-semibold' : ''}`}>
                             {isOverdue && <AlertTriangle size={14} />}
                             <Calendar size={14} />
-                            <span>Tenggat: {format(task.dueDate, 'd MMM yyyy', { locale: id })}</span>
+                            <span>Tenggat: {format(new Date(task.dueDate), 'd MMM yyyy', { locale: id })}</span>
                         </div>
                     )}
                 </div>
@@ -102,8 +103,8 @@ const InternTasksPage = () => {
         setActionLoading(null);
     };
     
-    const pendingTasks = useMemo(() => tasks.filter(t => !t.completed).sort((a,b) => (a.dueDate ? a.dueDate.getTime() : Infinity) - (b.dueDate ? b.dueDate.getTime() : Infinity)), [tasks]);
-    const completedTasks = useMemo(() => tasks.filter(t => t.completed).sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()), [tasks]);
+    const pendingTasks = useMemo(() => tasks.filter(t => !t.completed).sort((a,b) => (a.dueDate ? new Date(a.dueDate).getTime() : Infinity) - (b.dueDate ? new Date(b.dueDate).getTime() : Infinity)), [tasks]);
+    const completedTasks = useMemo(() => tasks.filter(t => t.completed).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [tasks]);
 
     if (loading) {
         return <div className="text-center p-8 min-h-full"><Loader2 className="animate-spin text-primary mx-auto" size={32} /></div>;

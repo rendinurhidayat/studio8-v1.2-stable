@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, UserRole, ChatRoom, ChatMessage } from '../../types';
 import { getUsers, getChatRoomsForUser, getMessagesStream, sendMessage, findOrCreateChatRoom } from '../../services/api';
 import { Loader2, Send, User as UserIcon } from 'lucide-react';
-import format from 'date-fns/format';
+import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { motion } from 'framer-motion';
@@ -55,7 +56,7 @@ const ChatPage = () => {
                     newRoom.lastMessage &&
                     newRoom.id !== selectedRoomId &&
                     newRoom.lastMessage.senderId !== currentUser.id &&
-                    (!oldRoom || !oldRoom.lastMessage || newRoom.lastMessage.timestamp > oldRoom.lastMessage.timestamp)
+                    (!oldRoom || !oldRoom.lastMessage || (newRoom.lastMessage.timestamp && oldRoom.lastMessage.timestamp && newRoom.lastMessage.timestamp > oldRoom.lastMessage.timestamp))
                 ) {
                     const senderName = newRoom.participantInfo[newRoom.lastMessage.senderId]?.name || 'Seseorang';
                     addNotification({
@@ -174,7 +175,7 @@ const ChatPage = () => {
                                             className={`flex items-end gap-2 ${msg.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}>
                                             <div className={`max-w-md p-3 rounded-2xl ${msg.senderId === currentUser?.id ? 'bg-blue-600 rounded-br-none' : 'bg-gray-700 rounded-bl-none'} text-white`}>
                                                 <p className="text-sm">{msg.text}</p>
-                                                <p className="text-xs text-white/60 text-right mt-1">{format(msg.timestamp, 'HH:mm')}</p>
+                                                <p className="text-xs text-white/60 text-right mt-1">{format(new Date(msg.timestamp), 'HH:mm')}</p>
                                             </div>
                                         </motion.div>
                                     ))

@@ -23,7 +23,7 @@ const StaffFinancePage = () => {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const monthlyTransactions = transactions.filter(t => t.date >= startOfMonth);
+        const monthlyTransactions = transactions.filter(t => new Date(t.date) >= startOfMonth);
         
         const income = monthlyTransactions.filter(t => t.type === TransactionType.Income).reduce((acc, t) => acc + t.amount, 0);
         const expense = monthlyTransactions.filter(t => t.type === TransactionType.Expense).reduce((acc, t) => acc + t.amount, 0);

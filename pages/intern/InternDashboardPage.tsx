@@ -1,9 +1,9 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getTodaysAttendance, checkIn, checkOut, getTodaysReport, getTasksForUser, getMentorFeedbackForIntern, updateTaskProgress, getLatestAIInsight, getInternLeaderboard, getUserById, updateUserPoints } from '../../services/api';
 import { Attendance, DailyReport, Task, MentorFeedback, AIInsight, User } from '../../types';
-import format from 'date-fns/format';
-import differenceInDays from 'date-fns/differenceInDays';
+import { format, differenceInDays } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { Calendar, ClipboardList, CheckSquare, LogIn, LogOut, Send, Loader2, Star, Target, ArrowRight, Lightbulb, Award, Trophy } from 'lucide-react';
 import InternCard from '../../components/intern/InternCard';
@@ -210,11 +210,11 @@ const InternDashboardPage = () => {
                             {actionLoading.checkout ? <Loader2 className="animate-spin" /> : <LogOut size={18} />} Check-out
                         </button>
                     </div>
-                    {hasCheckedIn && (
+                    {attendance && hasCheckedIn && (
                         <div className="text-sm mt-4 text-center bg-success/10 border border-success/20 text-green-800 p-3 rounded-lg">
                             <p>Status: <span className="font-semibold">Hadir</span></p>
-                            <p>Check-in: <span className="font-semibold">{format(attendance.checkInTime, 'HH:mm')}</span></p>
-                            {hasCheckedOut && <p>Check-out: <span className="font-semibold">{format(attendance.checkOutTime!, 'HH:mm')}</span></p>}
+                            <p>Check-in: <span className="font-semibold">{format(new Date(attendance.checkInTime), 'HH:mm')}</span></p>
+                            {hasCheckedOut && <p>Check-out: <span className="font-semibold">{format(new Date(attendance.checkOutTime!), 'HH:mm')}</span></p>}
                         </div>
                     )}
                 </InternCard>
@@ -238,7 +238,7 @@ const InternDashboardPage = () => {
                        <div>
                            <div className="flex justify-between items-center">
                                <StarRating value={latestFeedback.rating} isEditable={false} size={20} />
-                               <p className="text-xs text-muted">{format(latestFeedback.date, 'd MMM', { locale: id })}</p>
+                               <p className="text-xs text-muted">{format(new Date(latestFeedback.date), 'd MMM', { locale: id })}</p>
                            </div>
                            <p className="text-sm text-base-content mt-2 line-clamp-2 italic">"{latestFeedback.feedback}"</p>
                            <p className="text-xs text-muted mt-2">Dari: {latestFeedback.mentorName} untuk tugas "{latestFeedback.taskTitle}"</p>

@@ -641,7 +641,7 @@ export const deleteTask = async (taskId: string, currentUserId: string): Promise
 };
 
 export const addMentorFeedback = async (internId: string, feedbackData: Omit<MentorFeedback, 'id' | 'date'>): Promise<MentorFeedback> => {
-    const feedbackWithDate = { ...feedbackData, date: new Date() };
+    const feedbackWithDate = { ...feedbackData, date: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'users', internId, 'mentorFeedback'), feedbackWithDate);
     const newDoc = await getDoc(docRef);
     const data = fromFirestore<MentorFeedback>(newDoc, ['date']);
@@ -746,7 +746,7 @@ export const checkIn = async (userId: string): Promise<Attendance> => {
     const newAttendanceData = {
         userId,
         date: todayStr,
-        checkInTime: new Date(),
+        checkInTime: new Date().toISOString(),
         status: AttendanceStatus.Present,
     };
     const docRef = await addDoc(collection(db, 'attendance'), newAttendanceData);
@@ -756,7 +756,7 @@ export const checkIn = async (userId: string): Promise<Attendance> => {
 
 export const checkOut = async (userId: string, attendanceId: string): Promise<Attendance> => {
     const docRef = doc(db, 'attendance', attendanceId);
-    await updateDoc(docRef, { checkOutTime: new Date() });
+    await updateDoc(docRef, { checkOutTime: new Date().toISOString() });
     const updatedDoc = await getDoc(docRef);
     return fromFirestore<Attendance>(updatedDoc, ['checkInTime', 'checkOutTime']);
 };
@@ -779,7 +779,7 @@ export const submitDailyReport = async (reportData: Omit<DailyReport, 'id' | 'su
     const newReportData = {
         ...reportData,
         date: todayStr,
-        submittedAt: new Date(),
+        submittedAt: new Date().toISOString(),
         status: ReportStatus.Dikirim,
     };
     const docRef = await addDoc(collection(db, 'daily_reports'), newReportData);
@@ -911,7 +911,7 @@ export const getLatestAIInsight = async (userId: string): Promise<AIInsight | nu
 
 // --- Progress & Evaluation ---
 export const addDailyProgress = async (progressData: Omit<DailyProgress, 'id' | 'submittedAt'>): Promise<DailyProgress> => {
-    const dataToSave = { ...progressData, submittedAt: new Date(), };
+    const dataToSave = { ...progressData, submittedAt: new Date().toISOString(), };
     const docRef = await addDoc(collection(db, 'progress'), dataToSave);
     const newDoc = await getDoc(docRef);
     return fromFirestore<DailyProgress>(newDoc, ['submittedAt']);
@@ -929,7 +929,7 @@ export const getDailyProgressForUser = async (userId: string): Promise<DailyProg
 };
 
 export const addWeeklyEvaluation = async (evalData: Omit<WeeklyEvaluation, 'id' | 'date'>): Promise<WeeklyEvaluation> => {
-    const dataToSave = { ...evalData, date: new Date(), };
+    const dataToSave = { ...evalData, date: new Date().toISOString(), };
     const docRef = await addDoc(collection(db, 'weekly_evaluations'), dataToSave);
     const newDoc = await getDoc(docRef);
     return fromFirestore<WeeklyEvaluation>(newDoc, ['date']);
@@ -1334,7 +1334,7 @@ export const sendMessage = async (roomId: string, senderId: string, senderName: 
     const messageRef = doc(collection(roomRef, 'messages'));
     const timestamp = new Date();
     const messageData: Omit<ChatMessage, 'id'> = { senderId, senderName, text, timestamp: timestamp.toISOString() };
-    const lastMessageData = { text, timestamp, senderId };
+    const lastMessageData = { text, timestamp: timestamp.toISOString(), senderId };
     
     const batch = writeBatch(db);
     batch.set(messageRef, messageData);
@@ -1558,7 +1558,7 @@ export const getQuizById = async (quizId: string): Promise<Quiz | null> => {
     }
 };
 export const createQuiz = async (quizData: Omit<Quiz, 'id' | 'createdAt'>, currentUserId: string): Promise<Quiz> => {
-    const data = { ...quizData, createdAt: new Date() };
+    const data = { ...quizData, createdAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'quizzes'), data);
     await logActivity(currentUserId, `Membuat kuis baru: ${quizData.title}`);
     const newDoc = await getDoc(docRef);
@@ -1575,7 +1575,7 @@ export const deleteQuiz = async (quizId: string, currentUserId: string): Promise
     await logActivity(currentUserId, `Menghapus kuis: ${docSnap.data()?.title}`);
 };
 export const submitQuizResult = async (resultData: Omit<QuizResult, 'id' | 'submittedAt'>): Promise<string> => {
-    const data = { ...resultData, submittedAt: new Date() };
+    const data = { ...resultData, submittedAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'quiz_results'), data);
     return docRef.id;
 };
@@ -1603,7 +1603,7 @@ export const getWeeklyQuizResults = async (): Promise<QuizResult[]> => {
     try {
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        const q = query(collection(db, 'quiz_results'), where('submittedAt', '>=', oneWeekAgo));
+        const q = query(collection(db, 'quiz_results'), where('submittedAt', '>=', oneWeekAgo.toISOString()));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => fromFirestore<QuizResult>(doc, ['submittedAt']));
     } catch (error) {
@@ -1678,7 +1678,7 @@ export const getForumThreadById = async (threadId: string): Promise<ForumThread 
     }
 };
 export const addForumThread = async (threadData: Omit<ForumThread, 'id' | 'createdAt' | 'replyCount' | 'lastReplyAt'>): Promise<ForumThread> => {
-    const now = new Date();
+    const now = new Date().toISOString();
     const data = { ...threadData, createdAt: now, lastReplyAt: now, replyCount: 0 };
     const docRef = await addDoc(collection(db, 'forumThreads'), data);
     const newDoc = await getDoc(docRef);
@@ -1691,7 +1691,7 @@ export const getRepliesForThread = (threadId: string, callback: (replies: ForumR
 export const addReplyToThread = async (threadId: string, replyData: Omit<ForumReply, 'id' | 'threadId' | 'createdAt'>): Promise<void> => {
     const threadRef = doc(db, 'forumThreads', threadId);
     const replyRef = doc(collection(threadRef, 'replies'));
-    const now = new Date();
+    const now = new Date().toISOString();
     const batch = writeBatch(db);
     batch.set(replyRef, { ...replyData, threadId, createdAt: now });
     batch.update(threadRef, { replyCount: increment(1), lastReplyAt: now });
@@ -1708,7 +1708,7 @@ export const getJobPosts = async (): Promise<JobPost[]> => {
     }
 };
 export const addJobPost = async (jobData: Omit<JobPost, 'id' | 'createdAt'>): Promise<JobPost> => {
-    const data = { ...jobData, createdAt: new Date() };
+    const data = { ...jobData, createdAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'jobPosts'), data);
     const newDoc = await getDoc(docRef);
     return fromFirestore<JobPost>(newDoc, ['createdAt']);
@@ -1724,7 +1724,7 @@ export const getEvents = async (): Promise<CommunityEvent[]> => {
     }
 };
 export const addEvent = async (eventData: Omit<CommunityEvent, 'id' | 'createdAt'>): Promise<CommunityEvent> => {
-    const data = { ...eventData, createdAt: new Date() };
+    const data = { ...eventData, createdAt: new Date().toISOString() };
     const docRef = await addDoc(collection(db, 'communityEvents'), data);
     const newDoc = await getDoc(docRef);
     return fromFirestore<CommunityEvent>(newDoc, ['createdAt', 'eventDate']);

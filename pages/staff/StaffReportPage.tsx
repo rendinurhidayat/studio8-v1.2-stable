@@ -1,12 +1,13 @@
 
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUsers, getInternReports, generateInternReportContent, getAttendanceForUser, getTasksForUser, getDailyReportsForUser } from '../../services/api';
 import { User, UserRole, InternReport, Attendance, Task, DailyReport } from '../../types';
 import { Loader2, FileText, Download, Briefcase, Sparkles, Copy } from 'lucide-react';
 import Modal from '../../components/common/Modal';
-import format from 'date-fns/format';
+import { format } from 'date-fns';
 import id from 'date-fns/locale/id';
 
 const GeneratedReportModal: React.FC<{
@@ -101,7 +102,7 @@ const StaffReportPage = () => {
             const tasksSummary = tasks.length > 0 ? `${tasks.filter(t => t.completed).length} dari ${tasks.length} tugas khusus telah diselesaikan.` : "Tidak ada tugas khusus yang diberikan.";
             const reportsSummary = dailyReports.length > 0 ? `Telah mengirim ${dailyReports.length} laporan harian. Secara umum menunjukkan mood yang ${dailyReports[0]?.mood || 'netral'}.` : "Belum ada laporan harian yang dikirim.";
             
-            const period = `${format(intern.startDate!, 'd MMM yyyy', { locale: id })} - ${format(intern.endDate!, 'd MMM yyyy', { locale: id })}`;
+            const period = intern.startDate && intern.endDate ? `${format(new Date(intern.startDate), 'd MMM yyyy', { locale: id })} - ${format(new Date(intern.endDate), 'd MMM yyyy', { locale: id })}` : 'N/A';
 
             const content = await generateInternReportContent({
                 internName: intern.name,
@@ -165,7 +166,7 @@ const StaffReportPage = () => {
                                 <li key={report.id} className="flex justify-between items-center p-3 bg-base-100 rounded-lg">
                                     <div>
                                         <p className="font-semibold text-sm">{report.fileName}</p>
-                                        <p className="text-xs text-muted">Dibuat: {format(report.generatedAt, 'd MMM yyyy, HH:mm')}</p>
+                                        <p className="text-xs text-muted">Dibuat: {format(new Date(report.generatedAt), 'd MMM yyyy, HH:mm')}</p>
                                     </div>
                                     <a href={report.downloadUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors" title="Download Laporan">
                                         <Download size={18} />

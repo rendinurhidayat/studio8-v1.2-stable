@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { getFeedbacks, updateFeedback, deleteFeedback } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -222,7 +223,7 @@ const AdminFeedbackPage: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4"><StarRating value={fb.rating} size={18} /></td>
                                         <td className="px-6 py-4 text-sm text-gray-700 max-w-sm"><p className="line-clamp-3">{fb.komentar}</p></td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{fb.tanggal.toLocaleDateString('id-ID')}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(fb.tanggal).toLocaleDateString('id-ID')}</td>
                                         <td className="px-6 py-4 text-center">
                                             <span className={`px-3 py-1 text-xs font-semibold rounded-full ${fb.publish ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'}`}>
                                                 {fb.publish ? 'Published' : 'Hidden'}

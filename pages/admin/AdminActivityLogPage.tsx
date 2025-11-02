@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { getActivityLogs, getUsers } from '../../services/api';
 import { ActivityLog, User, UserRole } from '../../types';
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+import { formatDistanceToNow } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { Edit, Trash2, PlusCircle, CheckCircle, Settings, Download, Filter, X, User as UserIcon } from 'lucide-react';
 import { exportToCSV } from '../../utils/export';
@@ -56,7 +57,7 @@ const AdminActivityLogPage = () => {
 
     const handleExport = () => {
         const dataToExport = filteredLogs.map(log => ({
-            'Timestamp': log.timestamp.toLocaleString('id-ID'),
+            'Timestamp': new Date(log.timestamp).toLocaleString('id-ID'),
             'User': log.userName,
             'Action': log.action,
             'Details': log.details,
@@ -116,7 +117,7 @@ const AdminActivityLogPage = () => {
                                                     {log.details && <span className="text-gray-600"> - {log.details}</span>}
                                                 </p>
                                                 <p className="mt-1 text-xs text-gray-500">
-                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id })}
+                                                    oleh <span className="font-medium">{log.userName}</span> &bull; {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: id })}
                                                 </p>
                                             </div>
                                         </div>
