@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
-import { initializeFirebaseAdmin, initializeCloudinary } from './lib/services';
+import { initFirebaseAdmin } from './lib/firebase-admin';
 
 export const config = {
     api: {
@@ -11,6 +11,19 @@ export const config = {
         },
     },
 };
+
+// --- Cloudinary Initialization ---
+function initializeCloudinary() {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        throw new Error("Server configuration error: Cloudinary credentials are not set.");
+    }
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+}
+
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -22,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ message: 'Missing required fields: studentName, major, period, mentor, and pdfBase64.' });
     }
 
-    initializeFirebaseAdmin();
+    initFirebaseAdmin();
     initializeCloudinary();
     const db = admin.firestore();
     

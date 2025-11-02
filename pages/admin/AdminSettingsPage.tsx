@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -710,7 +711,7 @@ const PaymentSettingsTab = () => {
         });
     };
     
-    const handleBankAccountChange = (index: number, field: 'bankName' | 'accountNumber' | 'accountHolder', value: string) => {
+    const handleBankAccountChange = (index: number, field: keyof NonNullable<SystemSettings['paymentMethods']['bankAccounts']>[0], value: string) => {
         if (!settings) return;
         const newAccounts = [...(settings.paymentMethods.bankAccounts || [])];
         const accountToUpdate = newAccounts[index];

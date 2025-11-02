@@ -1,7 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { v2 as cloudinary } from 'cloudinary';
-import { initializeCloudinary } from './lib/services';
 
 export const config = {
     api: {
@@ -10,6 +9,19 @@ export const config = {
         },
     },
 };
+
+// --- Cloudinary Initialization ---
+function initializeCloudinary() {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        throw new Error("Server configuration error: Cloudinary credentials are not set.");
+    }
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+}
+
 
 async function handleUpload(req: VercelRequest, res: VercelResponse) {
     const { imageBase64, folder, publicId } = req.body;

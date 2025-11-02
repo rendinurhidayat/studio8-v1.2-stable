@@ -1,7 +1,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
-import { initializeFirebaseAdmin } from './lib/services';
+import { initFirebaseAdmin } from './lib/firebase-admin';
 
 // --- Main Handler ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        initializeFirebaseAdmin();
+        initFirebaseAdmin();
         const db = admin.firestore();
         const auth = admin.auth();
 

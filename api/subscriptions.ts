@@ -1,7 +1,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
-import { initializeFirebaseAdmin } from './lib/services';
+import { initFirebaseAdmin } from './lib/firebase-admin';
+
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -15,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ message: 'Subscription, userId, and role are required.' });
         }
 
-        initializeFirebaseAdmin();
+        initFirebaseAdmin();
         const db = admin.firestore();
 
         // Store the subscription in a dedicated collection, keyed by user ID

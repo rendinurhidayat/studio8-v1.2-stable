@@ -520,11 +520,13 @@ export interface WeeklyEvaluation {
   date: Date;
 }
 
+export type BadgeIconName = 'CheckCircle' | 'TrendingUp' | 'Zap' | 'ShieldCheck';
+
 export interface Badge {
     id: string;
     name: string;
     description: string;
-    icon: string; // lucide-react icon name
+    icon: BadgeIconName;
 }
 
 export enum QuizCategory {

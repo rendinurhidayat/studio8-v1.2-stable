@@ -58,7 +58,7 @@ const getPaymentStatus = (booking: Booking): { status: PaymentHistoryStatus, col
     }
 };
 
-const COLORS = ['var(--tw-colors-accent)', 'var(--tw-colors-success)', 'var(--tw-colors-warning)', 'var(--tw-colors-error)', 'var(--tw-colors-muted)', '#6366f1'];
+const COLORS = ['#3b82f6', '#16a34a', '#f59e0b', '#dc2626', '#6b7280', '#6366f1'];
 
 const ExpenseModal: React.FC<{isOpen: boolean, onClose: () => void, onAdd: (desc: string, amount: number) => void}> = ({ isOpen, onClose, onAdd }) => {
     const [description, setDescription] = useState('');
@@ -218,7 +218,7 @@ const FinancialForecastingSection: React.FC<{ bookings: Booking[] }> = ({ bookin
                                      <ResponsiveContainer width="100%" height="100%">
                                         <RechartsPieChart>
                                             <Pie data={budgetChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={5}>
-                                                {budgetChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length].replace('var(--tw-colors-', '').replace(')', '')} />)}
+                                                {budgetChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                             </Pie>
                                             <Tooltip formatter={(value) => `Rp ${Number(value).toLocaleString('id-ID')}`} />
                                         </RechartsPieChart>
@@ -398,7 +398,7 @@ const AdminFinancePage = () => {
                         <RechartsPieChart>
                             <Pie data={packageRevenueData} cx="50%" cy="50%" labelLine={false} outerRadius={80} dataKey="value" nameKey="name">
                                 {packageRevenueData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length].replace('var(--tw-colors-', '').replace(')', '')} />
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
                             <Tooltip formatter={(value) => `Rp ${Number(value).toLocaleString('id-ID')}`}/>

@@ -1,7 +1,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
-import { initializeFirebaseAdmin, initializeCloudinary, sendPushNotification } from './lib/services';
+import { v2 as cloudinary } from 'cloudinary';
+import webpush from 'web-push';
+import { initFirebaseAdmin } from './lib/firebase-admin';
 
 export const config = {
     api: {
@@ -21,11 +23,72 @@ interface AddOn { id: string; name: string; subAddOns: SubAddOn[]; }
 interface SubAddOn { id: string; name: string; price: number; }
 interface Client { id: string; name: string; email: string; phone: string; firstBooking: Date | admin.firestore.Timestamp; lastBooking: Date | admin.firestore.Timestamp; totalBookings: number; totalSpent: number; loyaltyPoints: number; referralCode: string; referredBy?: string; loyaltyTier?: string; }
 interface LoyaltyTier { id: string; name: string; bookingThreshold: number; discountPercentage: number; }
+// @ts-ignore
 interface SystemSettings { loyaltySettings: { firstBookingReferralDiscount: number; loyaltyTiers: LoyaltyTier[]; rupiahPerPoint: number; pointsPerRupiah: number; referralBonusPoints: number; }; }
 interface Promo { id: string; code: string; description: string; discountPercentage: number; isActive: boolean; }
 interface Booking { id: string; bookingCode: string; clientName: string; clientEmail: string; clientPhone: string; bookingDate: admin.firestore.Timestamp; package: Package; selectedSubPackage: SubPackage; addOns: AddOn[]; selectedSubAddOns: SubAddOn[]; numberOfPeople: number; paymentMethod: string; paymentStatus: PaymentStatus; bookingStatus: BookingStatus; totalPrice: number; remainingBalance: number; createdAt: admin.firestore.Timestamp; paymentProofUrl?: string; rescheduleRequestDate?: admin.firestore.Timestamp; notes?: string; googleDriveLink?: string; discountAmount?: number; discountReason?: string; pointsEarned?: number; pointsRedeemed?: number; pointsValue?: number; // Rupiah value of redeemed points
   referralCodeUsed?: string; promoCodeUsed?: string; extraPersonCharge?: number; }
 // --- End Type Duplication ---
+
+// --- Cloudinary Initialization ---
+function initializeCloudinary() {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        throw new Error("Server configuration error: Cloudinary credentials are not set.");
+    }
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+}
+
+// --- Push Notification Helper ---
+async function sendPushNotification(db: admin.firestore.Firestore, title: string, body: string, url: string) {
+    if (!process.env.VAPID_PRIVATE_KEY || !process.env.VITE_VAPID_PUBLIC_KEY || !process.env.WEB_PUSH_EMAIL) {
+        console.warn('VAPID keys or email not set. Skipping push notification.');
+        return;
+    }
+    
+    webpush.setVapidDetails(
+        `mailto:${process.env.WEB_PUSH_EMAIL}`,
+        process.env.VITE_VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+
+    const subscriptionsSnapshot = await db.collection('pushSubscriptions')
+        .where('role', 'in', [UserRole.Admin, UserRole.Staff])
+        .get();
+
+    if (subscriptionsSnapshot.empty) {
+        console.log("No push subscriptions found for admins or staff.");
+        return;
+    }
+    
+    const notificationPayload = JSON.stringify({ title, body, url });
+
+    const sendPromises = subscriptionsSnapshot.docs.flatMap(doc => {
+        const data = doc.data();
+        const userSubscriptions = data.subscriptions || [];
+        
+        return userSubscriptions.map((subscription: any) => 
+            webpush.sendNotification(subscription, notificationPayload)
+                .catch(error => {
+                    if (error.statusCode === 410) {
+                        console.log(`Subscription for user ${doc.id} expired. Removing.`);
+                        // Return a promise to update Firestore
+                        return db.collection('pushSubscriptions').doc(doc.id).update({
+                            subscriptions: admin.firestore.FieldValue.arrayRemove(subscription)
+                        });
+                    } else {
+                        console.error('Error sending notification:', error);
+                    }
+                })
+        );
+    });
+
+    await Promise.allSettled(sendPromises);
+}
+
 
 // --- Server-side API Helpers ---
 const fromFirestore = <T extends object>(doc: admin.firestore.DocumentSnapshot): T & { id: string } => {
@@ -160,7 +223,6 @@ async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
 
 async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
     const db = admin.firestore();
-    const { v2: cloudinary } = await import('cloudinary');
     const formData = req.body;
     const newBookingCode = `S8-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     
@@ -202,12 +264,6 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
             const settings = settingsDoc.data() as SystemSettings;
             let client = clientDoc.exists ? fromFirestore<Client>(clientDoc) : null;
             
-            const selectedPackage = allPackages.find(p => p.id === formData.packageId);
-            if (!selectedPackage) throw new Error("Paket yang dipilih tidak ditemukan.");
-            const selectedSubPackage = selectedPackage.subPackages.find(sp => sp.id === formData.subPackageId);
-            if (!selectedSubPackage) throw new Error("Varian paket tidak ditemukan.");
-            const selectedSubAddOns = allAddOns.flatMap(a => a.subAddOns).filter(sa => formData.subAddOnIds.includes(sa.id));
-            
             const isNewClient = !client;
             if (isNewClient) {
                 client = {
@@ -217,6 +273,17 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
                 };
             }
 
+            if (!client) {
+                // This path should logically be unreachable, but it satisfies TypeScript's flow analysis.
+                throw new Error('Client could not be retrieved or created. This indicates a logic error.');
+            }
+            
+            const selectedPackage = allPackages.find(p => p.id === formData.packageId);
+            if (!selectedPackage) throw new Error("Paket yang dipilih tidak ditemukan.");
+            const selectedSubPackage = selectedPackage.subPackages.find(sp => sp.id === formData.subPackageId);
+            if (!selectedSubPackage) throw new Error("Varian paket tidak ditemukan.");
+            const selectedSubAddOns = allAddOns.flatMap(a => a.subAddOns).filter(sa => formData.subAddOnIds.includes(sa.id));
+            
             let extraPersonCharge = (selectedPackage.isGroupPackage && formData.people > 2) ? (formData.people - 2) * 15000 : 0;
             let subtotal = selectedSubPackage.price + selectedSubAddOns.reduce((sum, sa) => sum + sa.price, 0) + extraPersonCharge;
             
@@ -238,14 +305,14 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
                         discountAmount = settings.loyaltySettings.firstBookingReferralDiscount;
                         discountReason = `Diskon Referral`; referralCodeUsed = formData.referralCode.toUpperCase(); client.referredBy = referralCodeUsed;
                      }
-                } else if (!isNewClient && client) {
+                } else if (!isNewClient) {
                     const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => b.bookingThreshold - a.bookingThreshold);
-                    const clientTier = sortedTiers.find(t => client!.totalBookings >= t.bookingThreshold);
+                    const clientTier = sortedTiers.find(t => client.totalBookings >= t.bookingThreshold);
                     if (clientTier) { discountAmount = subtotal * (clientTier.discountPercentage / 100); discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`; }
                 }
             }
 
-            if (formData.usePoints && client && client.loyaltyPoints > 0) {
+            if (formData.usePoints && client.loyaltyPoints > 0) {
                 pointsValue = Math.min(subtotal - discountAmount, client.loyaltyPoints * settings.loyaltySettings.rupiahPerPoint);
                 pointsRedeemed = Math.round(pointsValue / settings.loyaltySettings.rupiahPerPoint);
                 client.loyaltyPoints -= pointsRedeemed;
@@ -307,7 +374,6 @@ async function handleCreateInstitutional(req: VercelRequest, res: VercelResponse
 
     let requestLetterUrl = '';
     if (bookingData.requestLetterUrl) {
-        const { v2: cloudinary } = await import('cloudinary');
         const uploadResult = await cloudinary.uploader.upload(bookingData.requestLetterUrl, {
             folder: "studio8_requests", public_id: `req_${newBookingCode}`, resource_type: "auto"
         });
@@ -343,7 +409,6 @@ async function handleCreateInstitutional(req: VercelRequest, res: VercelResponse
 
 async function handleCreatePublicInstitutional(req: VercelRequest, res: VercelResponse) {
     const db = admin.firestore();
-    const { v2: cloudinary } = await import('cloudinary');
     const bookingData = req.body;
     const newBookingCode = `S8-INST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
@@ -408,7 +473,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { action, ...payload } = req.body;
 
     try {
-        initializeFirebaseAdmin();
+        initFirebaseAdmin();
         initializeCloudinary();
         req.body = payload; // Re-assign body for individual handlers to use
 

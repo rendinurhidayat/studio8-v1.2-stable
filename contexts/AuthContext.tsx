@@ -7,7 +7,7 @@ import {
     signInWithPopup,
     User as FirebaseUser
 } from 'firebase/auth';
-import { doc, getDoc, query, collection, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, query, collection, where, getDocs, limit, DocumentData } from 'firebase/firestore';
 import { User, UserRole } from '../types';
 
 interface AuthContextType {
@@ -37,24 +37,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     const userDocRef = doc(db, 'users', firebaseUser.uid);
                     const userDoc = await getDoc(userDocRef);
                     if (userDoc.exists()) {
-                        const userData = userDoc.data();
+                        const data = userDoc.data() as DocumentData;
                         
-                        const mappedUserData: any = {};
-                        for (const key in userData) {
-                            const value = (userData as any)[key];
-                            if (value && typeof value.toDate === 'function') {
-                                mappedUserData[key] = value.toDate();
-                            } else {
-                                mappedUserData[key] = value;
-                            }
-                        }
-
                         const appUser: User = {
                             id: firebaseUser.uid,
-                            email: firebaseUser.email!,
-                            photoURL: firebaseUser.photoURL || undefined,
-                            ...mappedUserData,
-                        } as User;
+                            name: data.name || 'No Name',
+                            email: data.email || firebaseUser.email!,
+                            role: data.role,
+                            photoURL: firebaseUser.photoURL || data.photoURL || undefined,
+                            username: data.username,
+                            asalSekolah: data.asalSekolah,
+                            jurusan: data.jurusan,
+                            startDate: data.startDate?.toDate(),
+                            endDate: data.endDate?.toDate(),
+                            totalPoints: data.totalPoints
+                        };
                         setUser(appUser);
                         setError(null);
                     } else {

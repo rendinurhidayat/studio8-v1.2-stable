@@ -1,9 +1,10 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, GenerateContentResponse } from '@google/genai';
 import admin from 'firebase-admin';
 import type { ActivityLog } from '../types';
-import { initializeFirebaseAdmin } from './lib/services';
+import { initFirebaseAdmin } from './lib/firebase-admin';
+
 
 // --- Main Handler ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -26,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const actionsRequiringDb = ['analyzeInternReport', 'generateAiFeedback', 'analyzeQuizResult'];
     if (actionsRequiringDb.includes(action)) {
         try {
-            initializeFirebaseAdmin();
+            initFirebaseAdmin();
         } catch (error: any) {
             console.error(`Firebase initialization failed for action '${action}':`, error);
             return res.status(500).json({ message: 'Server configuration error.', error: error.message });
@@ -411,9 +412,10 @@ async function handleChat(ai: GoogleGenAI, payload: any, res: VercelResponse) {
         config: { systemInstruction }
     });
     const latestMessage = history[history.length - 1]?.parts[0]?.text || '';
-    const result = await chat.sendMessageStream({ message: latestMessage });
+    const resultStream = await chat.sendMessageStream({ message: latestMessage });
+    
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    for await (const chunk of result) {
+    for await (const chunk of resultStream) {
         res.write(chunk.text);
     }
     res.end();
@@ -433,8 +435,9 @@ async function handleAnalyzeInternReport(ai: GoogleGenAI, payload: any, res: Ver
         },
         required: ['type', 'insight']
     };
+    let response: GenerateContentResponse | undefined;
     try {
-        const response = await ai.models.generateContent({
+        response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: `Analisis laporan harian ini: "${reportContent}". Kategorikan sebagai: produktif / santai / tidak fokus. Berikan satu kalimat motivasi singkat dalam Bahasa Indonesia yang relevan dan positif.`,
             config: { responseMimeType: 'application/json', responseSchema: schema }
@@ -446,9 +449,8 @@ async function handleAnalyzeInternReport(ai: GoogleGenAI, payload: any, res: Ver
         return res.status(200).json({ success: true, insight: insightData });
     } catch (aiError: any) {
         console.error("AI analysis failed during handleAnalyzeInternReport:", aiError);
-        // Fallback to default insight on AI error to maintain functionality
         if (aiError instanceof SyntaxError) {
-             console.error("Malformed JSON from AI in handleAnalyzeInternReport:", (aiError as any).response?.text);
+             console.error("Malformed JSON from AI in handleAnalyzeInternReport:", response?.text);
         }
         const defaultInsight = { type: 'default', insight: 'Tetap semangat hari ini 💪', date: admin.firestore.FieldValue.serverTimestamp() };
         await db.collection('users').doc(userId).collection('aiInsights').add(defaultInsight);

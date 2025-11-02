@@ -2,10 +2,25 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
-// The configuration has been simplified to use Vite's standard environment variable handling.
-// Client-side code now uses `import.meta.env.VITE_VARIABLE_NAME` to access variables
-// defined in a .env file (e.g., VITE_FIREBASE_API_KEY).
-// Vite automatically exposes variables with the `VITE_` prefix.
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    exclude: [
+      'firebase/compat/auth',
+      'firebase/compat/firestore',
+      'firebase/compat/storage',
+    ],
+  },
+  server: {
+    // Proxy API requests to the Vercel serverless functions endpoint.
+    // This is crucial for local development to avoid 404 errors when the frontend
+    // calls backend routes like /api/ai. The `vercel dev` command often runs
+    // functions on port 3000 by default.
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+    },
+  },
 });

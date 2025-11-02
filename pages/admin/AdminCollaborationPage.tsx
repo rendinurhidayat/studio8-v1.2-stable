@@ -280,7 +280,7 @@ const AdminCollaborationPage = () => {
             />
             <ActivityLogModal isOpen={modal.activityLog.isOpen} onClose={() => setModal(m => ({ ...m, activityLog: { isOpen: false, item: null, type: 'sponsorship' } }))} activities={activities} loading={loading.activity} />
             <InvoiceModal isOpen={modal.invoice.isOpen} onClose={() => setModal(m => ({ ...m, invoice: { isOpen: false, item: null } }))} booking={modal.invoice.item} />
-            {modal.manageBooking.item && <ManageBookingModal isOpen={modal.manageBooking.isOpen} onClose={() => setModal(m => ({ ...m, manageBooking: { isOpen: false, item: null } }))} booking={modal.manageBooking.item} packages={packages} onSave={handleManageBookingSave} />}
+            {modal.manageBooking.item && <ManageBookingModal isOpen={modal.manageBooking.isOpen} onClose={() => setModal(m => ({ ...m, manageBooking: { isOpen: false, item: null } }))} booking={modal.manageBooking.item} onSave={handleManageBookingSave} />}
             <GeneratedContentModal isOpen={modal.generatedContent.isOpen} onClose={() => setModal(m => ({...m, generatedContent: {isOpen: false}}))} title="Draf Konten MoU (AI)" content={generatedMouContent} />
         </div>
     );
@@ -288,8 +288,8 @@ const AdminCollaborationPage = () => {
 
 // Re-implementing ManageBookingModal locally to use it in this file
 const ManageBookingModal: React.FC<{
-    isOpen: boolean; onClose: () => void; booking: Booking | null; packages: Package[]; onSave: (id: string, data: Partial<Booking>) => Promise<void>;
-}> = ({ isOpen, onClose, booking, packages, onSave }) => {
+    isOpen: boolean; onClose: () => void; booking: Booking | null; onSave: (id: string, data: Partial<Booking>) => Promise<void>;
+}> = ({ isOpen, onClose, booking, onSave }) => {
     const [formData, setFormData] = useState<Partial<Booking>>({});
     const [isSaving, setIsSaving] = useState(false);
 

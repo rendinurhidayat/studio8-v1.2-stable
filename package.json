@@ -5,17 +5,15 @@
   "description": "A comprehensive, full-stack web system for managing Studio 8, a photo studio.",
   "type": "module",
   "scripts": {
-    "start": "vite",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "deploy": "npm run build && firebase deploy"
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@google/genai": "^0.11.0",
     "cloudinary": "^2.8.0",
     "date-fns": "^2.30.0",
-    "firebase": "^9.23.0",
+    "firebase": "^12.5.0",
     "firebase-admin": "^12.1.0",
     "framer-motion": "^11.2.4",
     "html2canvas": "^1.4.1",

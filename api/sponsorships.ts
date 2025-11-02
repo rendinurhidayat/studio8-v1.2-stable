@@ -1,7 +1,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
-import { initializeFirebaseAdmin, initializeCloudinary, sendPushNotification } from './lib/services';
+import { v2 as cloudinary } from 'cloudinary';
+import webpush from 'web-push';
+import { initFirebaseAdmin } from './lib/firebase-admin';
 
 export const config = {
     api: {
@@ -11,11 +13,75 @@ export const config = {
     },
 };
 
+// --- Type Duplication ---
+enum UserRole { Admin = 'Admin', Staff = 'Staff' }
+// --- End Type Duplication ---
+
+
+// --- Cloudinary Initialization ---
+function initializeCloudinary() {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        throw new Error("Server configuration error: Cloudinary credentials are not set.");
+    }
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+}
+
+// --- Push Notification Helper ---
+async function sendPushNotification(db: admin.firestore.Firestore, title: string, body: string, url: string) {
+    if (!process.env.VAPID_PRIVATE_KEY || !process.env.VITE_VAPID_PUBLIC_KEY || !process.env.WEB_PUSH_EMAIL) {
+        console.warn('VAPID keys or email not set. Skipping push notification.');
+        return;
+    }
+    
+    webpush.setVapidDetails(
+        `mailto:${process.env.WEB_PUSH_EMAIL}`,
+        process.env.VITE_VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+
+    const subscriptionsSnapshot = await db.collection('pushSubscriptions')
+        .where('role', 'in', [UserRole.Admin, UserRole.Staff])
+        .get();
+
+    if (subscriptionsSnapshot.empty) {
+        console.log("No push subscriptions found for admins or staff.");
+        return;
+    }
+    
+    const notificationPayload = JSON.stringify({ title, body, url });
+
+    const sendPromises = subscriptionsSnapshot.docs.flatMap(doc => {
+        const data = doc.data();
+        const userSubscriptions = data.subscriptions || [];
+        
+        return userSubscriptions.map((subscription: any) => 
+            webpush.sendNotification(subscription, notificationPayload)
+                .catch(error => {
+                    if (error.statusCode === 410) {
+                        console.log(`Subscription for user ${doc.id} expired. Removing.`);
+                        // Return a promise to update Firestore
+                        return db.collection('pushSubscriptions').doc(doc.id).update({
+                            subscriptions: admin.firestore.FieldValue.arrayRemove(subscription)
+                        });
+                    } else {
+                        console.error('Error sending notification:', error);
+                    }
+                })
+        );
+    });
+
+    await Promise.allSettled(sendPromises);
+}
+
+
 // --- Action Handlers ---
 
 async function handleCreate(req: VercelRequest, res: VercelResponse) {
     const db = admin.firestore();
-    const { v2: cloudinary } = await import('cloudinary');
     const { sponsorshipData, userId } = req.body;
     if (!sponsorshipData || !userId) {
         return res.status(400).json({ message: "sponsorshipData and userId are required." });
@@ -55,7 +121,6 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
 
 async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
     const db = admin.firestore();
-    const { v2: cloudinary } = await import('cloudinary');
     const sponsorshipData = req.body;
     
     const publicId = `proposal_${sponsorshipData.institutionName?.replace(/\s+/g, '_')}_${Date.now()}`;
@@ -96,7 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { action, ...payload } = req.body;
 
     try {
-        initializeFirebaseAdmin();
+        initFirebaseAdmin();
         initializeCloudinary();
         req.body = payload;
 
