@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { addDailyProgress, getDailyProgressForUser, getTodaysAttendance, getWeeklyEvaluationsForStudent } from '../../services/api';
@@ -259,7 +261,7 @@ const InternProgressPage = () => {
                                         <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
                                             {history.map(item => (
                                                 <div key={item.id} className="p-4 bg-base-100 rounded-lg">
-                                                    <p className="font-semibold text-sm">{format(item.submittedAt, 'eeee, d MMMM yyyy', { locale: id })}</p>
+                                                    <p className="font-semibold text-sm">{format(new Date(item.submittedAt), 'eeee, d MMMM yyyy', { locale: id })}</p>
                                                     <p className="text-sm text-muted mt-1">{item.note}</p>
                                                     <ul className="list-disc list-inside text-sm mt-2">
                                                         {item.tasks.map((t, i) => <li key={i}>{t.title}</li>)}

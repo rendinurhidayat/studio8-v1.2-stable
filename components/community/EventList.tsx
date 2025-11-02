@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { getEvents } from '../../services/api';
 import { CommunityEvent, UserRole } from '../../types';
@@ -58,7 +60,7 @@ const EventList = () => {
                             transition={{ delay: index * 0.1 }}
                             className="bg-base-100 p-4 rounded-lg border border-base-200"
                         >
-                            <p className="text-sm font-bold text-accent">{format(event.eventDate, 'd MMM yyyy, HH:mm', { locale: id })}</p>
+                            <p className="text-sm font-bold text-accent">{format(new Date(event.eventDate), 'd MMM yyyy, HH:mm', { locale: id })}</p>
                             <h4 className="font-semibold text-primary mt-1">{event.title}</h4>
                             <p className="text-sm text-muted mt-2">{event.description}</p>
                             <div className="flex items-center gap-2 text-xs text-muted mt-3 pt-3 border-t">

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getForumThreads } from '../../services/api';
@@ -63,7 +65,7 @@ const ForumList = () => {
                                 <div>
                                     <p className="font-semibold text-primary">{thread.title}</p>
                                     <p className="text-xs text-muted">
-                                        oleh {thread.authorName} &bull; {formatDistanceToNow(thread.lastReplyAt || thread.createdAt, { locale: id, addSuffix: true })}
+                                        oleh {thread.authorName} &bull; {formatDistanceToNow(new Date(thread.lastReplyAt || thread.createdAt), { locale: id, addSuffix: true })}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3 text-sm text-muted flex-shrink-0 ml-4">

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -95,7 +97,7 @@ const ForumThreadPage = () => {
                     <div className="bg-white p-6 rounded-lg border shadow-sm mb-6">
                         <div className="flex justify-between items-center text-sm text-muted mb-4">
                             <span>{thread.authorName}</span>
-                            <span>{format(thread.createdAt, 'd MMM yyyy, HH:mm', { locale: id })}</span>
+                            <span>{format(new Date(thread.createdAt), 'd MMM yyyy, HH:mm', { locale: id })}</span>
                         </div>
                         <p className="text-base-content whitespace-pre-wrap">{thread.content}</p>
                     </div>
@@ -113,7 +115,7 @@ const ForumThreadPage = () => {
                                 >
                                     <div className="flex justify-between items-center text-xs text-muted mb-2">
                                         <span className="font-semibold text-primary">{reply.authorName}</span>
-                                        <span>{format(reply.createdAt, 'd MMM, HH:mm', { locale: id })}</span>
+                                        <span>{format(new Date(reply.createdAt), 'd MMM, HH:mm', { locale: id })}</span>
                                     </div>
                                     <p className="text-sm text-base-content whitespace-pre-wrap">{reply.content}</p>
                                 </motion.div>

@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { addEvent } from '../../services/api';
@@ -32,7 +34,7 @@ const CreateEventModal: React.FC<Props> = ({ isOpen, onClose, onEventCreated }) 
         try {
             await addEvent({
                 ...formData,
-                eventDate: new Date(formData.eventDate),
+                eventDate: new Date(formData.eventDate).toISOString(),
                 createdById: user.id,
                 createdByName: user.name,
             });

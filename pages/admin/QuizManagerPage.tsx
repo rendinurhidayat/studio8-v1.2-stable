@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createQuiz, getQuizzes, updateQuiz, deleteQuiz } from '../../services/api';
@@ -266,7 +268,7 @@ const QuizManagerPage = () => {
                                 <td className="px-5 py-4 font-medium">{quiz.title}</td>
                                 <td className="px-5 py-4"><span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{quiz.category}</span></td>
                                 <td className="px-5 py-4">{quiz.questions.length}</td>
-                                <td className="px-5 py-4 text-sm text-muted">{format(quiz.createdAt, 'd MMM yyyy', { locale: id })}</td>
+                                <td className="px-5 py-4 text-sm text-muted">{format(new Date(quiz.createdAt), 'd MMM yyyy', { locale: id })}</td>
                                 <td className="px-5 py-4 text-center">
                                     <button onClick={() => handleOpenEditModal(quiz)} className="p-2 text-muted hover:text-blue-600"><Edit size={16}/></button>
                                     <button onClick={() => handleOpenDeleteModal(quiz)} className="p-2 text-muted hover:text-red-600"><Trash2 size={16}/></button>

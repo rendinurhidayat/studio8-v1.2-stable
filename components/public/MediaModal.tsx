@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HighlightWork } from '../../types';
@@ -98,7 +100,7 @@ const MediaModal: React.FC<MediaModalProps> = ({ work, isOpen, onClose }) => {
                   <InfoItem icon={<User size={18} />} label="Kreator" value={work.author} />
                   <InfoItem icon={<Briefcase size={18} />} label="Jurusan" value={work.major} />
                   <InfoItem icon={<Award size={18} />} label="Mentor" value={work.mentor} />
-                  <InfoItem icon={<Calendar size={18} />} label="Tanggal" value={format(work.highlightDate, 'd MMMM yyyy', { locale: id })} />
+                  <InfoItem icon={<Calendar size={18} />} label="Tanggal" value={format(new Date(work.highlightDate), 'd MMMM yyyy', { locale: id })} />
               </div>
             </div>
           </motion.div>

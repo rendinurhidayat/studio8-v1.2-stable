@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { getDailyTasks, updateDailyTaskStatus, getTasksForUser, updateTask } from '../../services/api';
 import { Task } from '../../types';
@@ -50,6 +51,7 @@ const StaffTasksPage = () => {
         setSpecialTasks(current => current.map(t => 
             t.id === task.id ? { ...t, completed: !t.completed } : t
         ));
+        // FIX: 't' was used here instead of 'task', causing a reference error.
         await updateTask(task.id, { completed: !task.completed }, user.id);
     };
 
