@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { addDailyProgress, getDailyProgressForUser, getTodaysAttendance, getWeeklyEvaluationsForStudent } from '../../services/api';
-import { DailyProgress, DailyProgressTask, Attendance, WeeklyEvaluation, Badge } from '../../types';
+import { DailyProgress, DailyProgressTask, Attendance, WeeklyEvaluation, Badge, BadgeIconName } from '../../types';
 import format from 'date-fns/format';
 import getWeek from 'date-fns/getWeek';
 import id from 'date-fns/locale/id';
@@ -44,8 +44,15 @@ const TabButton: React.FC<{
 );
 
 
-const BadgeIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
-    const Icon = { CheckCircle, TrendingUp, Zap, ShieldCheck }[name as keyof typeof import('lucide-react')];
+const icons: Record<BadgeIconName, React.FC<any>> = {
+    CheckCircle,
+    TrendingUp,
+    Zap,
+    ShieldCheck
+};
+
+const BadgeIcon: React.FC<{ name: BadgeIconName; className?: string }> = ({ name, className }) => {
+    const Icon = icons[name];
     return Icon ? <Icon className={className} /> : null;
 };
 

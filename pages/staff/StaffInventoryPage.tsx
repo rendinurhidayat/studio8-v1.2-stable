@@ -91,7 +91,7 @@ const StaffInventoryPage = () => {
         setActionLoading(prev => ({ ...prev, [item.id]: true }));
         await updateInventoryItem(item.id, {
             status: InventoryStatus.Available,
-            lastChecked: new Date(),
+            lastChecked: new Date().toISOString(),
             notes: '' // Clear notes when checked as okay
         }, currentUser.id);
         await fetchData();
@@ -104,14 +104,13 @@ const StaffInventoryPage = () => {
          await updateInventoryItem(itemId, {
             status,
             notes,
-            lastChecked: new Date()
+            lastChecked: new Date().toISOString()
         }, currentUser.id);
         await fetchData();
         setActionLoading(prev => ({ ...prev, [itemId]: false }));
     }
 
     const groupedInventory = useMemo(() => {
-        // FIX: Rewrote reduce to a for-loop to avoid type inference issues with Object.entries.
         const grouped: Record<string, InventoryItem[]> = {};
         for (const item of inventory) {
             const category = item.category;
@@ -131,7 +130,6 @@ const StaffInventoryPage = () => {
             <p className="text-muted mt-1 mb-6">Pastikan semua peralatan dalam kondisi baik dan siap digunakan.</p>
 
             <div className="space-y-8">
-                {/* FIX: Replaced Object.entries with Object.keys to resolve type inference issues with .map() in older TypeScript versions. */}
                 {Object.keys(groupedInventory).map((category) => {
                     const items = groupedInventory[category];
                     return (
@@ -146,7 +144,7 @@ const StaffInventoryPage = () => {
                                                 <StatusBadge status={item.status} />
                                             </div>
                                             <p className="text-xs text-muted mt-1">
-                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(item.lastChecked, { addSuffix: true, locale: id }) : 'Belum pernah'}
+                                                Terakhir dicek: {item.lastChecked ? formatDistanceToNow(new Date(item.lastChecked), { addSuffix: true, locale: id }) : 'Belum pernah'}
                                             </p>
                                             {item.notes && item.status !== InventoryStatus.Available && (
                                                 <div className="mt-2 p-2 bg-yellow-50 text-yellow-800 text-xs rounded flex items-start gap-2">

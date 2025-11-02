@@ -1,13 +1,18 @@
 
 
+
+
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, AddOn, SystemSettings, Client, Promo, CartItem } from '../../types';
 import { validateReferralCode, validatePromoCode, calculateDpAmount as apiCalculateDpAmount } from '../../services/api';
-import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, Send, Loader2, AlertTriangle, Tag, Award, X, ShoppingCart, Copy, Check, Download } from 'lucide-react';
+import { User, Mail, Phone, Calendar, Clock, Users, MessageSquare, CreditCard, UploadCloud, CheckCircle, Send, Loader2, AlertTriangle, Tag, Award, X, ShoppingCart, Copy, Check, Download, Sparkles } from 'lucide-react';
 import { fileToBase64 as fileUtilToBase64 } from '../../utils/fileUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSystemSettings } from '../../App';
-import isPast from 'date-fns/isPast';
+// FIX: Use named import for date-fns isPast function
+import { isPast } from 'date-fns';
 
 // --- Type Definitions ---
 type FormData = {
@@ -48,7 +53,7 @@ const fileToBase64 = (file: File): Promise<{ base64: string, fileName: string, m
 };
 
 // --- Main Form Component ---
-const BookingForm: React.FC<{ pkg: Package; addOns: AddOn[] }> = ({ pkg, addOns }) => {
+const BookingForm: React.FC<{ pkg: Package; addOns: AddOn[]; onOpenAiRecommender: () => void; }> = ({ pkg, addOns, onOpenAiRecommender }) => {
     const [formData, setFormData] = useState<FormData>({
         name: '', email: '', whatsapp: '', date: '', time: '', subPackageId: '', people: 1, subAddOnIds: [], notes: '', paymentMethod: '', paymentProof: null, referralCode: '', promoCode: '', usePoints: false
     });
@@ -210,11 +215,22 @@ const BookingForm: React.FC<{ pkg: Package; addOns: AddOn[] }> = ({ pkg, addOns 
                 subPackageId: item.subPkg.id,
                 subAddOnIds: item.addOns.map(sa => sa.id),
                 paymentProof: undefined,
-                paymentProofBase64: paymentProofBase64 ? { base64: paymentProofBase64.base64, fileName: formData.paymentProof.name, mimeType: formData.paymentProof.type } : null
+                paymentProofBase64: paymentProofBase64 ? { base64: paymentProofBase64.base64, fileName: paymentProofBase64.fileName, mimeType: paymentProofBase64.mimeType } : null
             };
 
             const response = await fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error((await response.json()).message || 'Gagal membuat booking.');
+            
+            if (!response.ok) {
+                let errorMessage = 'Gagal membuat booking.';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } catch (jsonError) {
+                    const textError = await response.text();
+                    errorMessage = textError || errorMessage;
+                }
+                throw new Error(errorMessage);
+            }
 
             const result = await response.json();
             setBookingCode(result.bookingCode);
@@ -246,6 +262,15 @@ const BookingForm: React.FC<{ pkg: Package; addOns: AddOn[] }> = ({ pkg, addOns 
                     <div className="mb-4">
                         <h1 className="text-3xl font-bold text-primary">{pkg.name}</h1>
                         <p className="text-muted mt-1">{pkg.description}</p>
+                    </div>
+
+                    <div className="my-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 text-center">
+                        <h3 className="font-bold text-primary">Bingung Pilih Paket?</h3>
+                        <p className="text-sm text-muted mt-1">Biarkan AI kami membantu menemukan paket yang paling cocok untukmu!</p>
+                        <button type="button" onClick={onOpenAiRecommender} className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90">
+                            <Sparkles size={16} />
+                            Dapatkan Rekomendasi
+                        </button>
                     </div>
 
                     <FormSection title="Kustomisasi Paket" step={1}>

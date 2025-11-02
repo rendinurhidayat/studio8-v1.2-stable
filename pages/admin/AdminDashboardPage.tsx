@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getBookings, getFinancialData, getExpenses, getActivityLogs } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,11 +9,8 @@ import ChartCard from '../../components/admin/ChartCard';
 import { DollarSign, BookOpen, Clock, TrendingUp, History, ArrowRight, UserCheck, CheckCircle, Loader2, Lightbulb, Sparkles, PlusCircle, Shield, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
-import format from 'date-fns/format';
-import isSameDay from 'date-fns/isSameDay';
-import eachDayOfInterval from 'date-fns/eachDayOfInterval';
-import subDays from 'date-fns/subDays';
-import formatDistanceToNow from 'date-fns/formatDistanceToNow';
+// FIX: Use named imports for date-fns functions
+import { format, isSameDay, eachDayOfInterval, subDays, formatDistanceToNow } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { motion, type Variants } from 'framer-motion';
 
@@ -49,12 +47,12 @@ const UpcomingBookingCard: React.FC<{ booking: Booking }> = ({ booking }) => (
     <motion.div variants={itemVariants} className="flex items-center justify-between p-3 bg-white hover:bg-base-100/50 rounded-xl transition-colors border">
         <div className="flex items-center gap-4">
             <div className="flex flex-col items-center justify-center w-12 h-12 bg-accent/10 text-accent rounded-lg">
-                <span className="text-sm font-bold">{booking.bookingDate.toLocaleDateString('id-ID', { day: '2-digit', timeZone: 'Asia/Jakarta' })}</span>
-                <span className="text-xs">{booking.bookingDate.toLocaleDateString('id-ID', { month: 'short', timeZone: 'Asia/Jakarta' })}</span>
+                <span className="text-sm font-bold">{new Date(booking.bookingDate).toLocaleDateString('id-ID', { day: '2-digit', timeZone: 'Asia/Jakarta' })}</span>
+                <span className="text-xs">{new Date(booking.bookingDate).toLocaleDateString('id-ID', { month: 'short', timeZone: 'Asia/Jakarta' })}</span>
             </div>
             <div>
                 <p className="font-semibold text-sm text-base-content">{booking.clientName}</p>
-                <p className="text-xs text-muted">{booking.package.name} at {booking.bookingDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}</p>
+                <p className="text-xs text-muted">{booking.package.name} at {new Date(booking.bookingDate).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}</p>
             </div>
         </div>
         <Link to="/admin/schedule" className="p-2 text-muted hover:text-accent rounded-full">
@@ -103,11 +101,11 @@ const AdminDashboardPage: React.FC = () => {
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const todaysRevenue = transactions.filter(t => isSameDay(t.date, now)).reduce((sum, t) => sum + t.amount, 0);
-        const newBookingsToday = bookings.filter(b => isSameDay(b.createdAt, now)).length;
-        const completedToday = bookings.filter(b => b.bookingStatus === BookingStatus.Completed && isSameDay(b.bookingDate, now)).length;
-        const monthlyIncome = transactions.filter(t => t.date >= monthStart).reduce((sum, t) => sum + t.amount, 0);
-        const monthlyExpense = expenses.filter(e => e.date >= monthStart).reduce((sum, e) => sum + e.amount, 0);
+        const todaysRevenue = transactions.filter(t => isSameDay(new Date(t.date), now)).reduce((sum, t) => sum + t.amount, 0);
+        const newBookingsToday = bookings.filter(b => isSameDay(new Date(b.createdAt), now)).length;
+        const completedToday = bookings.filter(b => b.bookingStatus === BookingStatus.Completed && isSameDay(new Date(b.bookingDate), now)).length;
+        const monthlyIncome = transactions.filter(t => new Date(t.date) >= monthStart).reduce((sum, t) => sum + t.amount, 0);
+        const monthlyExpense = expenses.filter(e => new Date(e.date) >= monthStart).reduce((sum, e) => sum + e.amount, 0);
 
         return { todaysRevenue, newBookingsToday, completedToday, monthlyProfit: monthlyIncome - monthlyExpense };
     }, [transactions, bookings, expenses]);
@@ -117,8 +115,8 @@ const AdminDashboardPage: React.FC = () => {
     const chartData = useMemo(() => {
         const last30Days = eachDayOfInterval({ start: subDays(new Date(), 29), end: new Date() });
         const dailyData = last30Days.map(date => {
-            const Pemasukan = transactions.filter(t => isSameDay(t.date, date)).reduce((sum, t) => sum + t.amount, 0);
-            const Pengeluaran = expenses.filter(e => isSameDay(e.date, date)).reduce((sum, e) => sum + e.amount, 0);
+            const Pemasukan = transactions.filter(t => isSameDay(new Date(t.date), date)).reduce((sum, t) => sum + t.amount, 0);
+            const Pengeluaran = expenses.filter(e => isSameDay(new Date(e.date), date)).reduce((sum, e) => sum + e.amount, 0);
             return { name: format(date, 'd MMM'), Pemasukan, Pengeluaran };
         });
 
@@ -169,8 +167,8 @@ const AdminDashboardPage: React.FC = () => {
 
 
     const upcomingBookings = useMemo(() => bookings
-        .filter(b => b.bookingDate > new Date() && b.bookingStatus === BookingStatus.Confirmed)
-        .sort((a, b) => a.bookingDate.getTime() - b.bookingDate.getTime())
+        .filter(b => new Date(b.bookingDate) > new Date() && b.bookingStatus === BookingStatus.Confirmed)
+        .sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime())
         .slice(0, 5), [bookings]);
     
     
@@ -270,7 +268,7 @@ const AdminDashboardPage: React.FC = () => {
                                         <div className="w-8 h-8 rounded-full bg-base-200 flex items-center justify-center flex-shrink-0"><UserCheck size={16} className="text-muted"/></div>
                                         <div>
                                             <p className="text-sm text-base-content leading-tight"><span className="font-semibold">{log.userName}</span> {log.action.toLowerCase()}</p>
-                                            <p className="text-xs text-muted">{formatDistanceToNow(log.timestamp, { addSuffix: true, locale: id })}</p>
+                                            <p className="text-xs text-muted">{formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: id })}</p>
                                         </div>
                                     </motion.li>
                                 ))}

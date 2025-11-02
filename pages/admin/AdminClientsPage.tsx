@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { getClients, deleteClient } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -71,7 +72,7 @@ const AdminClientsPage = () => {
                     )}
                  </td>
                 <td className="px-5 py-5 border-b border-gray-200 text-sm text-center font-semibold">{client.loyaltyPoints || 0}</td>
-                <td className="px-5 py-5 border-b border-gray-200 text-sm text-gray-600">{client.lastBooking.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+                <td className="px-5 py-5 border-b border-gray-200 text-sm text-gray-600">{new Date(client.lastBooking).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
                 <td className="px-5 py-5 border-b border-gray-200 text-sm text-center">
                     <button onClick={() => handleDeleteClick(client)} className="p-2 text-muted hover:text-error hover:bg-base-200 rounded-full transition-colors" title="Hapus Klien">
                         <Trash2 size={16}/>

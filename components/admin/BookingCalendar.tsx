@@ -1,13 +1,11 @@
 
-
 import React, { useMemo } from 'react';
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import format from 'date-fns/format';
-import getDay from 'date-fns/getDay';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
+import { Calendar, dateFnsLocalizer, Event as BigCalendarEvent, Views } from 'react-big-calendar';
+// FIX: Use named imports for date-fns functions
+import { format, getDay, parse, startOfWeek } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { Booking, BookingStatus } from '../../types';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const locales = {
   'id': id,
@@ -26,70 +24,83 @@ interface BookingCalendarProps {
   onSelectBooking: (booking: Booking) => void;
 }
 
-// Define a more specific type for calendar events for clarity
-interface CalendarEvent {
-  title: string;
-  start: Date;
-  end: Date;
+// Define a more specific type for events to include the original booking
+interface CalendarEvent extends BigCalendarEvent {
   resource: Booking;
 }
 
-const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, onSelectBooking }) => {
-  const events = useMemo(() => {
-    return bookings.map((booking): CalendarEvent => {
-      const eventDate = booking.bookingStatus === BookingStatus.RescheduleRequested && booking.rescheduleRequestDate
-          ? booking.rescheduleRequestDate
-          : booking.bookingDate;
-
-      return {
-        title: `${booking.clientName} - ${booking.package.name}`,
-        start: eventDate,
-        end: new Date(eventDate.getTime() + 60 * 60 * 1000), // Assume 1 hour duration
-        resource: booking,
-      };
-    });
-  }, [bookings]);
-
-  const eventPropGetter = (event: CalendarEvent) => {
-    const status = event.resource.bookingStatus;
-    let className = 'rbc-event ';
-    if (status === BookingStatus.Confirmed) {
-      className += 'bg-blue-500';
-    } else if (status === BookingStatus.RescheduleRequested) {
-      className += 'bg-orange-500';
-    } else if (status === BookingStatus.InProgress) {
-        className += 'bg-indigo-500';
-    } else {
-      className += 'bg-gray-500';
+const eventStyleGetter = (event: CalendarEvent) => {
+    let backgroundColor = '#3b82f6'; // Default blue for confirmed
+    switch (event.resource.bookingStatus) {
+        case BookingStatus.Pending:
+            backgroundColor = '#f59e0b'; // amber-500
+            break;
+        case BookingStatus.InProgress:
+            backgroundColor = '#6366f1'; // indigo-500
+            break;
+        case BookingStatus.Completed:
+            backgroundColor = '#16a34a'; // green-600
+            break;
+        case BookingStatus.Cancelled:
+            backgroundColor = '#6b7280'; // gray-500
+            break;
+        case BookingStatus.RescheduleRequested:
+            backgroundColor = '#f97316'; // orange-500
+            break;
     }
-    return { className };
-  };
+    return {
+        style: {
+            backgroundColor,
+            borderRadius: '5px',
+            opacity: 0.8,
+            color: 'white',
+            border: '0px',
+            display: 'block'
+        }
+    };
+};
 
-  return (
-    <div className="bg-white p-4 rounded-lg shadow-md" style={{ height: '75vh' }}>
-      <Calendar
-        localizer={localizer}
-        events={events}
-        startAccessor="start"
-        endAccessor="end"
-        style={{ height: '100%' }}
-        onSelectEvent={(event) => onSelectBooking(event.resource)}
-        eventPropGetter={eventPropGetter}
-        messages={{
-            next: "Berikutnya",
-            previous: "Sebelumnya",
-            today: "Hari Ini",
-            month: "Bulan",
-            week: "Minggu",
-            day: "Hari",
-            agenda: "Agenda",
-            date: "Tanggal",
-            time: "Waktu",
-            event: "Acara",
-        }}
-      />
-    </div>
-  );
+const BookingCalendar: React.FC<BookingCalendarProps> = ({ bookings, onSelectBooking }) => {
+    const events = useMemo((): CalendarEvent[] => {
+        return bookings.map(booking => ({
+            title: `${booking.clientName} - ${booking.package.name}`,
+            start: booking.bookingDate,
+            end: new Date(booking.bookingDate.getTime() + 60 * 60 * 1000), // Assume 1 hour duration
+            resource: booking,
+        }));
+    }, [bookings]);
+
+    const handleSelectEvent = (event: CalendarEvent) => {
+        onSelectBooking(event.resource);
+    };
+
+    return (
+        <div className="bg-white p-4 rounded-lg shadow-md h-[75vh]">
+            <Calendar<CalendarEvent>
+                localizer={localizer}
+                events={events}
+                startAccessor="start"
+                endAccessor="end"
+                style={{ height: '100%' }}
+                onSelectEvent={handleSelectEvent}
+                eventPropGetter={eventStyleGetter}
+                messages={{
+                    next: "Berikutnya",
+                    previous: "Sebelumnya",
+                    today: "Hari Ini",
+                    month: "Bulan",
+                    week: "Minggu",
+                    day: "Hari",
+                    agenda: "Agenda",
+                    date: "Tanggal",
+                    time: "Waktu",
+                    event: "Sesi",
+                }}
+                culture='id'
+                views={[Views.MONTH, Views.WEEK, Views.DAY]}
+            />
+        </div>
+    );
 };
 
 export default BookingCalendar;

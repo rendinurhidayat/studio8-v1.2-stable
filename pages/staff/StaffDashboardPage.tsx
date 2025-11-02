@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { getTodaysBookings, getBookings, getClients } from '../../services/api';
 import { Booking, BookingStatus, Client } from '../../types';
 import StatCard from '../../components/admin/StatCard';
 import { Link } from 'react-router-dom';
 import { BookOpen, UserCheck, Clock, ArrowRight, Calendar, User, Package as PackageIcon } from 'lucide-react';
-import format from 'date-fns/format';
+// FIX: Use named import for date-fns format function
+import { format } from 'date-fns';
 
 const IconWrapper: React.FC<{ children: React.ReactNode, className?: string }> = ({ children, className }) => (
     <div className={`p-3 rounded-full ${className}`}>
@@ -16,7 +18,7 @@ const TodaysBookingCard: React.FC<{ booking: Booking }> = ({ booking }) => (
     <div className="flex items-center justify-between p-4 bg-white hover:bg-base-100/50 rounded-xl transition-colors border border-base-200">
         <div className="flex items-center gap-4">
             <div className="flex flex-col items-center justify-center w-16 h-16 bg-accent/10 text-accent rounded-lg font-bold">
-                <span className="text-xl">{format(booking.bookingDate, 'HH:mm')}</span>
+                <span className="text-xl">{format(new Date(booking.bookingDate), 'HH:mm')}</span>
             </div>
             <div>
                 <p className="font-semibold text-sm text-base-content">{booking.clientName}</p>
@@ -45,7 +47,7 @@ const StaffDashboardPage = () => {
 
             const lastCompleted = allData
                 .filter(b => b.bookingStatus === BookingStatus.Completed)
-                .sort((a, b) => b.bookingDate.getTime() - a.bookingDate.getTime())[0];
+                .sort((a, b) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime())[0];
             setLastClient(lastCompleted || null);
             
             setLoading(false);
@@ -56,7 +58,7 @@ const StaffDashboardPage = () => {
     const weeklyBookingsCount = useMemo(() => {
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        return allBookings.filter(b => b.createdAt >= oneWeekAgo).length;
+        return allBookings.filter(b => new Date(b.createdAt) >= oneWeekAgo).length;
     }, [allBookings]);
 
     if (loading) {

@@ -39,6 +39,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (userDoc.exists()) {
                         const data = userDoc.data() as DocumentData;
                         
+                        // Firestore returns dates as Timestamps, they will be converted to ISO strings
+                        // by our updated logic. Here we convert them back to Date objects for use in the app context.
+                        const startDate = data.startDate ? new Date(data.startDate) : undefined;
+                        const endDate = data.endDate ? new Date(data.endDate) : undefined;
+                        
                         const appUser: User = {
                             id: firebaseUser.uid,
                             name: data.name || 'No Name',
@@ -48,8 +53,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             username: data.username,
                             asalSekolah: data.asalSekolah,
                             jurusan: data.jurusan,
-                            startDate: data.startDate?.toDate(),
-                            endDate: data.endDate?.toDate(),
+                            startDate: startDate?.toISOString(),
+                            endDate: endDate?.toISOString(),
                             totalPoints: data.totalPoints
                         };
                         setUser(appUser);

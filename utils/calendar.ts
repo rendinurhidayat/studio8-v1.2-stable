@@ -1,5 +1,5 @@
 import { Booking } from '../types';
-import format from 'date-fns/format';
+import { format } from 'date-fns';
 
 /**
  * Generates a Google Calendar event creation link from a booking object.
@@ -7,7 +7,7 @@ import format from 'date-fns/format';
  * @returns A URL string to create a Google Calendar event.
  */
 export const generateGoogleCalendarLink = (booking: Booking): string => {
-  const startTime = booking.bookingDate;
+  const startTime = new Date(booking.bookingDate);
   // Assuming a 1-hour session duration for the calendar event
   const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
 

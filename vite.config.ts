@@ -18,8 +18,26 @@ export default defineConfig({
     // functions on port 3000 by default.
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3000',
+        target: 'http://localhost:3000', // Changed to localhost for better compatibility
         changeOrigin: true,
+        // Add logging to debug proxy issues
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('--- VITE PROXY ERROR ---');
+            console.log('An error occurred while trying to proxy a request.');
+            console.log('Request URL:', req.method, req.url);
+            console.log('Error:', err);
+            console.log('This usually means the backend server (Vercel functions) is not running on the target port, or there is a network issue.');
+            console.log('Check the output of `vercel dev` to see which port the API is running on.');
+            console.log('------------------------');
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log(`[Vite Proxy] Sending request: ${req.method} ${req.url} -> http://localhost:3000${proxyReq.path}`);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log(`[Vite Proxy] Received response: ${proxyRes.statusCode} ${req.url}`);
+          });
+        }
       },
     },
   },

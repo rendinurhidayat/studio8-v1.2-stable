@@ -85,8 +85,8 @@ export interface User {
   password?: string;
   asalSekolah?: string;
   jurusan?: string;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: string; // ISO 8601 string
+  endDate?: string; // ISO 8601 string
   totalPoints?: number;
 }
 
@@ -136,7 +136,7 @@ export interface Booking {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
-  bookingDate: Date;
+  bookingDate: string; // ISO 8601 string
   package: Package;
   selectedSubPackage: SubPackage;
   addOns: AddOn[];
@@ -147,9 +147,9 @@ export interface Booking {
   bookingStatus: BookingStatus;
   totalPrice: number;
   remainingBalance: number;
-  createdAt: Date;
+  createdAt: string; // ISO 8601 string
   paymentProofUrl?: string;
-  rescheduleRequestDate?: Date;
+  rescheduleRequestDate?: string; // ISO 8601 string
   notes?: string;
   googleDriveLink?: string;
   discountAmount?: number;
@@ -170,7 +170,7 @@ export interface Booking {
   activityType?: string;
   requestLetterUrl?: string;
   paymentMode?: 'dp' | 'lunas' | 'termin';
-  dueDate?: Date; // For termin payments
+  dueDate?: string; // ISO 8601 string
   agreementUrl?: string;
 }
 
@@ -195,13 +195,13 @@ export interface Sponsorship {
   benefits: string;
   proposalUrl: string;
   status: SponsorshipStatus;
-  createdAt: Date;
+  createdAt: string; // ISO 8601 string
   agreementUrl?: string; // MoU URL
 }
 
 export interface CollaborationActivity {
   id: string;
-  timestamp: Date;
+  timestamp: string; // ISO 8601 string
   action: string;
   details?: string;
   userName: string;
@@ -209,7 +209,7 @@ export interface CollaborationActivity {
 
 export interface Transaction {
   id: string;
-  date: Date;
+  date: string; // ISO 8601 string
   description: string;
   type: TransactionType;
   amount: number;
@@ -221,8 +221,8 @@ export interface Client {
   name: string;
   email: string;
   phone: string;
-  firstBooking: Date;
-  lastBooking: Date;
+  firstBooking: string; // ISO 8601 string
+  lastBooking: string; // ISO 8601 string
   totalBookings: number;
   totalSpent: number;
   loyaltyPoints: number;
@@ -240,14 +240,14 @@ export interface Task {
   assigneeName: string;
   creatorId: string;
   creatorName: string;
-  createdAt: Date;
-  dueDate?: Date;
+  createdAt: string; // ISO 8601 string
+  dueDate?: string; // ISO 8601 string
   progress?: number; // 0-100
 }
 
 export interface Expense {
     id: string;
-    date: Date;
+    date: string; // ISO 8601 string
     description: string;
     amount: number;
     addedBy: string;
@@ -258,7 +258,7 @@ export interface Feedback {
   nama: string;
   rating: number;
   komentar: string;
-  tanggal: Date;
+  tanggal: string; // ISO 8601 string
   publish: boolean;
 }
 
@@ -268,7 +268,7 @@ export interface MentorFeedback {
   taskTitle: string;
   feedback: string;
   rating: number;
-  date: Date;
+  date: string; // ISO 8601 string
   mentorId: string;
   mentorName: string;
 }
@@ -282,7 +282,7 @@ export interface FeedbackAnalysis {
 
 export interface Insight {
     id: string;
-    date: Date;
+    date: string; // ISO 8601 string
     insight: string;
 }
 
@@ -290,7 +290,7 @@ export interface AIInsight {
   id: string;
   type: 'produktif' | 'santai' | 'tidak fokus' | 'default';
   insight: string;
-  date: Date;
+  date: string; // ISO 8601 string
 }
 
 export interface Notification {
@@ -376,7 +376,7 @@ export interface SystemSettings {
 
 export interface ActivityLog {
     id: string;
-    timestamp: Date;
+    timestamp: string; // ISO 8601 string
     userId: string;
     userName: string;
     action: string;
@@ -388,7 +388,7 @@ export interface InventoryItem {
     name: string;
     category: string;
     status: InventoryStatus;
-    lastChecked: Date | null;
+    lastChecked: string | null; // ISO 8601 string
     notes?: string;
 }
 
@@ -402,15 +402,15 @@ export interface Asset {
   tags: string[];
   uploadedBy: string; // User's name
   uploadedById: string; // User's ID
-  uploadedAt: Date;
+  uploadedAt: string; // ISO 8601 string
 }
 
 export interface Attendance {
     id: string;
     userId: string;
     date: string; // YYYY-MM-DD
-    checkInTime: Date;
-    checkOutTime?: Date;
+    checkInTime: string; // ISO 8601 string
+    checkOutTime?: string; // ISO 8601 string
     status: AttendanceStatus;
 }
 
@@ -422,7 +422,7 @@ export interface DailyReport {
     mood: InternMood;
     status: ReportStatus;
     blockers?: string;
-    submittedAt: Date;
+    submittedAt: string; // ISO 8601 string
     mentorFeedback?: string;
 }
 
@@ -430,7 +430,7 @@ export interface InternReport {
   id: string;
   fileName: string;
   downloadUrl: string;
-  generatedAt: Date;
+  generatedAt: string; // ISO 8601 string
   generatedBy: string; // mentor's name
 }
 
@@ -439,7 +439,7 @@ export interface ChatMessage {
     senderId: string;
     senderName: string;
     text: string;
-    timestamp: Date;
+    timestamp: string; // ISO 8601 string
 }
 
 export interface ChatRoom {
@@ -454,10 +454,10 @@ export interface ChatRoom {
     };
     lastMessage?: {
         text: string;
-        timestamp: Date;
+        timestamp: string; // ISO 8601 string
         senderId: string;
     };
-    createdAt: Date;
+    createdAt: string; // ISO 8601 string
 }
 
 export interface HighlightWork {
@@ -470,7 +470,7 @@ export interface HighlightWork {
   mediaUrl: string;
   thumbnailUrl: string;
   type: 'Video' | 'Image' | 'Design';
-  highlightDate: Date;
+  highlightDate: string; // ISO 8601 string
   category: 'Client' | 'PKL' | 'Event' | 'BTS';
   instagramUrl?: string;
 }
@@ -481,7 +481,7 @@ export interface Certificate {
   major: string;
   period: string; // e.g., "2 Feb 2026 - 30 Mei 2026"
   mentor: string;
-  issuedDate: Date;
+  issuedDate: string; // ISO 8601 string
   certificateUrl: string; // URL to the PDF on Cloudinary
   qrValidationUrl: string; // Public URL for validation
   verified: boolean; // Always true upon creation
@@ -500,7 +500,7 @@ export interface DailyProgress {
   note: string;
   documentationUrl?: string;
   weekNumber: number;
-  submittedAt: Date;
+  submittedAt: string; // ISO 8601 string
 }
 
 export interface WeeklyEvaluation {
@@ -517,7 +517,7 @@ export interface WeeklyEvaluation {
   averageScore: number;
   mentorId: string;
   mentorName: string;
-  date: Date;
+  date: string; // ISO 8601 string
 }
 
 export type BadgeIconName = 'CheckCircle' | 'TrendingUp' | 'Zap' | 'ShieldCheck';
@@ -550,7 +550,7 @@ export interface Quiz {
     category: QuizCategory;
     questions: QuizQuestion[];
     createdBy: string; // userId
-    createdAt: Date;
+    createdAt: string; // ISO 8601 string
     timeLimit?: number; // Time limit in minutes
     isMonthlyExam?: boolean;
 }
@@ -569,7 +569,7 @@ export interface QuizResult {
         correctAnswerIndex: number;
         isCorrect: boolean;
     }[];
-    submittedAt: Date;
+    submittedAt: string; // ISO 8601 string
     quiz?: Quiz; // Optional: Embed the full quiz for review
     aiFeedback?: string; // AI-generated overall feedback
 }
@@ -578,7 +578,7 @@ export interface PracticalClass {
     id: string;
     topic: string;
     description: string;
-    classDate: Date;
+    classDate: string; // ISO 8601 string
     mentorName: string;
     maxParticipants: number;
     registeredInternIds: string[];
@@ -599,9 +599,9 @@ export interface ForumThread {
     content: string;
     authorId: string;
     authorName: string;
-    createdAt: Date;
+    createdAt: string; // ISO 8601 string
     replyCount: number;
-    lastReplyAt?: Date;
+    lastReplyAt?: string; // ISO 8601 string
 }
 
 export interface ForumReply {
@@ -610,7 +610,7 @@ export interface ForumReply {
     content: string;
     authorId: string;
     authorName: string;
-    createdAt: Date;
+    createdAt: string; // ISO 8601 string
 }
 
 export enum JobType {
@@ -630,18 +630,18 @@ export interface JobPost {
     applyLink: string;
     postedById: string;
     postedByName: string;
-    createdAt: Date;
+    createdAt: string; // ISO 8601 string
 }
 
 export interface CommunityEvent {
     id: string;
     title: string;
     description: string;
-    eventDate: Date;
+    eventDate: string; // ISO 8601 string
     location: string;
     createdById: string;
     createdByName: string;
-    createdAt: Date;
+    createdAt: string; // ISO 8601 string
 }
 
 export interface ImageUpload {

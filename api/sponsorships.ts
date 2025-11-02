@@ -80,53 +80,25 @@ async function sendPushNotification(db: admin.firestore.Firestore, title: string
 
 // --- Action Handlers ---
 
-async function handleCreate(req: VercelRequest, res: VercelResponse) {
-    const db = admin.firestore();
-    const { sponsorshipData, userId } = req.body;
-    if (!sponsorshipData || !userId) {
-        return res.status(400).json({ message: "sponsorshipData and userId are required." });
-    }
-    
-    const publicId = `proposal_${sponsorshipData.institutionName?.replace(/\s+/g, '_')}_${Date.now()}`;
-    const uploadResult = await cloudinary.uploader.upload(sponsorshipData.proposalUrl, {
-        folder: "studio8_proposals", public_id: publicId, resource_type: "auto", upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET
-    });
-
-    try {
-        const newSponsorship = {
-            ...sponsorshipData,
-            proposalUrl: uploadResult.secure_url,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            status: 'Pending',
-        };
-        await db.collection('sponsorships').add(newSponsorship);
-
-        const userDoc = await db.collection('users').doc(userId).get();
-        const userName = userDoc.data()?.name || 'Unknown User';
-        await db.collection('activity_logs').add({
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            userId,
-            userName,
-            action: 'Menambah Kerjasama Sponsorship',
-            details: `Proposal dari ${newSponsorship.institutionName}`
-        });
-
-        return res.status(200).json({ success: true });
-    } catch (dbError) {
-        console.warn(`Firestore write failed for sponsorship. Deleting orphaned file: ${publicId}`);
-        await cloudinary.uploader.destroy(publicId).catch(delErr => console.error(`CRITICAL: Failed to delete orphaned file ${publicId}`, delErr));
-        throw dbError;
-    }
-}
-
 async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
     const db = admin.firestore();
     const sponsorshipData = req.body;
     
+    if (!sponsorshipData.proposalBase64) {
+        throw new Error("Proposal file is required.");
+    }
+
     const publicId = `proposal_${sponsorshipData.institutionName?.replace(/\s+/g, '_')}_${Date.now()}`;
-    const uploadResult = await cloudinary.uploader.upload(sponsorshipData.proposalBase64, {
-        folder: "studio8_proposals", public_id: publicId, resource_type: "auto", upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET
-    });
+    
+    let uploadResult;
+    try {
+        uploadResult = await cloudinary.uploader.upload(sponsorshipData.proposalBase64, {
+            folder: "studio8_proposals", public_id: publicId, resource_type: "auto", upload_preset: process.env.CLOUDINARY_UPLOAD_PRESET
+        });
+    } catch (uploadError) {
+        console.error("Cloudinary upload failed for sponsorship proposal:", uploadError);
+        throw new Error("Gagal mengunggah file proposal. Mohon coba lagi.");
+    }
 
     try {
         const newSponsorship = {
@@ -144,10 +116,10 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
         const body = `Dari ${newSponsorship.institutionName} untuk event ${newSponsorship.eventName}`;
         sendPushNotification(db, 'Proposal Kerjasama Baru!', body, '/admin/collaboration').catch(err => console.error("Push notification failed in background:", err));
         return res.status(200).json({ success: true });
-    } catch (dbError) {
+    } catch (dbError: any) {
         console.warn(`Firestore write failed for public sponsorship. Deleting orphaned file: ${publicId}`);
         await cloudinary.uploader.destroy(publicId).catch(delErr => console.error(`CRITICAL: Failed to delete orphaned file ${publicId}`, delErr));
-        throw dbError;
+        throw new Error(`Gagal menyimpan data proposal ke database: ${dbError.message}`);
     }
 }
 
@@ -166,8 +138,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         req.body = payload;
 
         switch (action) {
-            case 'create':
-                return await handleCreate(req, res);
             case 'createPublic':
                 return await handleCreatePublic(req, res);
             default:
@@ -177,8 +147,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error(`API Error in sponsorships handler (action: ${action}):`, error);
         return res.status(500).json({
             success: false,
-            message: "Gagal memproses permintaan sponsorship.",
-            error: error.message || String(error),
+            message: error.message || "Gagal memproses permintaan sponsorship.",
+            error: error.message,
         });
     }
 }

@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect } from 'react';
 import { getUsers, addUser, updateUser, deleteUser, getTasksForUser, createTask, deleteTask, addMentorFeedback, getMentorFeedbackForIntern, updateTask } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,8 +9,8 @@ import { User, UserRole, Task, MentorFeedback } from '../../types';
 import { PlusCircle, Edit, Trash2, ClipboardList, Loader2, Send, MessageSquare, Star, Eye, Image as ImageIcon } from 'lucide-react';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import format from 'date-fns/format';
-import addDays from 'date-fns/addDays';
+// FIX: Use named imports for date-fns functions
+import { format, addDays } from 'date-fns';
 import id from 'date-fns/locale/id';
 import StarRating from '../../components/feedback/StarRating';
 import { fileToBase64 } from '../../utils/fileUtils';
@@ -128,8 +129,8 @@ const TaskManagementModal: React.FC<{
             assigneeName: user.name,
             creatorId: currentUser.id,
             creatorName: currentUser.name,
-            createdAt: creationDate,
-            dueDate: dueDate ? new Date(dueDate) : addDays(creationDate, 3),
+            createdAt: creationDate.toISOString(),
+            dueDate: dueDate ? new Date(dueDate).toISOString() : addDays(creationDate, 3).toISOString(),
             progress: 0,
         };
 
@@ -189,8 +190,8 @@ const TaskManagementModal: React.FC<{
                                                 <p className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>{task.text}</p>
                                                 {task.description && <p className="text-sm text-gray-500 mt-1">{task.description}</p>}
                                                 <div className="text-xs text-gray-400 mt-1 space-x-2">
-                                                    <span>Dibuat: {format(task.createdAt, 'd MMM yyyy', { locale: id })}</span>
-                                                    {task.dueDate && <span>Tenggat: {format(task.dueDate, 'd MMM yyyy', { locale: id })}</span>}
+                                                    <span>Dibuat: {format(new Date(task.createdAt), 'd MMM yyyy', { locale: id })}</span>
+                                                    {task.dueDate && <span>Tenggat: {format(new Date(task.dueDate), 'd MMM yyyy', { locale: id })}</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -294,8 +295,8 @@ const AdminUsersPage = () => {
         photoURL: user.photoURL || '',
         asalSekolah: user.asalSekolah || '',
         jurusan: user.jurusan || '',
-        startDate: user.startDate ? format(user.startDate, 'yyyy-MM-dd') : '',
-        endDate: user.endDate ? format(user.endDate, 'yyyy-MM-dd') : '',
+        startDate: user.startDate ? format(new Date(user.startDate), 'yyyy-MM-dd') : '',
+        endDate: user.endDate ? format(new Date(user.endDate), 'yyyy-MM-dd') : '',
     });
     setPhotoFile(null);
     setIsModalOpen(true);
@@ -348,8 +349,8 @@ const AdminUsersPage = () => {
             dataToSubmit.startDate = '';
             dataToSubmit.endDate = '';
         } else {
-            dataToSubmit.startDate = formData.startDate ? new Date(formData.startDate) : undefined;
-            dataToSubmit.endDate = formData.endDate ? new Date(formData.endDate) : undefined;
+            dataToSubmit.startDate = formData.startDate ? new Date(formData.startDate).toISOString() : undefined;
+            dataToSubmit.endDate = formData.endDate ? new Date(formData.endDate).toISOString() : undefined;
         }
 
         if (isEditing && selectedUser) {

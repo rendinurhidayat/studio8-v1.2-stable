@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, DocumentSnapshot, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+import { getFirestore, DocumentSnapshot, initializeFirestore, CACHE_SIZE_UNLIMITED, Firestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getMessaging } from 'firebase/messaging';
 
@@ -52,7 +52,7 @@ const messaging = getMessaging(app);
 // Apply experimental settings to mitigate potential connectivity issues in certain environments (e.g., Vercel deployments).
 // This forces Firestore to use HTTP long-polling instead of WebSockets.
 // It must be called before any other Firestore operations are initiated.
-let db;
+let db: Firestore;
 try {
     db = initializeFirestore(app, {
       experimentalForceLongPolling: true,

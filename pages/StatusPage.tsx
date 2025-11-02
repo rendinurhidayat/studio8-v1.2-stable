@@ -8,10 +8,9 @@ import Modal from '../components/common/Modal';
 import ChatbotModal from '../components/common/ChatbotModal';
 import { useSystemSettings } from '../App';
 import { motion, AnimatePresence } from 'framer-motion';
-import format from 'date-fns/format';
+// FIX: Use named imports for date-fns functions
+import { format, isBefore, startOfToday } from 'date-fns';
 import id from 'date-fns/locale/id';
-import isBefore from 'date-fns/isBefore';
-import startOfToday from 'date-fns/startOfToday';
 
 
 const RescheduleModal: React.FC<{
@@ -146,7 +145,7 @@ const TrackingTimeline: React.FC<{ booking: Booking }> = ({ booking }) => {
                             </span>
                             <div className="p-4 bg-base-100 rounded-lg border">
                                 <h3 className="font-semibold text-primary">{step.title}</h3>
-                                {step.timestamp && !isCompleted && <time className="block mb-2 text-xs font-normal leading-none text-muted">Dibuat pada {format(step.timestamp, 'd MMM yyyy, HH:mm', { locale: id })}</time>}
+                                {step.timestamp && !isCompleted && <time className="block mb-2 text-xs font-normal leading-none text-muted">Dibuat pada {format(new Date(step.timestamp), 'd MMM yyyy, HH:mm', { locale: id })}</time>}
                                 <p className="text-sm text-muted">{step.description}</p>
                             </div>
                         </li>
@@ -167,8 +166,8 @@ const BookingSummaryCard: React.FC<{ booking: Booking }> = ({ booking }) => (
         </div>
         <div className="flex items-center gap-3"><User size={18} className="text-muted"/> <span className="font-semibold">{booking.clientName}</span></div>
         <div className="flex items-center gap-3"><BookOpen size={18} className="text-muted"/> <span className="font-semibold">{booking.package.name} ({booking.selectedSubPackage.name})</span></div>
-        <div className="flex items-center gap-3"><Calendar size={18} className="text-muted"/> <span className="font-semibold">{format(booking.bookingDate, 'eeee, d MMMM yyyy', { locale: id })}</span></div>
-        <div className="flex items-center gap-3"><Clock size={18} className="text-muted"/> <span className="font-semibold">{format(booking.bookingDate, 'HH:mm')} WIB</span></div>
+        <div className="flex items-center gap-3"><Calendar size={18} className="text-muted"/> <span className="font-semibold">{format(new Date(booking.bookingDate), 'eeee, d MMMM yyyy', { locale: id })}</span></div>
+        <div className="flex items-center gap-3"><Clock size={18} className="text-muted"/> <span className="font-semibold">{format(new Date(booking.bookingDate), 'HH:mm')} WIB</span></div>
     </div>
 );
 
@@ -412,7 +411,7 @@ const StatusPage = () => {
               <div className="lg:col-span-2 space-y-6">
                 <ClientPortal />
                 <TrackingTimeline booking={booking} />
-                {booking.bookingStatus === BookingStatus.Confirmed && isBefore(new Date(), booking.bookingDate) && <PreparationTipsCard />}
+                {booking.bookingStatus === BookingStatus.Confirmed && isBefore(new Date(), new Date(booking.bookingDate)) && <PreparationTipsCard />}
                 <LocationCard />
               </div>
             </motion.div>

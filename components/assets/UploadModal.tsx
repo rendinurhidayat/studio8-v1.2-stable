@@ -87,7 +87,7 @@ const UploadModal: React.FC<{ isOpen: boolean; onClose: () => void; onUploadComp
                     tags: fileWrapper.tags.split(',').map(t => t.trim()).filter(Boolean),
                     uploadedBy: user.name,
                     uploadedById: user.id,
-                    uploadedAt: new Date(),
+                    uploadedAt: new Date().toISOString(),
                 };
                 await addAsset(assetData, user.id);
                 

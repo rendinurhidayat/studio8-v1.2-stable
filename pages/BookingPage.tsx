@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getPackages, getAddOns } from '../services/api';
@@ -9,6 +10,7 @@ import InstitutionalBookingForm from '../components/client/InstitutionalBookingF
 import SponsorshipForm from '../components/client/SponsorshipForm';
 import { Camera, Briefcase, Award, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import AiRecommenderModal from '../components/client/AiRecommenderModal';
 
 const PackageSidebar: React.FC<{
     packages: Package[];
@@ -46,6 +48,7 @@ const BookingPage = () => {
     const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeForm, setActiveForm] = useState<'package' | 'institutional' | 'sponsorship'>('package');
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -68,6 +71,11 @@ const BookingPage = () => {
 
     const selectedPackage = packages.find(p => p.id === selectedPackageId);
 
+    const handleRecommendationSelect = (recommendedPackage: Package) => {
+        setSelectedPackageId(recommendedPackage.id);
+        setIsAiModalOpen(false);
+    };
+
     const renderContent = () => {
         if (loading) {
             return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-primary" size={32}/></div>;
@@ -76,9 +84,9 @@ const BookingPage = () => {
         switch (activeForm) {
             case 'package':
                 if (selectedPackage) {
-                    return <BookingForm key={selectedPackage.id} pkg={selectedPackage} addOns={addOns} />;
+                    return <BookingForm key={selectedPackage.id} pkg={selectedPackage} addOns={addOns} onOpenAiRecommender={() => setIsAiModalOpen(true)} />;
                 }
-                return <div className="p-8 text-center text-muted">Pilih paket dari daftar di samping untuk memulai.</div>;
+                return <div className="p-8 text-center text-muted">Pilih paket dari daftar di samping untuk memulai, atau <button onClick={() => setIsAiModalOpen(true)} className="text-accent font-semibold hover:underline">dapatkan rekomendasi dari AI</button>.</div>;
             case 'institutional':
                 return <InstitutionalBookingForm />;
             case 'sponsorship':
@@ -115,6 +123,12 @@ const BookingPage = () => {
                     </motion.div>
                 </main>
             </div>
+             <AiRecommenderModal
+                isOpen={isAiModalOpen}
+                onClose={() => setIsAiModalOpen(false)}
+                packages={packages}
+                onRecommendationSelect={handleRecommendationSelect}
+            />
         </div>
     );
 };

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Briefcase, User, Phone, Users, Calendar, MessageSquare, UploadCloud, CheckCircle, Loader2, AlertTriangle, Send, Tag } from 'lucide-react';
@@ -50,8 +51,15 @@ const InstitutionalBookingForm = () => {
             });
 
             if(!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Gagal mengirim permintaan booking.');
+                let errorMessage = 'Gagal mengirim permintaan booking.';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } catch (jsonError) {
+                    const textError = await response.text();
+                    errorMessage = textError || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
             setIsSubmitted(true);

@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getPackages, getAddOns } from '../services/api';
@@ -267,7 +269,7 @@ const CartSummary: React.FC = () => {
                 <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
                     {cart.map(item => (
                         <div key={item.id} className="flex items-start gap-3">
-                            <img src={getOptimizedImageUrl(item.pkg.imageUrls[0], 100)} alt={item.pkg.name} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
+                            <img src={getOptimizedImageUrl(item.pkg.imageUrls?.[0] || '/images/hero-1.jpg', 100)} alt={item.pkg.name} className="w-16 h-16 object-cover rounded-lg flex-shrink-0" />
                             <div className="flex-grow">
                                 <p className="font-semibold text-sm text-base-content leading-tight">{item.pkg.name}</p>
                                 <p className="text-xs text-muted">{item.subPkg.name}</p>

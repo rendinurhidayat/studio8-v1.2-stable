@@ -13,7 +13,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { subscription, userId, role } = req.body;
 
         if (!subscription || !userId || !role) {
-            return res.status(400).json({ message: 'Subscription, userId, and role are required.' });
+            return res.status(400).json({ message: 'Payload tidak lengkap. `subscription`, `userId`, dan `role` wajib diisi.' });
+        }
+        
+        // Basic validation for the subscription object
+        if (!subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
+            return res.status(400).json({ message: 'Objek `subscription` tidak valid.' });
         }
 
         initFirebaseAdmin();
@@ -29,10 +34,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
 
-        return res.status(200).json({ success: true, message: 'Subscription saved successfully.' });
+        return res.status(200).json({ success: true, message: 'Langganan notifikasi berhasil disimpan.' });
 
     } catch (error: any) {
         console.error('Error saving push subscription:', error);
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        return res.status(500).json({ message: 'Gagal menyimpan langganan notifikasi di server.', error: error.message });
     }
 }

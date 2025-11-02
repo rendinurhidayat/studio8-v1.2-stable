@@ -29,11 +29,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 const currentUserDoc = await db.collection('users').doc(currentUserId).get();
                 if (!currentUserDoc.exists || currentUserDoc.data()?.role !== 'Admin') {
-                    return res.status(403).json({ message: 'Forbidden: You do not have permission to create users.' });
+                    return res.status(403).json({ message: 'Forbidden: Anda tidak memiliki izin untuk membuat pengguna.' });
                 }
                 
                 if (!userData.password) {
-                    return res.status(400).json({ message: 'Password is required to create a new user.' });
+                    return res.status(400).json({ message: 'Password wajib diisi untuk pengguna baru.' });
                 }
 
                 const { password, ...userDataForFirestore } = userData;
@@ -48,7 +48,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     photoURL: userData.photoURL || undefined,
                 });
                 
-                await db.collection('users').doc(newUserRecord.uid).set(userDataForFirestore);
+                try {
+                    await db.collection('users').doc(newUserRecord.uid).set(userDataForFirestore);
+                } catch (dbError) {
+                    // If Firestore write fails, delete the orphaned Auth user
+                    console.warn(`Firestore write failed for new user ${newUserRecord.uid}. Deleting orphaned Auth user.`);
+                    await auth.deleteUser(newUserRecord.uid);
+                    throw dbError; // Re-throw to be caught by the main handler
+                }
                 
                 await db.collection('activity_logs').add({
                     timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -70,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 // 1. Verify Admin Privileges
                 const currentUserDoc = await db.collection('users').doc(currentUserId).get();
                 if (!currentUserDoc.exists || currentUserDoc.data()?.role !== 'Admin') {
-                    return res.status(403).json({ message: 'Forbidden: You do not have permission to delete users.' });
+                    return res.status(403).json({ message: 'Forbidden: Anda tidak memiliki izin untuk menghapus pengguna.' });
                 }
 
                 // 2. Get user data for logging before deletion
@@ -99,21 +106,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (error: any) {
         console.error(`API Error in users handler (action: ${action}):`, error);
         
-        let errorMessage = 'Internal Server Error';
+        let errorMessage = 'Terjadi kesalahan pada server saat mengelola pengguna.';
         if (error.code === 'auth/user-not-found') {
-            errorMessage = 'User not found in Firebase Authentication. The account may have already been deleted.';
+            errorMessage = 'Pengguna tidak ditemukan di sistem autentikasi. Akun mungkin sudah dihapus.';
             try {
+                // Attempt to clean up Firestore data if Auth user is missing
                 const { userIdToDelete } = payload;
                 if (userIdToDelete) {
                      await admin.firestore().collection('users').doc(userIdToDelete).delete();
-                     return res.status(200).json({ success: true, message: 'User data cleaned up from Firestore.' });
+                     return res.status(200).json({ success: true, message: 'Data pengguna berhasil dibersihkan dari database.' });
                 }
             } catch (cleanupError) {
-                 return res.status(500).json({ message: 'User not found in Auth, and also failed to clean up Firestore.', error: (cleanupError as Error).message });
+                 return res.status(500).json({ message: 'Pengguna tidak ditemukan di Autentikasi, dan gagal membersihkan data database.', error: (cleanupError as Error).message });
             }
         }
         if (error.code === 'auth/email-already-exists') {
-            errorMessage = 'Email ini sudah digunakan oleh akun lain.';
+            errorMessage = 'Email ini sudah digunakan oleh akun lain. Silakan gunakan email yang berbeda.';
+        }
+        if (error.code === 'auth/invalid-password') {
+            errorMessage = 'Password harus terdiri dari minimal 6 karakter.';
         }
         
         return res.status(500).json({

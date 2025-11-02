@@ -56,7 +56,7 @@ const PracticalClassManager: React.FC<{
             await createPracticalClass({
                 topic: formData.topic,
                 description: formData.description,
-                classDate: new Date(formData.classDate),
+                classDate: new Date(formData.classDate).toISOString(),
                 mentorName: formData.mentorName,
                 maxParticipants: Number(formData.maxParticipants),
                 registeredInternIds: [],
@@ -95,7 +95,7 @@ const PracticalClassManager: React.FC<{
                             </div>
                             <p className="text-sm text-muted mt-1 flex-grow">{cls.description}</p>
                             <div className="text-xs text-muted mt-3 pt-3 border-t space-y-1">
-                                <div className="flex items-center gap-2"><Clock size={14}/> {format(cls.classDate, 'd MMM yyyy, HH:mm', { locale: id })}</div>
+                                <div className="flex items-center gap-2"><Clock size={14}/> {format(new Date(cls.classDate), 'd MMM yyyy, HH:mm', { locale: id })}</div>
                                 <div className="flex items-center gap-2"><UserIcon size={14}/> Mentor: {cls.mentorName}</div>
                                 <div className="flex items-center gap-2"><Users size={14}/> {cls.registeredInternIds.length} / {cls.maxParticipants} Peserta</div>
                             </div>
@@ -151,10 +151,10 @@ const PracticalClassViewer: React.FC<{ classes: PracticalClass[]; onUpdate: () =
 
     const { upcomingClasses, pastClasses } = useMemo(() => {
         const now = new Date();
-        const sortedClasses = [...classes].sort((a, b) => a.classDate.getTime() - b.classDate.getTime());
+        const sortedClasses = [...classes].sort((a, b) => new Date(a.classDate).getTime() - new Date(b.classDate).getTime());
         return {
-            upcomingClasses: sortedClasses.filter(c => c.classDate >= now),
-            pastClasses: sortedClasses.filter(c => c.classDate < now).reverse(),
+            upcomingClasses: sortedClasses.filter(c => new Date(c.classDate) >= now),
+            pastClasses: sortedClasses.filter(c => new Date(c.classDate) < now).reverse(),
         };
     }, [classes]);
 
@@ -173,7 +173,7 @@ const PracticalClassViewer: React.FC<{ classes: PracticalClass[]; onUpdate: () =
                                         <h3 className="font-bold text-accent">{cls.topic}</h3>
                                         <p className="text-sm text-muted mt-1">{cls.description}</p>
                                         <div className="text-xs text-base-content pt-3 mt-3 border-t space-y-2">
-                                            <div className="flex items-center gap-2"><Clock size={16}/> {format(cls.classDate, 'eeee, d MMMM yyyy, HH:mm', { locale: id })}</div>
+                                            <div className="flex items-center gap-2"><Clock size={16}/> {format(new Date(cls.classDate), 'eeee, d MMMM yyyy, HH:mm', { locale: id })}</div>
                                             <div className="flex items-center gap-2"><UserIcon size={16}/> Mentor: {cls.mentorName}</div>
                                             <div className="flex items-center gap-2"><Users size={16}/> Kuota: {cls.registeredInternIds.length} / {cls.maxParticipants}</div>
                                         </div>
@@ -207,7 +207,7 @@ const PracticalClassViewer: React.FC<{ classes: PracticalClass[]; onUpdate: () =
                     {pastClasses.map(cls => (
                         <div key={cls.id} className="bg-white p-4 rounded-lg border">
                              <p className="font-semibold text-primary">{cls.topic}</p>
-                             <p className="text-xs text-muted mt-1">{format(cls.classDate, 'd MMM yyyy', { locale: id })} - oleh {cls.mentorName}</p>
+                             <p className="text-xs text-muted mt-1">{format(new Date(cls.classDate), 'd MMM yyyy', { locale: id })} - oleh {cls.mentorName}</p>
                         </div>
                     ))}
                 </div>

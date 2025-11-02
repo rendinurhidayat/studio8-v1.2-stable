@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Award, Briefcase, User, Phone, FileText, UploadCloud, CheckCircle, Loader2, AlertTriangle, Send } from 'lucide-react';
@@ -50,8 +51,15 @@ const SponsorshipForm = () => {
             });
 
             if(!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Gagal mengirim proposal.');
+                let errorMessage = 'Gagal mengirim proposal.';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } catch (jsonError) {
+                    const textError = await response.text();
+                    errorMessage = textError || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
             setIsSubmitted(true);

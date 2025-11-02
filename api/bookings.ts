@@ -92,9 +92,7 @@ async function sendPushNotification(db: admin.firestore.Firestore, title: string
 
 // --- Server-side API Helpers ---
 const fromFirestore = <T extends object>(doc: admin.firestore.DocumentSnapshot): T & { id: string } => {
-    const data = { id: doc.id, ...doc.data() } as any;
-    // Note: Timestamps are handled by the caller, as they might be serialized for response.
-    return data as T & { id: string };
+    return { id: doc.id, ...doc.data() } as T & { id: string };
 };
 
 
@@ -113,30 +111,20 @@ async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
         return res.status(403).json({ message: 'Forbidden: You do not have permission to complete sessions.' });
     }
 
+    const bookingRef = db.collection('bookings').doc(bookingId);
+    let updatedBookingData: any = null;
+    
     try {
-        const bookingRef = db.collection('bookings').doc(bookingId);
-        
-        let referrerRef: admin.firestore.DocumentReference | null = null;
-        
-        const preTxBookingDoc = await bookingRef.get();
-        if (!preTxBookingDoc.exists) throw new Error("Booking not found.");
-        const bookingToComplete = fromFirestore<Booking>(preTxBookingDoc);
-
-        if (bookingToComplete.referralCodeUsed) {
-            const clientDoc = await db.collection('clients').doc(bookingToComplete.clientEmail.toLowerCase()).get();
-            if (clientDoc.exists && clientDoc.data()!.totalBookings === 0) {
-                 const referrerQuery = await db.collection('clients').where('referralCode', '==', bookingToComplete.referralCodeUsed).limit(1).get();
-                 if (!referrerQuery.empty) {
-                     referrerRef = referrerQuery.docs[0].ref;
-                 }
-            }
-        }
-
-        let updatedBookingData: any = null;
         await db.runTransaction(async (transaction) => {
             const bookingDoc = await transaction.get(bookingRef);
-            if (!bookingDoc.exists) throw new Error("Booking not found inside transaction.");
+            if (!bookingDoc.exists) throw new Error("Booking not found.");
             const bookingData = fromFirestore<Booking>(bookingDoc);
+
+            if (bookingData.bookingStatus === BookingStatus.Completed) {
+                console.warn(`Attempted to complete an already completed session: ${bookingId}`);
+                updatedBookingData = bookingData; // Set data to prevent further processing
+                return; // Exit transaction early
+            }
             
             const settingsDoc = await transaction.get(db.collection('settings').doc('main'));
             if (!settingsDoc.exists) throw new Error("System settings not found.");
@@ -148,30 +136,32 @@ async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
             const client = fromFirestore<Client>(clientDoc);
 
             const pointsEarned = Math.floor(bookingData.totalPrice * settings.loyaltySettings.pointsPerRupiah);
-
             const clientUpdateData: any = {
                 loyaltyPoints: admin.firestore.FieldValue.increment(pointsEarned),
                 totalBookings: admin.firestore.FieldValue.increment(1),
                 totalSpent: admin.firestore.FieldValue.increment(bookingData.totalPrice),
                 lastBooking: admin.firestore.FieldValue.serverTimestamp(),
             };
-
-            if (referrerRef && client.totalBookings === 0) {
-                const referrerBonus = settings.loyaltySettings.referralBonusPoints;
-                transaction.update(referrerRef, { loyaltyPoints: admin.firestore.FieldValue.increment(referrerBonus) });
-                clientUpdateData.loyaltyPoints = admin.firestore.FieldValue.increment(pointsEarned + referrerBonus);
+            
+            // Handle referral bonus only for the client's first completed booking
+            if (bookingData.referralCodeUsed && client.totalBookings === 0) {
+                 const referrerQuery = await transaction.get(db.collection('clients').where('referralCode', '==', bookingData.referralCodeUsed).limit(1));
+                 if (!referrerQuery.empty) {
+                     const referrerRef = referrerQuery.docs[0].ref;
+                     const referrerBonus = settings.loyaltySettings.referralBonusPoints;
+                     transaction.update(referrerRef, { loyaltyPoints: admin.firestore.FieldValue.increment(referrerBonus) });
+                     clientUpdateData.loyaltyPoints = admin.firestore.FieldValue.increment(pointsEarned + referrerBonus);
+                 }
             }
 
             const newTotalBookings = client.totalBookings + 1;
             const sortedTiers = settings.loyaltySettings.loyaltyTiers.sort((a, b) => b.bookingThreshold - a.bookingThreshold);
             const newTier = sortedTiers.find(tier => newTotalBookings >= tier.bookingThreshold);
-        
             if (newTier && newTier.name !== client.loyaltyTier) {
                 clientUpdateData.loyaltyTier = newTier.name;
             }
 
             const finalPaymentAmount = bookingData.remainingBalance;
-
             const bookingUpdateData = {
                 bookingStatus: BookingStatus.Completed,
                 paymentStatus: PaymentStatus.Paid,
@@ -179,6 +169,7 @@ async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
                 googleDriveLink: googleDriveLink,
                 pointsEarned: pointsEarned,
             };
+
             transaction.update(bookingRef, bookingUpdateData);
             transaction.update(clientRef, clientUpdateData);
 
@@ -187,24 +178,22 @@ async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
                 transaction.set(transactionRef, {
                     date: admin.firestore.FieldValue.serverTimestamp(),
                     description: `Pelunasan Sesi ${bookingData.bookingCode} - ${bookingData.clientName}`,
-                    type: 'Income',
-                    amount: finalPaymentAmount,
-                    bookingId: bookingId,
+                    type: 'Income', amount: finalPaymentAmount, bookingId: bookingId,
                 });
             }
-            
             updatedBookingData = { ...bookingData, ...bookingUpdateData };
         });
 
-        await admin.firestore().collection('activity_logs').add({
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            userId: currentUserId,
-            userName: currentUserDoc.data()?.name || 'Unknown User',
-            action: `Menyelesaikan sesi ${updatedBookingData.bookingCode}`,
-            details: `Pelunasan Rp ${(updatedBookingData.remainingBalance > 0 ? updatedBookingData.remainingBalance : 0).toLocaleString('id-ID')} dicatat.`
-        });
-        
         if (updatedBookingData) {
+            await admin.firestore().collection('activity_logs').add({
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                userId: currentUserId,
+                userName: currentUserDoc.data()?.name || 'Unknown User',
+                action: `Menyelesaikan sesi ${updatedBookingData.bookingCode}`,
+                details: `Pelunasan Rp ${(updatedBookingData.remainingBalance > 0 ? updatedBookingData.remainingBalance : 0).toLocaleString('id-ID')} dicatat.`
+            });
+
+            // Convert Timestamps to ISO strings for JSON serialization
             Object.keys(updatedBookingData).forEach(key => {
                 if (updatedBookingData[key] instanceof admin.firestore.Timestamp) {
                     updatedBookingData[key] = updatedBookingData[key].toDate().toISOString();
@@ -214,9 +203,9 @@ async function handleCompleteSession(req: VercelRequest, res: VercelResponse) {
         
         return res.status(200).json(updatedBookingData);
 
-    } catch(error: any) {
-        console.error("Error in handleCompleteSession:", error);
-        return res.status(500).json({ message: error.message || 'Failed to complete session.' });
+    } catch(error) {
+        console.error("Error in handleCompleteSession transaction:", error);
+        throw new Error('Transaksi database untuk menyelesaikan sesi gagal.');
     }
 }
 
@@ -241,7 +230,7 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
             paymentProofUrl = uploadResult.secure_url;
             paymentProofPublicId = uploadResult.public_id;
         } catch (uploadError: any) {
-            const message = uploadError.error?.message || uploadError.message || 'Gagal mengunggah bukti pembayaran ke Cloudinary.';
+            const message = uploadError.error?.message || uploadError.message || 'Gagal mengunggah bukti pembayaran.';
             throw new Error(message);
         }
     }
@@ -258,6 +247,8 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
             const promosSnap = await transaction.get(db.collection('promos'));
             const clientDoc = await transaction.get(clientRef);
             
+            if (!settingsDoc.exists) throw new Error("Pengaturan sistem tidak ditemukan. Hubungi admin.");
+            
             const allPackages = packagesSnap.docs.map(doc => fromFirestore<Package>(doc));
             const allAddOns = addOnsSnap.docs.map(doc => fromFirestore<AddOn>(doc));
             const allPromos = promosSnap.docs.map(doc => fromFirestore<Promo>(doc));
@@ -273,15 +264,12 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
                 };
             }
 
-            if (!client) {
-                // This path should logically be unreachable, but it satisfies TypeScript's flow analysis.
-                throw new Error('Client could not be retrieved or created. This indicates a logic error.');
-            }
+            if (!client) throw new Error('Data klien tidak dapat dibuat atau ditemukan.');
             
             const selectedPackage = allPackages.find(p => p.id === formData.packageId);
-            if (!selectedPackage) throw new Error("Paket yang dipilih tidak ditemukan.");
+            if (!selectedPackage) throw new Error("Paket yang Anda pilih tidak lagi tersedia.");
             const selectedSubPackage = selectedPackage.subPackages.find(sp => sp.id === formData.subPackageId);
-            if (!selectedSubPackage) throw new Error("Varian paket tidak ditemukan.");
+            if (!selectedSubPackage) throw new Error("Varian paket yang Anda pilih tidak lagi tersedia.");
             const selectedSubAddOns = allAddOns.flatMap(a => a.subAddOns).filter(sa => formData.subAddOnIds.includes(sa.id));
             
             let extraPersonCharge = (selectedPackage.isGroupPackage && formData.people > 2) ? (formData.people - 2) * 15000 : 0;
@@ -292,8 +280,7 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
             if (formData.promoCode && formData.promoCode.trim()) {
                 const promo = allPromos.find(p => p.code.toUpperCase() === formData.promoCode.toUpperCase() && p.isActive);
                 if (promo) {
-                    promoCodeUsed = promo.code;
-                    discountReason = promo.description;
+                    promoCodeUsed = promo.code; discountReason = promo.description;
                     discountAmount = subtotal * (promo.discountPercentage / 100);
                 }
             }
@@ -307,7 +294,7 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
                      }
                 } else if (!isNewClient) {
                     const sortedTiers = [...settings.loyaltySettings.loyaltyTiers].sort((a,b) => b.bookingThreshold - a.bookingThreshold);
-                    const clientTier = sortedTiers.find(t => client.totalBookings >= t.bookingThreshold);
+                    const clientTier = sortedTiers.find(t => client!.totalBookings >= t.bookingThreshold);
                     if (clientTier) { discountAmount = subtotal * (clientTier.discountPercentage / 100); discountReason = `Diskon Tier ${clientTier.name} (${clientTier.discountPercentage}%)`; }
                 }
             }
@@ -343,13 +330,12 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
         });
 
         return res.status(200).json({ 
-            success: true, 
-            message: "Booking berhasil dibuat!",
-            bookingCode: newBookingCode, 
-            cloudinaryUrl: paymentProofUrl 
+            success: true, message: "Booking berhasil dibuat!",
+            bookingCode: newBookingCode, cloudinaryUrl: paymentProofUrl 
         });
 
-    } catch (transactionError) {
+    } catch (transactionError: any) {
+        // Jika transaksi database gagal, hapus file yang sudah diupload.
         if (paymentProofPublicId) {
             console.warn(`Firestore transaction failed. Deleting orphaned Cloudinary file: ${paymentProofPublicId}`);
             try {
@@ -359,52 +345,9 @@ async function handleCreatePublic(req: VercelRequest, res: VercelResponse) {
                 console.error(`CRITICAL: Failed to delete orphaned Cloudinary file ${paymentProofPublicId}. Manual cleanup required.`, deleteError);
             }
         }
-        throw transactionError; // Re-throw to be caught by the main handler
+        // Lempar error agar ditangkap oleh handler utama.
+        throw new Error(`Transaksi database gagal: ${transactionError.message}`);
     }
-}
-
-async function handleCreateInstitutional(req: VercelRequest, res: VercelResponse) {
-    const db = admin.firestore();
-    const { bookingData, userId } = req.body;
-    if (!bookingData || !userId) {
-        return res.status(400).json({ message: "bookingData and userId are required." });
-    }
-    
-    const newBookingCode = `S8-INST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-    let requestLetterUrl = '';
-    if (bookingData.requestLetterUrl) {
-        const uploadResult = await cloudinary.uploader.upload(bookingData.requestLetterUrl, {
-            folder: "studio8_requests", public_id: `req_${newBookingCode}`, resource_type: "auto"
-        });
-        requestLetterUrl = uploadResult.secure_url;
-    }
-
-    const newBooking = {
-        ...bookingData,
-        bookingCode: newBookingCode,
-        bookingDate: admin.firestore.Timestamp.fromDate(new Date(bookingData.bookingDate)),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        paymentStatus: PaymentStatus.Pending,
-        requestLetterUrl: requestLetterUrl || undefined,
-        clientName: bookingData.institutionName,
-        clientEmail: '',
-        clientPhone: bookingData.picContact,
-    };
-
-    await db.collection('bookings').add(newBooking);
-
-    const userDoc = await db.collection('users').doc(userId).get();
-    const userName = userDoc.data()?.name || 'Unknown User';
-    await db.collection('activity_logs').add({
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        userId,
-        userName,
-        action: 'Membuat Booking Instansi',
-        details: `Booking untuk ${newBooking.institutionName}`
-    });
-
-    return res.status(200).json({ success: true, bookingCode: newBookingCode });
 }
 
 async function handleCreatePublicInstitutional(req: VercelRequest, res: VercelResponse) {
@@ -417,50 +360,42 @@ async function handleCreatePublicInstitutional(req: VercelRequest, res: VercelRe
 
     if (bookingData.requestLetterBase64) {
         publicId = `req_${newBookingCode}`;
-        const uploadResult = await cloudinary.uploader.upload(`data:application/octet-stream;base64,${bookingData.requestLetterBase64}`, {
-            folder: "studio8_requests", public_id: publicId, resource_type: "auto"
-        });
-        requestLetterUrl = uploadResult.secure_url;
+        try {
+            const uploadResult = await cloudinary.uploader.upload(`data:application/octet-stream;base64,${bookingData.requestLetterBase64}`, {
+                folder: "studio8_requests", public_id: publicId, resource_type: "auto"
+            });
+            requestLetterUrl = uploadResult.secure_url;
+        } catch (uploadError) {
+            console.error("Cloudinary upload failed for institutional booking:", uploadError);
+            throw new Error("Gagal mengunggah surat permintaan.");
+        }
     }
 
     try {
         const newBooking = {
-            clientName: bookingData.institutionName,
-            clientEmail: '',
-            clientPhone: bookingData.picContact,
-            bookingType: 'institutional',
-            institutionName: bookingData.institutionName,
-            activityType: bookingData.activityType,
-            picName: bookingData.picName,
-            picContact: bookingData.picContact,
+            clientName: bookingData.institutionName, clientEmail: '', clientPhone: bookingData.picContact,
+            bookingType: 'institutional', institutionName: bookingData.institutionName,
+            activityType: bookingData.activityType, picName: bookingData.picName, picContact: bookingData.picContact,
             numberOfParticipants: Number(bookingData.numberOfParticipants),
-            requestLetterUrl: requestLetterUrl || null,
-            bookingCode: newBookingCode,
+            requestLetterUrl: requestLetterUrl || null, bookingCode: newBookingCode,
             bookingDate: admin.firestore.Timestamp.fromDate(new Date(bookingData.bookingDate)),
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            notes: bookingData.notes,
-            promoCodeUsed: bookingData.promoCode || null,
-            bookingStatus: BookingStatus.Pending,
-            paymentStatus: PaymentStatus.Pending,
-            paymentMode: 'dp',
-            package: {},
-            selectedSubPackage: {},
-            addOns: [],
-            selectedSubAddOns: [],
-            totalPrice: 0,
-            remainingBalance: 0,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(), notes: bookingData.notes,
+            promoCodeUsed: bookingData.promoCode || null, bookingStatus: BookingStatus.Pending,
+            paymentStatus: PaymentStatus.Pending, paymentMode: 'dp',
+            package: {}, selectedSubPackage: {}, addOns: [], selectedSubAddOns: [],
+            totalPrice: 0, remainingBalance: 0,
         };
         await db.collection('bookings').add(newBooking);
         const body = `Proposal dari ${newBooking.institutionName} untuk ${newBooking.activityType}`;
         sendPushNotification(db, 'Permintaan Booking Instansi!', body, '/admin/collaboration').catch(err => console.error("Push notification failed in background:", err));
         return res.status(200).json({ success: true, bookingCode: newBookingCode });
 
-    } catch (dbError) {
+    } catch (dbError: any) {
         if (publicId) {
              console.warn(`Firestore write failed. Deleting orphaned file: ${publicId}`);
              await cloudinary.uploader.destroy(publicId).catch(delErr => console.error(`CRITICAL: Failed to delete orphaned file ${publicId}`, delErr));
         }
-        throw dbError;
+        throw new Error(`Gagal menyimpan data booking instansi: ${dbError.message}`);
     }
 }
 
@@ -480,8 +415,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         switch (action) {
             case 'createPublic':
                 return await handleCreatePublic(req, res);
-            case 'createInstitutional':
-                return await handleCreateInstitutional(req, res);
             case 'createPublicInstitutional':
                 return await handleCreatePublicInstitutional(req, res);
             case 'complete':
@@ -493,8 +426,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error(`API Error in bookings handler (action: ${action}):`, error);
         return res.status(500).json({
             success: false,
-            message: "Gagal memproses permintaan booking.",
-            error: error.message || String(error),
+            message: error.message || "Gagal memproses permintaan booking.",
+            error: error.message,
         });
     }
 }

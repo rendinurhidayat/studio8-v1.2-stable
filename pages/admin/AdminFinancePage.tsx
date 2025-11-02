@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getBookings, getPackages, getExpenses, addExpense, deleteExpense } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,14 +9,8 @@ import InvoiceModal from '../../components/admin/InvoiceModal';
 import Modal from '../../components/common/Modal';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { exportToCSV } from '../../utils/export';
-import format from 'date-fns/format';
-import endOfMonth from 'date-fns/endOfMonth';
-import endOfWeek from 'date-fns/endOfWeek';
-import isWithinInterval from 'date-fns/isWithinInterval';
-import parse from 'date-fns/parse';
-import startOfMonth from 'date-fns/startOfMonth';
-import startOfWeek from 'date-fns/startOfWeek';
-import subDays from 'date-fns/subDays';
+// FIX: Use named imports for date-fns functions
+import { format, endOfMonth, endOfWeek, isWithinInterval, parse, startOfMonth, startOfWeek, subDays } from 'date-fns';
 import id from 'date-fns/locale/id';
 import { ResponsiveContainer, BarChart as RechartsBarChart, LineChart, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart as RechartsPieChart, Pie, Cell, Legend } from 'recharts';
 import ChartCard from '../../components/admin/ChartCard';
@@ -103,14 +98,14 @@ const FinancialForecastingSection: React.FC<{ bookings: Booking[] }> = ({ bookin
         const completedBookings = bookings.filter(b => b.bookingStatus === BookingStatus.Completed);
 
         completedBookings.forEach(b => {
-            const monthKey = format(b.bookingDate, 'yyyy-MM');
+            const monthKey = format(new Date(b.bookingDate), 'yyyy-MM');
             history[monthKey] = (history[monthKey] || 0) + b.totalPrice;
         });
 
         return Object.entries(history)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([month, revenue]) => ({
-                month: format(parse(month, 'yyyy-MM', new Date()), 'MMM yyyy', { locale: id }),
+                month: format(new Date(`${month}-02`), 'MMM yyyy', { locale: id }),
                 revenue,
             }));
     }, [bookings]);
@@ -293,9 +288,9 @@ const AdminFinancePage = () => {
         
         const completedBookings = bookings.filter(b => b.bookingStatus === BookingStatus.Completed);
 
-        const weekly = completedBookings.filter(b => isWithinInterval(b.bookingDate, { start: startOfWeekDate, end: endOfWeekDate })).reduce((sum, b) => sum + b.totalPrice, 0);
-        const monthlyInc = completedBookings.filter(b => isWithinInterval(b.bookingDate, { start: startOfMonthDate, end: endOfMonthDate })).reduce((sum, b) => sum + b.totalPrice, 0);
-        const monthlyExp = expenses.filter(e => isWithinInterval(e.date, { start: startOfMonthDate, end: endOfMonthDate })).reduce((sum, e) => sum + e.amount, 0);
+        const weekly = completedBookings.filter(b => isWithinInterval(new Date(b.bookingDate), { start: startOfWeekDate, end: endOfWeekDate })).reduce((sum, b) => sum + b.totalPrice, 0);
+        const monthlyInc = completedBookings.filter(b => isWithinInterval(new Date(b.bookingDate), { start: startOfMonthDate, end: endOfMonthDate })).reduce((sum, b) => sum + b.totalPrice, 0);
+        const monthlyExp = expenses.filter(e => isWithinInterval(new Date(e.date), { start: startOfMonthDate, end: endOfMonthDate })).reduce((sum, e) => sum + e.amount, 0);
 
         return { weeklyIncome: weekly, monthlyIncome: monthlyInc, monthlyExpenses: monthlyExp, monthlyProfit: monthlyInc - monthlyExp };
     }, [bookings, expenses]);
@@ -308,7 +303,7 @@ const AdminFinancePage = () => {
         }));
         
         bookings.filter(b => b.bookingStatus === 'Completed').forEach(b => {
-            const dayIndex = last30Days.findIndex(d => format(d, 'yyyy-MM-dd') === format(b.bookingDate, 'yyyy-MM-dd'));
+            const dayIndex = last30Days.findIndex(d => format(d, 'yyyy-MM-dd') === format(new Date(b.bookingDate), 'yyyy-MM-dd'));
             if (dayIndex > -1) {
                 data[dayIndex].Pemasukan += b.totalPrice;
             }
@@ -328,7 +323,7 @@ const AdminFinancePage = () => {
 
     const filteredBookings = useMemo(() => {
         return bookings.filter(booking => {
-            const bookingMonth = format(booking.bookingDate, 'yyyy-MM');
+            const bookingMonth = format(new Date(booking.bookingDate), 'yyyy-MM');
             const monthMatch = filterMonth === 'all' || bookingMonth === filterMonth;
             const packageMatch = filterPackage === 'all' || booking.package.id === filterPackage;
             return monthMatch && packageMatch;
@@ -337,20 +332,20 @@ const AdminFinancePage = () => {
 
     const monthOptions = useMemo(() => {
         const months = new Set<string>();
-        bookings.forEach(b => months.add(format(b.bookingDate, 'yyyy-MM')));
+        bookings.forEach(b => months.add(format(new Date(b.bookingDate), 'yyyy-MM')));
         return Array.from(months).sort().reverse();
     }, [bookings]);
 
     const handleExportInvoices = () => {
         const dataToExport = filteredBookings.map(b => ({
-            'Kode Invoice': b.bookingCode, 'Nama Klien': b.clientName, 'Tanggal': format(b.bookingDate, 'dd-MM-yyyy HH:mm'), 'Paket': `${b.package.name} (${b.selectedSubPackage.name})`, 'Total Harga': b.totalPrice, 'Sisa Bayar': b.remainingBalance, 'Status': getPaymentStatus(b).status
+            'Kode Invoice': b.bookingCode, 'Nama Klien': b.clientName, 'Tanggal': format(new Date(b.bookingDate), 'dd-MM-yyyy HH:mm'), 'Paket': `${b.package.name} (${b.selectedSubPackage.name})`, 'Total Harga': b.totalPrice, 'Sisa Bayar': b.remainingBalance, 'Status': getPaymentStatus(b).status
         }));
         exportToCSV(dataToExport, `laporan-invoice-${filterMonth}-${filterPackage}.csv`);
     };
     
     const handleExportExpenses = () => {
         const dataToExport = expenses.map(e => ({
-            'Tanggal': format(e.date, 'dd-MM-yyyy'), 'Deskripsi': e.description, 'Jumlah': e.amount,
+            'Tanggal': format(new Date(e.date), 'dd-MM-yyyy'), 'Deskripsi': e.description, 'Jumlah': e.amount,
         }));
         exportToCSV(dataToExport, 'laporan-pengeluaran.csv');
     };
@@ -433,7 +428,7 @@ const AdminFinancePage = () => {
                         <tbody>
                             {expenses.map(e => (
                                 <tr key={e.id} className="border-b">
-                                    <td className="px-4 py-2 text-sm">{format(e.date, 'dd MMM yyyy', { locale: id })}</td>
+                                    <td className="px-4 py-2 text-sm">{format(new Date(e.date), 'dd MMM yyyy', { locale: id })}</td>
                                     <td className="px-4 py-2 text-sm">{e.description}</td>
                                     <td className="px-4 py-2 text-sm text-right font-semibold">Rp {e.amount.toLocaleString('id-ID')}</td>
                                     <td className="px-4 py-2 text-center">
@@ -493,7 +488,7 @@ const AdminFinancePage = () => {
                                 <tr key={b.id} className="hover:bg-base-100/50">
                                     <td className="px-6 py-4 text-sm font-mono text-accent">{b.bookingCode}</td>
                                     <td className="px-6 py-4 text-sm font-medium text-base-content">{b.clientName}</td>
-                                    <td className="px-6 py-4 text-sm text-muted">{format(b.bookingDate, 'dd MMM yyyy')}</td>
+                                    <td className="px-6 py-4 text-sm text-muted">{format(new Date(b.bookingDate), 'dd MMM yyyy')}</td>
                                     <td className="px-6 py-4 text-sm font-semibold text-right text-base-content">Rp {b.totalPrice.toLocaleString('id-ID')}</td>
                                     <td className="px-6 py-4 text-center">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${paymentInfo.color}`}>

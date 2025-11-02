@@ -64,7 +64,7 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
                             <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                 {cart.map(item => (
                                     <div key={item.id} className="flex items-start gap-4 p-3 bg-base-100 rounded-lg">
-                                        <img src={item.pkg.imageUrls?.[0]} alt={item.pkg.name} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
+                                        <img src={item.pkg.imageUrls?.[0] || '/images/hero-1.jpg'} alt={item.pkg.name} className="w-20 h-20 object-cover rounded-md flex-shrink-0" />
                                         <div className="flex-grow">
                                             <p className="font-semibold text-sm">{item.pkg.name}</p>
                                             <p className="text-xs text-muted">{item.subPkg.name}</p>

@@ -57,7 +57,7 @@ const AdminHighlightManagerPage = () => {
     const resetForm = () => {
         setFormData({
             title: '', author: '', mentor: '', major: '', description: '',
-            type: 'Image', category: 'PKL', highlightDate: new Date(), instagramUrl: ''
+            type: 'Image', category: 'PKL', highlightDate: new Date().toISOString(), instagramUrl: ''
         });
         setMediaFile(null); setThumbnailFile(null);
         setMediaPreview(null); setThumbnailPreview(null);
@@ -132,7 +132,7 @@ const AdminHighlightManagerPage = () => {
                 title: formData.title!, author: formData.author!,
                 major: formData.major, mentor: formData.mentor,
                 description: formData.description!, mediaUrl, thumbnailUrl,
-                type: formData.type!, highlightDate: new Date(formData.highlightDate!),
+                type: formData.type!, highlightDate: new Date(formData.highlightDate!).toISOString(),
                 category: formData.category!,
                 instagramUrl: formData.instagramUrl,
             };
@@ -191,7 +191,7 @@ const AdminHighlightManagerPage = () => {
                                 <td className="px-5 py-2">{work.author}</td>
                                 <td className="px-5 py-2"><span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{work.category}</span></td>
                                 <td className="px-5 py-2">{work.type}</td>
-                                <td className="px-5 py-2 text-sm text-muted">{format(work.highlightDate, 'd MMM yyyy', { locale: id })}</td>
+                                <td className="px-5 py-2 text-sm text-muted">{format(new Date(work.highlightDate), 'd MMM yyyy', { locale: id })}</td>
                                 <td className="px-5 py-2 text-center">
                                     <button onClick={() => handleOpenModal('edit', work)} className="p-2 text-muted hover:text-blue-600"><Edit size={16}/></button>
                                     <button onClick={() => { setSelectedWork(work); setIsConfirmOpen(true); }} className="p-2 text-muted hover:text-red-600"><Trash2 size={16}/></button>
@@ -206,7 +206,7 @@ const AdminHighlightManagerPage = () => {
                 <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div><label className="font-semibold text-sm">Judul</label><input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required className="w-full p-2 border rounded mt-1"/></div>
-                        <div><label className="font-semibold text-sm">Tanggal</label><input type="date" value={formData.highlightDate ? format(new Date(formData.highlightDate), 'yyyy-MM-dd') : ''} onChange={e => setFormData({...formData, highlightDate: new Date(e.target.value)})} required className="w-full p-2 border rounded mt-1"/></div>
+                        <div><label className="font-semibold text-sm">Tanggal</label><input type="date" value={formData.highlightDate ? format(new Date(formData.highlightDate), 'yyyy-MM-dd') : ''} onChange={e => setFormData({...formData, highlightDate: e.target.value})} required className="w-full p-2 border rounded mt-1"/></div>
                         <div><label className="font-semibold text-sm">Kreator (Intern)</label><select value={formData.author} onChange={e => setFormData({...formData, author: e.target.value})} required className="w-full p-2 border rounded mt-1"><option value="">-- Pilih Intern --</option>{interns.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}</select></div>
                         <div><label className="font-semibold text-sm">Mentor</label><select value={formData.mentor} onChange={e => setFormData({...formData, mentor: e.target.value})} required className="w-full p-2 border rounded mt-1"><option value="">-- Pilih Mentor --</option>{mentors.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}</select></div>
                         <div><label className="font-semibold text-sm">Tipe</label><select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as any})} className="w-full p-2 border rounded mt-1"><option>Image</option><option>Video</option><option>Design</option></select></div>

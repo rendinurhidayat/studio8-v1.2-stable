@@ -1,4 +1,5 @@
 
+
 import { User, Booking, BookingStatus, Package, AddOn, PaymentStatus, Client, Transaction, TransactionType, UserRole, SubPackage, SubAddOn, Task, Promo, SystemSettings, ActivityLog, InventoryItem, InventoryStatus, Feedback, Expense, LoyaltySettings, LoyaltyTier, Insight, Attendance, DailyReport, AttendanceStatus, ReportStatus, InternMood, MentorFeedback, InternReport, AIInsight, ChatRoom, ChatMessage, HighlightWork, Certificate, DailyProgress, WeeklyEvaluation, Quiz, QuizResult, Sponsorship, CollaborationActivity, Asset, ForumThread, ForumReply, JobPost, CommunityEvent, PracticalClass } from '../types';
 import { notificationService } from './notificationService';
 import { db, auth } from '../firebase';
@@ -25,7 +26,8 @@ import {
     DocumentSnapshot,
     setDoc
 } from 'firebase/firestore';
-import format from 'date-fns/format';
+// FIX: Use named import for date-fns format function
+import { format } from 'date-fns';
 
 // --- Helper Functions ---
 
@@ -47,7 +49,7 @@ const fromFirestore = <T extends object>(doc: DocumentSnapshot, dateFields: stri
         if (exists) {
             const finalField = fieldParts[fieldParts.length - 1];
             if (target[finalField] && (target[finalField] as any).toDate) {
-                target[finalField] = (target[finalField] as any).toDate();
+                target[finalField] = (target[finalField] as any).toDate().toISOString();
             }
         }
     }
@@ -143,7 +145,7 @@ export const findBookingByCode = async (code: string): Promise<Booking | null> =
         const q = query(collection(db, 'bookings'), where('bookingCode', '==', code.toUpperCase()), limit(1));
         const snapshot = await getDocs(q);
         if (snapshot.empty) return null;
-        return fromFirestore<Booking>(snapshot.docs[0], ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+        return fromFirestore<Booking>(snapshot.docs[0], ['bookingDate', 'createdAt', 'rescheduleRequestDate', 'dueDate']);
     } catch (error) {
         console.error("Error finding booking by code:", error);
         return null;
@@ -155,7 +157,7 @@ export const getBookings = async (): Promise<Booking[]> => {
     try {
         const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
         const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']));
+        return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'rescheduleRequestDate', 'dueDate']));
     } catch (error) {
         console.error("Error fetching bookings:", error);
         return [];
@@ -180,7 +182,7 @@ export const updateBooking = async (bookingId: string, updatedData: Partial<Book
         const originalDoc = await getDoc(bookingRef);
         if (!originalDoc.exists()) return null;
         
-        const originalBooking = fromFirestore<Booking>(originalDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+        const originalBooking = fromFirestore<Booking>(originalDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate', 'dueDate']);
 
         // Recalculate total price if package or addons change
         if (updatedData.selectedSubPackage || updatedData.selectedSubAddOns) {
@@ -191,7 +193,7 @@ export const updateBooking = async (bookingId: string, updatedData: Partial<Book
 
         await updateDoc(bookingRef, updatedData);
         const newDoc = await getDoc(bookingRef);
-        const newBooking = fromFirestore<Booking>(newDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+        const newBooking = fromFirestore<Booking>(newDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate', 'dueDate']);
 
         await logActivity(currentUserId, `Mengubah booking ${originalBooking.bookingCode}`);
         
@@ -236,7 +238,7 @@ export const confirmBooking = async (bookingId: string, currentUserId: string): 
         const docToConfirm = await getDoc(bookingRef);
         if (!docToConfirm.exists()) return null;
 
-        const bookingToConfirm = fromFirestore<Booking>(docToConfirm, ['bookingDate', 'createdAt']);
+        const bookingToConfirm = fromFirestore<Booking>(docToConfirm, ['bookingDate', 'createdAt', 'dueDate']);
         if (bookingToConfirm.bookingStatus !== BookingStatus.Pending) return null;
 
         const dpAmount = calculateDpAmount(bookingToConfirm);
@@ -262,7 +264,7 @@ export const confirmBooking = async (bookingId: string, currentUserId: string): 
         notificationService.notify({ recipient: UserRole.Staff, type: 'success', message: `Booking ${bookingToConfirm.bookingCode} oleh ${bookingToConfirm.clientName} telah dikonfirmasi.`, link: '/staff/schedule'});
         
         const updatedDoc = await getDoc(bookingRef);
-        return fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt']);
+        return fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt', 'dueDate']);
     } catch (error) {
         console.error("Error confirming booking:", error);
         return null;
@@ -287,17 +289,7 @@ export const completeBookingSession = async (bookingId: string, googleDriveLink:
             throw new Error(errorData.message || 'Gagal menyelesaikan sesi.');
         }
 
-        const updatedBookingData = await response.json();
-        
-        // Convert ISO date strings back to Date objects
-        const dateFields = ['bookingDate', 'createdAt', 'rescheduleRequestDate'];
-        for (const field of dateFields) {
-            if (updatedBookingData[field]) {
-                updatedBookingData[field] = new Date(updatedBookingData[field]);
-            }
-        }
-        
-        return updatedBookingData as Booking;
+        return await response.json() as Booking;
 
     } catch (error) {
         console.error("Error completing booking session via API:", error);
@@ -313,7 +305,7 @@ export const requestReschedule = async (bookingId: string, newDate: Date): Promi
             rescheduleRequestDate: newDate,
         });
         const updatedDoc = await getDoc(bookingRef);
-        const booking = fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate']);
+        const booking = fromFirestore<Booking>(updatedDoc, ['bookingDate', 'createdAt', 'rescheduleRequestDate', 'dueDate']);
         
         notificationService.notify({ recipient: UserRole.Admin, type: 'warning', message: `Klien ${booking.clientName} meminta jadwal ulang.`, link: '/admin/schedule'});
         return booking;
@@ -354,7 +346,7 @@ export const getTodaysBookings = async (): Promise<Booking[]> => {
         );
         const snapshot = await getDocs(q);
           
-        return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt']));
+        return snapshot.docs.map(doc => fromFirestore<Booking>(doc, ['bookingDate', 'createdAt', 'dueDate']));
     } catch (error) {
         console.error("Error fetching today's bookings:", error);
         return [];
@@ -445,17 +437,7 @@ export const addUser = async (user: Omit<User, 'id'>, currentUserId: string): Pr
         throw new Error(errorData.message || 'Gagal membuat pengguna baru.');
     }
 
-    const createdUserData = await response.json();
-    
-    // Convert date strings if they exist
-    const dateFields = ['startDate', 'endDate'];
-    for (const field of dateFields) {
-        if (createdUserData[field]) {
-            createdUserData[field] = new Date(createdUserData[field]);
-        }
-    }
-
-    return createdUserData as User;
+    return await response.json() as User;
 };
 
 
@@ -465,7 +447,7 @@ export const updateUser = async (userId: string, updatedData: Partial<Omit<User,
         await updateDoc(userDocRef, updatedData);
         const updatedDoc = await getDoc(userDocRef);
         await logActivity(currentUserId, `Mengubah user ${updatedDoc.data()?.name}`);
-        return fromFirestore<User>(updatedDoc);
+        return fromFirestore<User>(updatedDoc, ['startDate', 'endDate']);
     } catch (error) {
         console.error("Error updating user:", error);
         return null;
@@ -769,7 +751,7 @@ export const checkIn = async (userId: string): Promise<Attendance> => {
     };
     const docRef = await addDoc(collection(db, 'attendance'), newAttendanceData);
     const newDoc = await getDoc(docRef);
-    return fromFirestore<Attendance>(newDoc, ['checkInTime']);
+    return fromFirestore<Attendance>(newDoc, ['checkInTime', 'checkOutTime']);
 };
 
 export const checkOut = async (userId: string, attendanceId: string): Promise<Attendance> => {
@@ -815,11 +797,7 @@ export const generateAiFeedbackForReport = async (reportId: string, reportConten
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to generate AI feedback');
     }
-    const data = await response.json();
-    if (data.submittedAt) {
-        data.submittedAt = new Date(data.submittedAt);
-    }
-    return data as DailyReport;
+    return await response.json() as DailyReport;
 };
 
 export const checkAndSendReportReminders = async () => {
@@ -1104,8 +1082,8 @@ export const getOrCreateClient = async (name: string, email: string, phone: stri
             name,
             email: lowerEmail,
             phone,
-            firstBooking: new Date(),
-            lastBooking: new Date(),
+            firstBooking: new Date().toISOString(),
+            lastBooking: new Date().toISOString(),
             totalBookings: 0,
             totalSpent: 0,
             loyaltyPoints: 0,
@@ -1318,7 +1296,7 @@ export const findOrCreateChatRoom = async (user1: User, user2: User): Promise<st
             [user1.id]: { name: user1.name, email: user1.email, photoURL: user1.photoURL || '' },
             [user2.id]: { name: user2.name, email: user2.email, photoURL: user2.photoURL || '' },
         },
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
     };
     await setDoc(roomRef, newRoom);
     return roomId;
@@ -1355,7 +1333,7 @@ export const sendMessage = async (roomId: string, senderId: string, senderName: 
     const roomRef = doc(db, 'chats', roomId);
     const messageRef = doc(collection(roomRef, 'messages'));
     const timestamp = new Date();
-    const messageData: Omit<ChatMessage, 'id'> = { senderId, senderName, text, timestamp };
+    const messageData: Omit<ChatMessage, 'id'> = { senderId, senderName, text, timestamp: timestamp.toISOString() };
     const lastMessageData = { text, timestamp, senderId };
     
     const batch = writeBatch(db);
@@ -1583,7 +1561,8 @@ export const createQuiz = async (quizData: Omit<Quiz, 'id' | 'createdAt'>, curre
     const data = { ...quizData, createdAt: new Date() };
     const docRef = await addDoc(collection(db, 'quizzes'), data);
     await logActivity(currentUserId, `Membuat kuis baru: ${quizData.title}`);
-    return { ...data, id: docRef.id, createdAt: data.createdAt };
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<Quiz>(newDoc, ['createdAt']);
 };
 export const updateQuiz = async (quizId: string, updatedData: Partial<Quiz>, currentUserId: string): Promise<void> => {
     await updateDoc(doc(db, 'quizzes', quizId), updatedData);
@@ -1702,7 +1681,8 @@ export const addForumThread = async (threadData: Omit<ForumThread, 'id' | 'creat
     const now = new Date();
     const data = { ...threadData, createdAt: now, lastReplyAt: now, replyCount: 0 };
     const docRef = await addDoc(collection(db, 'forumThreads'), data);
-    return { ...data, id: docRef.id };
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<ForumThread>(newDoc, ['createdAt', 'lastReplyAt']);
 };
 export const getRepliesForThread = (threadId: string, callback: (replies: ForumReply[]) => void): (() => void) => {
     const q = query(collection(db, 'forumThreads', threadId, 'replies'), orderBy('createdAt', 'asc'));
@@ -1730,7 +1710,8 @@ export const getJobPosts = async (): Promise<JobPost[]> => {
 export const addJobPost = async (jobData: Omit<JobPost, 'id' | 'createdAt'>): Promise<JobPost> => {
     const data = { ...jobData, createdAt: new Date() };
     const docRef = await addDoc(collection(db, 'jobPosts'), data);
-    return { ...data, id: docRef.id };
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<JobPost>(newDoc, ['createdAt']);
 };
 export const getEvents = async (): Promise<CommunityEvent[]> => {
     try {
@@ -1745,5 +1726,6 @@ export const getEvents = async (): Promise<CommunityEvent[]> => {
 export const addEvent = async (eventData: Omit<CommunityEvent, 'id' | 'createdAt'>): Promise<CommunityEvent> => {
     const data = { ...eventData, createdAt: new Date() };
     const docRef = await addDoc(collection(db, 'communityEvents'), data);
-    return { ...data, id: docRef.id };
+    const newDoc = await getDoc(docRef);
+    return fromFirestore<CommunityEvent>(newDoc, ['createdAt', 'eventDate']);
 };
