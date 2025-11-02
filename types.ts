@@ -369,8 +369,8 @@ export interface SystemSettings {
     loyaltySettings: LoyaltySettings;
     partners?: Partner[];
     landingPageImages?: {
-        hero: string[];
-        about: string;
+        hero?: string[];
+        about?: string;
     };
 }
 

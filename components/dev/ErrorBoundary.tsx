@@ -12,8 +12,6 @@ interface State {
 }
 
 // FIX: An Error Boundary must be a class component that extends React.Component and implements either getDerivedStateFromError or componentDidCatch.
-// The previous implementation was not a valid React component, causing the reported errors related to missing `state`, `props`, and `setState`.
-// This corrected implementation ensures it functions as a proper React Error Boundary.
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);

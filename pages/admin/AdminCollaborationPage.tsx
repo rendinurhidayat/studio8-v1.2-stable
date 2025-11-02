@@ -39,7 +39,7 @@ const ActivityLogModal: React.FC<{
                             <div>
                                 <p className="text-sm font-semibold text-primary">{act.action}</p>
                                 <p className="text-sm text-muted">{act.details}</p>
-                                <p className="text-xs text-muted/70 mt-1">{act.userName} &bull; {format(act.timestamp, 'd MMM yyyy, HH:mm', { locale: id })}</p>
+                                <p className="text-xs text-muted/70 mt-1">{act.userName} &bull; {format(new Date(act.timestamp), 'd MMM yyyy, HH:mm', { locale: id })}</p>
                             </div>
                         </li>
                     ))}
@@ -249,7 +249,7 @@ const AdminCollaborationPage = () => {
                                         <p className="text-sm text-muted">{b.activityType}</p>
                                     </div>
                                     <div className="text-sm space-y-2 p-3 bg-base-100 rounded-lg">
-                                        <p><strong>Jadwal:</strong> {format(b.bookingDate, 'd MMM yyyy, HH:mm', { locale: id })}</p>
+                                        <p><strong>Jadwal:</strong> {format(new Date(b.bookingDate), 'd MMM yyyy, HH:mm', { locale: id })}</p>
                                         <p><strong>PIC:</strong> {b.picName} ({b.picContact})</p>
                                         <p><strong>Peserta:</strong> {b.numberOfParticipants} orang</p>
                                         {b.promoCodeUsed && <p><strong>Kode Promo:</strong> <span className="font-mono bg-accent/10 text-accent px-2 py-0.5 rounded">{b.promoCodeUsed}</span></p>}
