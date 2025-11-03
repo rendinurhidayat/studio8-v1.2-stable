@@ -6,18 +6,7 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["*"]
-    },
     "types": ["node"]
   },
-  "include": [
-    "next-env.d.ts",
-    "api/**/*.ts",
-    "lib/**/*.ts",
-    "types.ts",
-    "env.d.ts"
-, "lib/firebase-admin.js"  ],
-  "exclude": ["node_modules"]
+  "include": ["vite.config.ts", "api/**/*.ts"]
 }
