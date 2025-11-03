@@ -24,5 +24,7 @@
             "maxDuration": 30
         }
     },
-    "buildCommand": "tsc --noEmit && next build"
+    "buildCommand": "vite build",
+    "outputDirectory": "dist",
+    "framework": null
 }
