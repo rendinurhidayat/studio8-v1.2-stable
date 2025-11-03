@@ -1,3 +1,4 @@
+// tsconfig.json (INI YANG BENAR)
 {
   "compilerOptions": {
     "target": "ESNext",
@@ -15,9 +16,18 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["*"]
+    }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "dist", "api", "vite.config.ts"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": [
+    // HANYA KODE FRONTEND DI SINI
+    "env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "dist", ".vercel", "**/*.d.ts"],
+  "references": [{ "path": "./tsconfig.node.json" }] // Ini biarkan
 }

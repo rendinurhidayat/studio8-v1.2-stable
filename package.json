@@ -5,8 +5,8 @@
   "description": "A comprehensive, full-stack web system for managing Studio 8, a photo studio.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+     "dev": "vite",
+    "build": "tsc && vite build && mkdir -p dist/lib && cp -r lib/* dist/lib/ || true",
     "preview": "vite preview"
   },
   "dependencies": {

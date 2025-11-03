@@ -1,27 +1,11 @@
-
-
 {
-    "functions": {
-        "api/ai.ts": {
-            "maxDuration": 60
-        },
-        "api/bookings.ts": {
-            "maxDuration": 30
-        },
-        "api/sponsorships.ts": {
-            "maxDuration": 30
-        },
-        "api/assets.ts": {
-            "maxDuration": 30
-        },
-        "api/certificates.ts": {
-            "maxDuration": 60
-        },
-        "api/subscriptions.ts": {
-            "maxDuration": 15
-        },
-        "api/users.ts": {
-            "maxDuration": 30
-        }
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60,
+      "includeFiles": "lib/**"
     }
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": null
 }

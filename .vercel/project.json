@@ -1,1 +1,16 @@
-{"projectId":"prj_Y10pSkO20ira5IAdVSl7hFU42Uiu","orgId":"team_QJI4EuZ3TDtKRnIQ8exfbuuD","projectName":"studio8-v1-2-stable"}
+{
+  "projectId": "prj_Y10pSkO20ira5IAdVSl7hFU42Uiu",
+  "orgId": "team_QJI4EuZ3TDtKRnIQ8exfbuuD",
+  "projectName": "studio8-v1-2-stable",
+  "settings": {
+    "createdAt": 1761313366236,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "22.x"
+  }
+}
