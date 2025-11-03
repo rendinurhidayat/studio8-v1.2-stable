@@ -2,7 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
 import { v2 as cloudinary } from 'cloudinary';
-import { initFirebaseAdmin } from '../lib/firebase-admin';
+import { initFirebaseAdmin } from '../lib/firebase-admin.js';
 
 export const config = {
     api: {
