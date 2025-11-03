@@ -213,12 +213,12 @@ const AppearanceSettingsTab = () => {
     const handleRemoveHeroImage = (urlToRemove: string) => {
         if (!settings?.landingPageImages) return;
         setSettings(prev => {
-            if (!prev || !prev.landingPageImages) return prev;
+            if (!prev) return prev;
             return {
                 ...prev,
                 landingPageImages: {
                     ...prev.landingPageImages,
-                    hero: prev.landingPageImages.hero.filter(url => url !== urlToRemove),
+                    hero: (prev.landingPageImages?.hero ?? []).filter(url => url !== urlToRemove),
                 },
             };
         });
