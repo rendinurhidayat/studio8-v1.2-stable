@@ -241,7 +241,7 @@ async function handleGenerateSocialMediaCaption(ai: GoogleGenAI, payload: any, r
             }
         });
 
-        const result = JSON.parse(response.text);
+        const result = JSON.parse(response.text!);
         return res.status(200).json(result);
     } catch (e: any) {
         if (e instanceof SyntaxError) {
@@ -386,8 +386,8 @@ async function handleRecommendPackage(ai: GoogleGenAI, payload: any, res: Vercel
                 responseSchema: schema,
             }
         });
-    
-        const result = JSON.parse(response.text);
+
+        const result = JSON.parse(response.text!);
         return res.status(200).json(result);
     } catch(e: any) {
         if (e instanceof SyntaxError) {
@@ -445,8 +445,8 @@ async function handleAnalyzeFeedback(ai: GoogleGenAI, payload: any, res: VercelR
             contents: `Analisis kumpulan feedback pelanggan untuk studio foto bernama "Studio 8" berikut ini.\nFeedback:\n${feedbackText}\n\nBerikan analisis terstruktur dalam format JSON. Analisis harus mencakup:\n1. 'overallSentiment': Satu kalimat ringkas tentang sentimen umum dalam Bahasa Indonesia (misal: "Sangat Positif", "Cukup Baik dengan beberapa masukan", "Negatif").\n2. 'positivePoints': Array string berisi poin-poin positif utama yang sering disebut pelanggan.\n3. 'areasForImprovement': Array string berisi kritik atau area utama untuk perbaikan.\n4. 'actionableSuggestions': Array string berisi 2-3 saran konkret yang bisa ditindaklanjuti oleh pemilik studio.\n\nSeluruh respons harus dalam Bahasa Indonesia.`,
             config: { responseMimeType: 'application/json', responseSchema: schema }
         });
-    
-        const result = JSON.parse(response.text);
+
+        const result = JSON.parse(response.text!);
         return res.status(200).json(result);
     } catch(e: any) {
         if (e instanceof SyntaxError) {
@@ -483,8 +483,8 @@ async function handleGenerateForecast(ai: GoogleGenAI, payload: any, res: Vercel
             contents: `Anda adalah seorang analis keuangan ahli untuk sebuah studio foto bernama Studio 8.\nBerdasarkan data pendapatan historis berikut, berikan analisis dan peramalan keuangan.\nData historis (hingga 6 bulan terakhir):\n${historicalDataString}\n\nTugas Anda:\n1.  predictedRevenue: Prediksi pendapatan untuk bulan berikutnya dalam bentuk angka (integer, tanpa format Rupiah atau desimal).\n2.  budgetRecommendation: Berikan rekomendasi alokasi anggaran berdasarkan pendapatan yang diprediksi. Alokasikan ke dalam kategori berikut: 'marketing', 'equipment', 'maintenance', 'savings', 'operation'. Total alokasi harus sama dengan predictedRevenue. Kembalikan dalam bentuk objek dengan nilai numerik (integer).\n3.  aiAlert: Berikan satu insight atau peringatan singkat (maksimal 2 kalimat, dalam Bahasa Indonesia) berdasarkan tren data historis. Misalnya, jika ada penurunan, sarankan sesuatu. Jika ada kenaikan, berikan dorongan.\n\nBerikan output HANYA dalam format JSON yang valid dan terstruktur sesuai skema.`,
             config: { responseMimeType: 'application/json', responseSchema: schema }
         });
-    
-        const result = JSON.parse(response.text);
+
+        const result = JSON.parse(response.text!);
         return res.status(200).json(result);
     } catch(e: any) {
         if (e instanceof SyntaxError) {
@@ -577,8 +577,8 @@ async function handleAnalyzeInternReport(ai: GoogleGenAI, payload: any, res: Ver
             contents: `Analisis laporan harian ini: "${reportContent}". Kategorikan sebagai: produktif / santai / tidak fokus. Berikan satu kalimat motivasi singkat dalam Bahasa Indonesia yang relevan dan positif.`,
             config: { responseMimeType: 'application/json', responseSchema: schema }
         });
-        
-        const result = JSON.parse(response.text);
+
+        const result = JSON.parse(response.text!);
         const insightData = { ...result, date: admin.firestore.FieldValue.serverTimestamp() };
         await db.collection('users').doc(userId).collection('aiInsights').add(insightData);
         return res.status(200).json({ success: true, insight: insightData });
@@ -668,8 +668,8 @@ async function handleGenerateQuizQuestions(ai: GoogleGenAI, payload: any, res: V
             contents: `Buat ${numQuestions} soal kuis pilihan ganda (4 pilihan) tentang "${topic}" dengan kategori "${category}". Pastikan ada satu jawaban yang benar. Berikan penjelasan singkat untuk setiap jawaban yang benar. Untuk setiap pertanyaan, berikan juga "imagePrompt", yaitu deskripsi singkat dalam Bahasa Indonesia untuk membuat gambar yang relevan secara visual dengan pertanyaan tersebut. Jika tidak ada gambar yang relevan, berikan string kosong untuk imagePrompt.\n\nFormat output harus berupa array JSON dari objek, sesuai dengan skema berikut.`,
             config: { responseMimeType: 'application/json', responseSchema: schema }
         });
-    
-        const questions = JSON.parse(response.text);
+
+        const questions = JSON.parse(response.text!);
         return res.status(200).json(questions);
     } catch(e: any) {
         if (e instanceof SyntaxError) {
