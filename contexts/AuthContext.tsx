@@ -14,7 +14,7 @@ interface AuthContextType {
     user: User | null;
     isLoading: boolean;
     error: string | null;
-    login: (emailOrUsername: string, password: string, role?: UserRole | string | null) => Promise<void>;
+    login: (emailOrUsername: string, password: string, allowedRoles?: UserRole[] | null) => Promise<void>;
     loginWithGoogle: (allowedRoles?: UserRole[]) => Promise<void>;
     logout: () => Promise<void>;
     clearError: () => void;
@@ -39,8 +39,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (userDoc.exists()) {
                         const data = userDoc.data() as DocumentData;
                         
-                        // Firestore returns dates as Timestamps, they will be converted to ISO strings
-                        // by our updated logic. Here we convert them back to Date objects for use in the app context.
                         const startDate = data.startDate ? new Date(data.startDate) : undefined;
                         const endDate = data.endDate ? new Date(data.endDate) : undefined;
                         
@@ -78,7 +76,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return () => unsubscribe();
     }, []);
 
-    const login = async (emailOrUsername: string, password: string, role?: UserRole | string | null) => {
+    const login = async (emailOrUsername: string, password: string, allowedRoles?: UserRole[] | null) => {
         setError(null);
         setIsLoading(true);
         try {
@@ -95,14 +93,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const firebaseUser = userCredential.user;
-            if (firebaseUser && role) {
+            
+            // LOGIKA VALIDASI PERAN YANG DIPERBARUI
+            if (firebaseUser && allowedRoles && allowedRoles.length > 0) {
                 const userDocRef = doc(db, 'users', firebaseUser.uid);
                 const userDoc = await getDoc(userDocRef);
                 if (userDoc.exists()) {
                     const userData = userDoc.data() as Omit<User, 'id'>;
-                    if (userData.role !== role) {
+                    
+                    // Mengecek apakah role pengguna ADA DI DALAM array yang diizinkan
+                    if (!allowedRoles.includes(userData.role)) { 
                         await signOut(auth);
-                        throw new Error(`Akun ini terdaftar sebagai ${userData.role}, bukan ${role}.`);
+                        throw new Error(`Akun ini terdaftar sebagai ${userData.role}. Hanya peran ${allowedRoles.join(' atau ')} yang diizinkan.`);
                     }
                 }
             }
@@ -134,13 +136,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             if (allowedRoles && allowedRoles.length > 0) {
-            const userData = userDoc.data() as Omit<User, 'id'>;
-
-             // INI ADALAH PENYEBABNYA (dan ini sudah benar)
-            if (!allowedRoles.includes(userData.role)) { 
-                await signOut(auth); // <-- Anda ditendang keluar
-                throw new Error(`Akun ini terdaftar sebagai ${userData.role}. Hanya peran ${allowedRoles.join(' atau ')} yang diizinkan.`);
-             }
+                 const userData = userDoc.data() as Omit<User, 'id'>;
+                 if (!allowedRoles.includes(userData.role)) {
+                    await signOut(auth);
+                    throw new Error(`Akun ini terdaftar sebagai ${userData.role}. Hanya peran ${allowedRoles.join(' atau ')} yang diizinkan.`);
+                 }
             }
         } catch (err: any) {
             let errorMessage = err.message || 'Gagal masuk dengan Google.';

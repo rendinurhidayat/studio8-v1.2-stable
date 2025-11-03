@@ -15,7 +15,8 @@ const roles: { name: SelectedRole; icon: React.ReactNode; description: string }[
     { name: 'Internship', icon: <Briefcase className="w-6 h-6" />, description: 'Akses absensi & laporan.' },
 ];
 
-const StaffAdminLogin: React.FC<{ role: 'Admin' | 'Staff' }> = ({ role }) => {
+// KOMPONEN INI SEKARANG MENANGANI SEMUA PERAN
+const StaffAdminLogin: React.FC<{ role: 'Admin' | 'Staff' | 'Internship' }> = ({ role }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -27,14 +28,37 @@ const StaffAdminLogin: React.FC<{ role: 'Admin' | 'Staff' }> = ({ role }) => {
         setPassword('');
     }, [role, clearError]);
 
+    // FUNGSI INI DIPERBARUI
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!username || !password) return;
-        await login(username, password, role as UserRole);
+
+        // Tentukan peran yang diizinkan berdasarkan 'role' prop
+        let allowedRoles: UserRole[] = [];
+        if (role === 'Admin') {
+            allowedRoles = [UserRole.Admin];
+        } else if (role === 'Staff') {
+            allowedRoles = [UserRole.Staff];
+        } else if (role === 'Internship') {
+            allowedRoles = [UserRole.AnakMagang, UserRole.AnakPKL];
+        }
+
+        await login(username, password, allowedRoles);
     };
     
+    // FUNGSI INI JUGA DIPERBARUI
     const handleGoogleLogin = async () => {
-        await loginWithGoogle([role as UserRole]);
+        // Tentukan peran yang diizinkan berdasarkan 'role' prop
+        let allowedRoles: UserRole[] = [];
+        if (role === 'Admin') {
+            allowedRoles = [UserRole.Admin];
+        } else if (role === 'Staff') {
+            allowedRoles = [UserRole.Staff];
+        } else if (role === 'Internship') {
+            allowedRoles = [UserRole.AnakMagang, UserRole.AnakPKL];
+        }
+        
+        await loginWithGoogle(allowedRoles);
     };
 
     return (
@@ -77,31 +101,7 @@ const StaffAdminLogin: React.FC<{ role: 'Admin' | 'Staff' }> = ({ role }) => {
     );
 };
 
-const InternLogin: React.FC = () => {
-    const { loginWithGoogle, error: authError, isLoading, clearError } = useAuth();
-    
-    useEffect(() => {
-        clearError();
-    }, [clearError]);
-
-    const handleGoogleLogin = async () => {
-        await loginWithGoogle([UserRole.AnakMagang, UserRole.AnakPKL]);
-    };
-
-    return (
-        <div className="space-y-6 text-center">
-            <h1 className="text-3xl font-bold text-primary">Intern Dashboard</h1>
-            <p className="text-muted">Login dengan akun Google yang telah didaftarkan oleh admin untuk mengakses dasbor magang Anda.</p>
-            {authError && <p className="text-sm text-error bg-error/10 p-3 rounded-lg">{authError}</p>}
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="button" disabled={isLoading} onClick={handleGoogleLogin} className="w-full flex justify-center items-center py-3 px-4 border text-sm font-medium rounded-lg hover:bg-base-100">
-                {isLoading ? <Loader2 className="animate-spin" /> : <>
-                    <svg className="w-5 h-5 mr-3" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C42.022,35.136,44,30.022,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
-                    Masuk dengan Google
-                </>}
-            </motion.button>
-        </div>
-    );
-};
+// KOMPONEN InternLogin TELAH DIHAPUS
 
 const RoleSelectorPage = () => {
     const { user } = useAuth();
@@ -119,11 +119,12 @@ const RoleSelectorPage = () => {
         return <Navigate to={dashboardPath} />;
     }
 
+    // FUNGSI INI DIPERBARUI
     const renderLoginContent = () => {
         switch (selectedRole) {
             case 'Admin': return <StaffAdminLogin role="Admin" />;
             case 'Staff': return <StaffAdminLogin role="Staff" />;
-            case 'Internship': return <InternLogin />;
+            case 'Internship': return <StaffAdminLogin role="Internship" />; // Menggunakan StaffAdminLogin
             default: return null;
         }
     };
