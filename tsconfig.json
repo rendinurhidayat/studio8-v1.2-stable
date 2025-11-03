@@ -15,9 +15,21 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["*"]
+    }
   },
-  "include": ["vite.config.ts", "**/*.ts", "**/*.tsx", "types.ts", "api/**/*.ts"],
-  "exclude": ["node_modules", "dist", "api", ".vercel", "**/*.d.ts"],
+  "include": [
+    "vite.config.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "types.ts",
+    "lib/**/*.ts",
+    "api/**/*.ts",
+    "env.d.ts"
+  ],
+  "exclude": ["node_modules", "dist", ".vercel", "**/*.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

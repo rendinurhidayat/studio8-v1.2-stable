@@ -6,7 +6,18 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["*"]
+    },
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "api/**/*.ts","types.ts","api", "lib", "env.d.ts"]
+  "include": [
+    "next-env.d.ts",
+    "api/**/*.ts",
+    "lib/**/*.ts",
+    "types.ts",
+    "env.d.ts"
+  ],
+  "exclude": ["node_modules"]
 }
