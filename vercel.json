@@ -23,5 +23,6 @@
         "api/users.ts": {
             "maxDuration": 30
         }
-    }
+    },
+    "buildCommand": "tsc --noEmit && next build"
 }
