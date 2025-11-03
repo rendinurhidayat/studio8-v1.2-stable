@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "build",
+    "declaration": false,
+    "isolatedModules": false
+  },
+  "include": ["api/**/*.ts", "lib/**/*.ts"]
+}
