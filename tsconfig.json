@@ -29,7 +29,7 @@
     "lib/**/*.ts",
     "api/**/*.ts",
     "env.d.ts"
-  ],
+, "lib/firebase-admin.js"  ],
   "exclude": ["node_modules", "dist", ".vercel", "**/*.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

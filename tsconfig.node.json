@@ -18,6 +18,6 @@
     "lib/**/*.ts",
     "types.ts",
     "env.d.ts"
-  ],
+, "lib/firebase-admin.js"  ],
   "exclude": ["node_modules"]
 }
