@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Modal from '../common/Modal';
 import { Crop, ZoomIn, ZoomOut, Move, Check, RotateCcw } from 'lucide-react';
@@ -35,37 +34,38 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // 1. Bersihkan canvas dan beri latar belakang gelap
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#2d2d2d'; // Latar belakang gelap jika gambar tidak penuh
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 2. Terapkan pan & zoom
     ctx.save();
     ctx.translate(canvas.width / 2 + pan.x, canvas.height / 2 + pan.y);
     ctx.scale(zoom, zoom);
+    
+    // 3. Gambar gambar (berpusat)
     ctx.drawImage(image, -image.width / 2, -image.height / 2, image.width, image.height);
     ctx.restore();
     
-    // Draw semi-transparent overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Carve out the crop area
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = 'source-over';
-
-    // Draw safe zone guide
+    // 4. Gambar "safe zone" guide
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.setLineDash([5, 5]);
     ctx.lineWidth = 1;
     const safeZonePadding = 0.05; // 5% padding
-    ctx.strokeRect(canvas.width * safeZonePadding, canvas.height * safeZonePadding, canvas.width * (1 - safeZonePadding * 2), canvas.height * (1 - safeZonePadding * 2));
+    ctx.strokeRect(
+        canvas.width * safeZonePadding, 
+        canvas.height * safeZonePadding, 
+        canvas.width * (1 - safeZonePadding * 2), 
+        canvas.height * (1 - safeZonePadding * 2)
+    );
     ctx.setLineDash([]);
-
   }, [pan, zoom]);
 
   useEffect(() => {
     if (!imageSrc) return;
     const image = imageRef.current;
-    image.crossOrigin = "anonymous"; // Handle potential CORS issues if loading from URL
+    image.crossOrigin = "anonymous"; // Handle potential CORS
     image.src = imageSrc;
     image.onload = () => {
       const canvas = canvasRef.current;
@@ -87,11 +87,12 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
       setPan({ x: 0, y: 0 }); // Reset pan
       draw();
     };
-  }, [imageSrc, aspectRatio]);
+  }, [imageSrc, aspectRatio]); // 'draw' di-exclude dari dependencies agar tidak loop
 
-  useEffect(() => {
+   useEffect(() => {
+     // Panggil draw setiap kali pan atau zoom berubah
     draw();
-  }, [draw]);
+  }, [draw]); // 'draw' adalah useCallback, jadi aman
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsPanning(true);
@@ -114,35 +115,42 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     const image = imageRef.current;
     if (!canvas || !image.src) return;
 
-    // Create a new canvas with the final dimensions
+    // Buat kanvas output
     const outputCanvas = document.createElement('canvas');
-    const outputWidth = 800; // Standard width for uploads
+    const outputWidth = 800; // Tetapkan lebar standar
     outputCanvas.width = outputWidth;
     outputCanvas.height = outputWidth / aspectRatio;
     const outputCtx = outputCanvas.getContext('2d');
     if (!outputCtx) return;
 
-    // Calculate the source region from the original image
-    const scale = image.width / (canvas.width / zoom);
-    const sourceX = (image.width / 2) - (pan.x * scale);
-    const sourceY = (image.height / 2) - (pan.y * scale);
-    const sourceWidth = outputCanvas.width * scale;
-    const sourceHeight = outputCanvas.height * scale;
+    // Kalkulasi WYSIWYG (What You See Is What You Get)
     
+    // 1. Tentukan area sumber (di gambar asli) yang terlihat di kanvas
+    const sourceWidth = canvas.width / zoom;
+    const sourceHeight = canvas.height / zoom;
+    
+    // 2. Hitung titik top-left dari area yang terlihat
+    const sourceX = (image.width / 2) - (canvas.width / 2 + pan.x) / zoom;
+    const sourceY = (image.height / 2) - (canvas.height / 2 + pan.y) / zoom;
+    
+    // 3. Gambar area sumber itu ke kanvas output
     outputCtx.drawImage(
       image,
-      sourceX - (sourceWidth / 2),
-      sourceY - (sourceHeight / 2),
-      sourceWidth,
-      sourceHeight,
-      0, 0, outputCanvas.width, outputCanvas.height
+      sourceX,          // Titik X di gambar asli
+      sourceY,          // Titik Y di gambar asli
+      sourceWidth,      // Lebar area di gambar asli
+      sourceHeight,     // Tinggi area di gambar asli
+      0, 0,             // Gambar ke kanvas output (mulai dari 0,0)
+      outputCanvas.width, // Lebar target di kanvas output
+      outputCanvas.height // Tinggi target di kanvas output
     );
 
+    // 4. Simpan sebagai Blob
     outputCanvas.toBlob(blob => {
       if (blob) {
         onSave(blob);
       }
-    }, 'image/jpeg', 0.8);
+    }, 'image/jpeg', 0.8); // Kualitas 80%
   };
   
   const resetAdjustments = () => {
