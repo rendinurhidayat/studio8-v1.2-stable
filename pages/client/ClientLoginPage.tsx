@@ -47,7 +47,7 @@ const PublicCalendarPage = () => {
         const dates = new Set<string>();
         bookings.forEach(booking => {
             // Store date as YYYY-MM-DD string for easy lookup
-            dates.add(format(booking.bookingDate, 'yyyy-MM-dd'));
+            dates.add(format(new Date(booking.bookingDate), 'yyyy-MM-dd'));
         });
         return dates;
     }, [bookings]);
@@ -69,7 +69,7 @@ const PublicCalendarPage = () => {
     const events = useMemo(() => bookings.map(booking => ({
         title: 'Booked',
         start: booking.bookingDate,
-        end: new Date(booking.bookingDate.getTime() + 60 * 60 * 1000), // 1 hour session
+        end: new Date(new Date(booking.bookingDate).getTime() + 60 * 60 * 1000), // 1 hour session
     })), [bookings]);
     
     const eventPropGetter = (event: any) => {

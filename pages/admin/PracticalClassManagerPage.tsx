@@ -67,7 +67,7 @@ const PracticalClassManagerPage = () => {
             await createPracticalClass({
                 topic: formData.topic,
                 description: formData.description,
-                classDate: new Date(formData.classDate),
+                classDate: new Date(formData.classDate).toISOString(),
                 mentorName: formData.mentorName,
                 maxParticipants: Number(formData.maxParticipants),
                 registeredInternIds: [],
@@ -107,7 +107,7 @@ const PracticalClassManagerPage = () => {
                         </div>
                         <p className="text-sm text-muted mt-2 flex-grow">{cls.description}</p>
                         <div className="text-xs text-muted mt-4 pt-4 border-t space-y-2">
-                            <div className="flex items-center gap-2"><Clock size={14}/> {format(cls.classDate, 'd MMM yyyy, HH:mm', { locale: id })}</div>
+                            <div className="flex items-center gap-2"><Clock size={14}/> {format(new Date(cls.classDate), 'd MMM yyyy, HH:mm', { locale: id })}</div>
                             <div className="flex items-center gap-2"><UserIcon size={14}/> Mentor: {cls.mentorName}</div>
                             <div className="flex items-center gap-2"><Users size={14}/> {cls.registeredInternIds.length} / {cls.maxParticipants} Peserta</div>
                         </div>

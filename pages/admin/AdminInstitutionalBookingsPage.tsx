@@ -62,7 +62,7 @@ const ManageBookingModal: React.FC<{
             setIsSaving(true);
             const dataToSave: Partial<Booking> = { ...formData };
             if (dataToSave.dueDate) {
-                dataToSave.dueDate = new Date(dataToSave.dueDate);
+                dataToSave.dueDate = new Date(dataToSave.dueDate).toISOString();
             }
             if(dataToSave.totalPrice) {
                 dataToSave.totalPrice = Number(dataToSave.totalPrice);
@@ -149,7 +149,7 @@ const AdminInstitutionalBookingsPage = () => {
                         {bookings.map(booking => (
                             <tr key={booking.id} className="hover:bg-gray-50 border-b">
                                 <td className="px-5 py-4"><p className="font-semibold">{booking.institutionName}</p><p className="text-xs text-muted">{booking.picName} ({booking.picContact})</p></td>
-                                <td className="px-5 py-4 text-sm">{format(booking.bookingDate, 'd MMM yyyy, HH:mm', { locale: id })}</td>
+                                <td className="px-5 py-4 text-sm">{format(new Date(booking.bookingDate), 'd MMM yyyy, HH:mm', { locale: id })}</td>
                                 <td className="px-5 py-4 text-sm">{booking.package?.name || 'Belum diatur'}</td>
                                 <td className="px-5 py-4 text-sm font-semibold">Rp {(booking.totalPrice || 0).toLocaleString('id-ID')}</td>
                                 <td className="px-5 py-4 text-center"><StatusBadge status={booking.bookingStatus} /></td>

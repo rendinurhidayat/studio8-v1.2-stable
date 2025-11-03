@@ -74,7 +74,7 @@ const PracticalClassPage = () => {
                                 <h3 className="font-bold text-lg text-primary">{cls.topic}</h3>
                                 <p className="text-sm text-muted mt-2 flex-grow">{cls.description}</p>
                                 <div className="text-xs text-muted mt-4 pt-4 border-t space-y-2">
-                                    <div className="flex items-center gap-2"><Clock size={14}/> {format(cls.classDate, 'eeee, d MMM yyyy, HH:mm', { locale: id })}</div>
+                                    <div className="flex items-center gap-2"><Clock size={14}/> {format(new Date(cls.classDate), 'eeee, d MMM yyyy, HH:mm', { locale: id })}</div>
                                     <div className="flex items-center gap-2"><User size={14}/> Mentor: {cls.mentorName}</div>
                                     <div className="flex items-center gap-2"><Users size={14}/> Kuota: {cls.registeredInternIds.length} / {cls.maxParticipants}</div>
                                 </div>
