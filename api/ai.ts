@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI, Type, GenerateContentResponse } from '@google/genai';
 import admin from 'firebase-admin';
 import type { ActivityLog } from '../types';
-import { initFirebaseAdmin } from './lib/firebase-admin';
+import { initFirebaseAdmin } from '../lib/firebase-admin';
 
 
 // --- Main Handler ---
