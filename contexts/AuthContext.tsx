@@ -134,11 +134,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             if (allowedRoles && allowedRoles.length > 0) {
-                 const userData = userDoc.data() as Omit<User, 'id'>;
-                 if (!allowedRoles.includes(userData.role)) {
-                    await signOut(auth);
-                    throw new Error(`Akun ini terdaftar sebagai ${userData.role}. Hanya peran ${allowedRoles.join(' atau ')} yang diizinkan.`);
-                 }
+            const userData = userDoc.data() as Omit<User, 'id'>;
+
+             // INI ADALAH PENYEBABNYA (dan ini sudah benar)
+            if (!allowedRoles.includes(userData.role)) { 
+                await signOut(auth); // <-- Anda ditendang keluar
+                throw new Error(`Akun ini terdaftar sebagai ${userData.role}. Hanya peran ${allowedRoles.join(' atau ')} yang diizinkan.`);
+             }
             }
         } catch (err: any) {
             let errorMessage = err.message || 'Gagal masuk dengan Google.';

@@ -115,42 +115,58 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     const image = imageRef.current;
     if (!canvas || !image.src) return;
 
-    // Buat kanvas output
+    // --- AWAL PERBAIKAN ---
+
+    // 1. Dapatkan resolusi NATIVE (asli) dari area yang di-crop
+    const nativeCropWidth = canvas.width / zoom;
+    const nativeCropHeight = canvas.height / zoom;
+    const sourceX = (image.width / 2) - (canvas.width / 2 + pan.x) / zoom;
+    const sourceY = (image.height / 2) - (canvas.height / 2 + pan.y) / zoom;
+
+    // 2. Tentukan Resolusi Output (dengan Batas Atas)
+    const MAX_WIDTH = 1920; // Atur batas atas resolusi (misal: 1920px HD)
+    
+    let outputWidth = nativeCropWidth;
+    let outputHeight = nativeCropHeight;
+
+    // 3. Jika crop aslinya (native) lebih besar dari batas,
+    // kita kecilkan (downscale) ke MAX_WIDTH agar file tidak terlalu besar.
+    if (nativeCropWidth > MAX_WIDTH) {
+      outputWidth = MAX_WIDTH;
+      outputHeight = MAX_WIDTH / aspectRatio;
+    }
+    
+    // Jika nativeCropWidth lebih kecil (misal 500px), maka outputWidth
+    // akan tetap 500px. KITA TIDAK MELAKUKAN UPSCALING.
+    // Inilah yang menghilangkan "burik".
+
+    // 4. Buat kanvas output dengan resolusi yang sudah dihitung
     const outputCanvas = document.createElement('canvas');
-    const outputWidth = 800; // Tetapkan lebar standar
     outputCanvas.width = outputWidth;
-    outputCanvas.height = outputWidth / aspectRatio;
+    outputCanvas.height = outputHeight;
     const outputCtx = outputCanvas.getContext('2d');
     if (!outputCtx) return;
 
-    // Kalkulasi WYSIWYG (What You See Is What You Get)
-    
-    // 1. Tentukan area sumber (di gambar asli) yang terlihat di kanvas
-    const sourceWidth = canvas.width / zoom;
-    const sourceHeight = canvas.height / zoom;
-    
-    // 2. Hitung titik top-left dari area yang terlihat
-    const sourceX = (image.width / 2) - (canvas.width / 2 + pan.x) / zoom;
-    const sourceY = (image.height / 2) - (canvas.height / 2 + pan.y) / zoom;
-    
-    // 3. Gambar area sumber itu ke kanvas output
+    // 5. Gambar area crop asli ke kanvas output
     outputCtx.drawImage(
       image,
-      sourceX,          // Titik X di gambar asli
-      sourceY,          // Titik Y di gambar asli
-      sourceWidth,      // Lebar area di gambar asli
-      sourceHeight,     // Tinggi area di gambar asli
-      0, 0,             // Gambar ke kanvas output (mulai dari 0,0)
-      outputCanvas.width, // Lebar target di kanvas output
-      outputCanvas.height // Tinggi target di kanvas output
+      sourceX,          // Ambil dari source X asli
+      sourceY,          // Ambil dari source Y asli
+      nativeCropWidth,  // Lebar area crop asli
+      nativeCropHeight, // Tinggi area crop asli
+      0, 0,             // Gambar ke kanvas output
+      outputWidth,      // Sesuaikan ke lebar output
+      outputHeight      // Sesuaikan ke tinggi output
     );
 
-    // 4. Simpan sebagai Blob
+    // 6. Simpan sebagai Blob dengan KUALITAS LEBIH TINGGI
     outputCanvas.toBlob(blob => {
       if (blob) {
         onSave(blob);
       }
-    }, 'image/jpeg', 0.8); // Kualitas 80%
+    }, 'image/jpeg', 1); // <-- Kualitas dinaikkan ke 100%
+
+    // --- AKHIR PERBAIKAN ---
   };
   
   const resetAdjustments = () => {
