@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite && next dev",
-    "build": "tsc -p tsconfig.build.json && next build",
+    "build": "tsc && vite build && cp -r lib dist/lib",
     "start": "vite preview && next start",
     "preview": "vite preview"
   },
