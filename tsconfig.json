@@ -1,22 +1,23 @@
 {
   "compilerOptions": {
-    "composite": true,
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": false,
     "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "types": ["node"]
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client", "node"]
   },
-  "include": [
-    "vite.config.ts",
-    "api/**/*.ts",
-    "types.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.d.ts",
-    ".vercel"
-  ]
+  "include": ["vite.config.ts", "**/*.ts", "**/*.tsx", "types.ts", "api/**/*.ts"],
+  "exclude": ["node_modules", "dist", "api", ".vercel", "**/*.d.ts"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }
